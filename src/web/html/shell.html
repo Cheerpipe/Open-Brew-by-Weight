@@ -627,12 +627,10 @@
         >
       </footer>
     </div>
-    <dialog id="confirmDialog">
+    <dialog id="confirmDialog" class="sheetDialog" aria-labelledby="confirmText">
+      <div class="sheetGrab"><i aria-hidden="true"></i></div>
       <form method="dialog">
         <p id="confirmText"></p>
-        <label id="confirmOptionRow" hidden
-          ><input id="confirmOption" type="checkbox" /> <span id="confirmOptionText"></span
-        ></label>
         <div class="btnBar">
           <button class="btnGlyph" type="submit" value="cancel">
             <span class="t">{{webui:shell.cancel}}</span></button
@@ -642,7 +640,8 @@
         </div>
       </form>
     </dialog>
-    <dialog id="pairDialog" aria-labelledby="pairTitle">
+    <dialog id="pairDialog" class="sheetDialog" aria-labelledby="pairTitle">
+      <div class="sheetGrab"><i aria-hidden="true"></i></div>
       <h2 id="pairTitle">{{webui:shell.pair_title}}</h2>
       <p>{{webui:shell.pair_text}}</p>
       <p id="pairCode" class="pairCode"></p>

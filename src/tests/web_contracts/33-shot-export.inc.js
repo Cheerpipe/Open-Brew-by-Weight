@@ -216,7 +216,7 @@
       get() {return this._t ?? this.children.map((c) => c.textContent).join('');},
       set(v) {this._t = v;}});
     return e;
-  }}, formatShotTime: () => 'today', setEmptyState: (id, text) => Object.assign(dom[id],
+  }}, sheetDialog: (d) => d, formatShotTime: () => 'today', setEmptyState: (id, text) => Object.assign(dom[id],
     {textContent: text || '', hidden: !text})});
   const interrupted = {...trace, flags: {...trace.flags, interrupted: true, decisionsTruncated: true},
     counters: {...trace.counters, decisionsDropped: 4}};
@@ -506,16 +506,19 @@
   assert.ok(!codeIncludes(viewJs.history, 'btnGlyph btnDanger'));
   assert.ok(codeIncludes(viewJs.history, 'btn.onclick = () => entryMenu.open(btn, r)'));
   assert.ok(codeIncludes(rawViewJs.history, 'deleteItem(__WEBUI_TEXT__("history.delete_entry"), () => deleteOneHistory(r), __WEBUI_TEXT__("runtime.delete_this_history_record"),)'));
-  // On a phone every record menu rises as the shared bottom sheet; wider, it
-  // stays anchored to its trigger. A delete is confirmed once, by the menu:
-  // in the sheet itself on a phone, with the confirm dialog elsewhere.
+  // On a phone every record menu rises in the runtime's page sheet; wider,
+  // it stays anchored to its trigger. A delete is confirmed once, by the
+  // menu: in the sheet itself on a phone, with the confirm dialog elsewhere.
   const popup = blockAt(viewJs.records, 'function createPopup(');
   assert.ok(codeIncludes(popup, 'const narrow = matchMedia("(width < 700px)")') &&
       codeIncludes(popup, 'if (narrow.matches) return openSheet(...args);') &&
-      codeIncludes(popup, 'R.showSheet(s.box, s.backdrop, true)') &&
+      codeIncludes(popup, 'const s = R.openPageSheet(label, done),') &&
+      codeIncludes(popup, 'if (mode === "sheet") return R.closePageSheet(focus);') &&
       codeIncludes(popup, 'narrow.addEventListener("change", () => close())'));
-  assert.ok(codeIncludes(blockAt(viewJs.records, 'function recordSheet('),
-      'R.sheetGrip(box, [sheet.grab], () => sheetMenu?.close(true))'));
+  const pageSheet = blockAt(runtimeJs, 'function openPageSheet(');
+  assert.ok(codeIncludes(pageSheet, 'sheetGrip(box, [pageSheet.grab], () => closePageSheet(true))') &&
+      codeIncludes(pageSheet, 'backdrop.onclick = () => closePageSheet(true)') &&
+      codeIncludes(pageSheet, 'closePageSheet(); const s = pageSheet;'));
   assert.ok(codeIncludes(blockAt(viewJs.records, 'function actionMenu('),
       ': ui.sheet ? ui.ask(ask, ok, run) : (menu.close(), R.askConfirm(ask, ok, true).then((yes) => yes && run()))'));
   for (const [source, marker] of [[viewJs.stats, 'function deleteOneShot('],

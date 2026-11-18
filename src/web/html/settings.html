@@ -155,35 +155,29 @@
         <div id="presetCards" class="presetCards"></div>
         <small class="fieldHint">{{webui:settings.preset_tap_hint}}</small>
       </div>
-      <dialog id="presetRenameDialog">
-        <form method="dialog" id="presetRenameForm">
+      <dialog
+        id="presetRenameDialog"
+        class="sheetDialog"
+        aria-label="{{webui:runtime.rename_preset_2}}"
+      >
+        <form method="dialog" id="presetRenameForm" novalidate>
+          <div class="sheetGrab">
+            <i aria-hidden="true"></i>
+            <p class="sheetHead" id="presetRenameHead"></p>
+            <button class="sheetAction" type="submit">{{webui:settings.save}}</button>
+          </div>
           <label
             >{{webui:settings.name}}
-            <input id="presetRenameInput" type="text" maxlength="23" required /><small
-              class="fieldHint"
-              >{{webui:settings.preset_name_hint}}</small
-            ></label
+            <input
+              id="presetRenameInput"
+              type="text"
+              maxlength="23"
+              enterkeyhint="done"
+              autocomplete="off"
+              aria-describedby="presetRenameError"
+            /><small class="fieldHint">{{webui:settings.preset_name_hint}}</small></label
           >
-          <div class="btnBar">
-            <button
-              class="btnGlyph"
-              type="submit"
-              title="{{webui:settings.cancel}}"
-              value="cancel"
-              formnovalidate
-            >
-              <span class="g" aria-hidden="true">×</span
-              ><span class="t">{{webui:settings.cancel}}</span></button
-            ><button
-              class="btnGlyph btnInvert"
-              type="submit"
-              title="{{webui:settings.save}}"
-              value="default"
-            >
-              <span class="g" aria-hidden="true">✓</span
-              ><span class="t">{{webui:settings.save}}</span>
-            </button>
-          </div>
+          <p id="presetRenameError" class="fieldError" role="alert" hidden></p>
         </form>
       </dialog>
     </div>

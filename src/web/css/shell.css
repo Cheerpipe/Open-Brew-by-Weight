@@ -303,6 +303,42 @@ body {
   min-width: 0;
 }
 
+/* On a phone a header panel moves into the page sheet (components/sheet.css):
+   it sheds its floating box and its title, which the sheet's head carries,
+   and its rows take a thumb's height. */
+.pageSheet .signalDetails {
+  position: static;
+  width: auto;
+  max-width: none;
+  padding: 0 0.4rem;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 0.95rem;
+}
+
+.pageSheet .signalDetails > strong,
+.pageSheet .quickPanel > header {
+  display: none;
+}
+
+.pageSheet .signalDetails:not(.quickPanel) p {
+  align-items: center;
+  min-height: 3.2rem;
+  margin: 0;
+  border-bottom: 1px solid var(--ln);
+}
+
+.pageSheet .signalDetails:not(.quickPanel) p:last-child {
+  border-bottom: 0;
+}
+
+.pageSheet .qsRow {
+  min-height: 3.4rem;
+  font-size: 0.95rem;
+}
+
 .qsI {
   width: 1.35rem;
   height: 1.35rem;
@@ -1546,6 +1582,14 @@ body.homeAdminActions .view[data-view="home"]:not(.hidden) ~ .pageFooter {
 
 #pairDialog .btnBar {
   justify-content: center;
+}
+
+@media (width < 700px) {
+  .pairCode span {
+    width: 3rem;
+    height: 3.6rem;
+    font-size: 1.9rem;
+  }
 }
 
 /* Cards sit farther from each other than their content sits from their own

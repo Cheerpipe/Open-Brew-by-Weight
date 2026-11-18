@@ -201,8 +201,9 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     !codeIncludes(ui, 'id="presetResetBtn"') ||
     !codeIncludes(ui, 'id="presetDeleteBtn"') ||
     !codeIncludes(ui, 'id="presetRenameDialog"') ||
-    // Cancel must close the dialog even with the required name field empty.
-    !/<button[^>]*value="cancel"[^>]*formnovalidate/.test(partialHtml.settings) ||
+    // The rename sheet checks the name itself, so an empty field never
+    // blocks closing it.
+    !/<form method="dialog" id="presetRenameForm" novalidate>/.test(partialHtml.settings) ||
     !codeIncludes(ui, 'id="homePresetAcc"') ||
     !html.includes('<legend>Presets</legend>') ||
     html.indexOf('id="presetPanel"') > html.indexOf('<legend>Presets <button type="button" id="presetLockButton"') ||

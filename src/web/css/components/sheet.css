@@ -1,7 +1,8 @@
 /* Bottom sheet: a panel that rises from the screen's bottom edge over a
 dimmed page, with a grab handle that drags it closed. Home's quick-weight
-sheet sizes itself in views/preset.css; the Stats and History record menus
-use it on phones, sized to their items. */
+sheet sizes itself in views/preset.css; on phones the page sheet holds the
+record menus and the header panels, sized to their content, and the modal
+dialogs take the same shape. */
 body.sheetOpen {
   overflow: hidden;
 }
@@ -83,14 +84,14 @@ body.sheetOpen {
   margin-bottom: 0.35rem;
 }
 
-/* A record menu's sheet: an optional one-line head over its scrolling items,
-and the confirmation step a destructive item swaps in. */
-.sheetMenu .sheetGrab {
+/* The page sheet: an optional one-line head over its scrolling content, and
+the confirmation step a destructive menu item swaps in. */
+.pageSheet .sheetGrab {
   padding-bottom: 0.55rem;
   border-bottom: 1px solid var(--ln);
 }
 
-.sheetMenu .sheetGrab:has(> .sheetHead:empty):not(:has(> button)) {
+.pageSheet .sheetGrab:has(> .sheetHead:empty):not(:has(> button)) {
   padding-bottom: 0.2rem;
   border-bottom: 0;
 }
@@ -127,7 +128,7 @@ and the confirmation step a destructive item swaps in. */
   color: var(--sf);
 }
 
-.sheetMenu .histFilterReset:disabled {
+.pageSheet .histFilterReset:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -169,4 +170,65 @@ and the confirmation step a destructive item swaps in. */
   border-color: var(--dn);
   background: var(--dn);
   color: var(--sf);
+}
+
+/* The head's own action, such as Save. */
+.sheetAction {
+  min-height: 2.1rem;
+  padding: 0 0.9rem;
+  border: 1.5px solid var(--pri);
+  border-radius: 1.6rem;
+  background: var(--pri);
+  color: var(--on);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* A modal dialog keeps its own centred box on wider screens and rises as a
+bottom sheet on phones, its handle pinned while its content scrolls. */
+.sheetDialog .sheetGrab {
+  display: none;
+}
+
+@media (width < 700px) {
+  .sheetDialog {
+    inset: auto 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(88dvh, 40rem);
+    margin: 0;
+    padding: 0 1rem calc(1rem + env(safe-area-inset-bottom));
+    border: 0;
+    border-top: 1px solid var(--ln);
+    border-radius: 1.35rem 1.35rem 0 0;
+    background: var(--sf);
+    color: var(--fg);
+    box-shadow: 0 -1.1rem 2.6rem rgb(0 0 0 / 30%);
+    transition: transform 0.34s cubic-bezier(0.32, 0.72, 0.32, 1);
+  }
+
+  .sheetDialog[open] {
+    animation: sheetRise 0.34s cubic-bezier(0.32, 0.72, 0.32, 1);
+  }
+
+  .sheetDialog.nodrag {
+    transition: none;
+  }
+
+  .sheetDialog .sheetGrab {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    margin: 0 -1rem 0.4rem;
+    background: var(--sf);
+  }
+}
+
+@keyframes sheetRise {
+  from {
+    transform: translateY(100%);
+  }
 }

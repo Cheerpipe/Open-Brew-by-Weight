@@ -712,6 +712,8 @@ function updateQuickSettings(s = quickStatus) {
   $("quickSignal").hidden = false;
   $("guardSignal").dataset.level = on === QUICK_GUARDS.length ? "all" : on ? "some" : "none";
   $("quickSignal").title = $("quickStatus").textContent = status;
+  if (pageSheet?.body.contains($("quickPanel")))
+    pageSheet.head.replaceChildren(...signalSheetHead($("quickPanel")));
   root.querySelectorAll("[data-quick]").forEach((el) => {
     const k = el.dataset.quick,
       v = k === "brewByWeight" ? String(c.brewByWeight) === el.dataset.value : quickOn(c, k);
@@ -815,15 +817,51 @@ function scaleBatteryText(pct) {
     };
   return level ? pct + "%" + (words[level] ? " · " + words[level] : "") : "";
 }
+// The page sheet's head for a header panel: Quick settings name the stop mode
+// in a pill and the guards' status; the others their title and first value.
+function signalSheetHead(panel) {
+  if (panel.id === "quickPanel") {
+    const manual = $("headerSignals").dataset.mode === "manual",
+      tag = document.createElement("span");
+    tag.className = manual ? "sheetTag muted" : "sheetTag";
+    tag.textContent = manual
+      ? __WEBUI_TEXT__("runtime.quick_manual_mode")
+      : __WEBUI_TEXT__("runtime.quick_by_weight_mode");
+    return [tag, " ", $("quickStatus").textContent];
+  }
+  const value = panel.querySelector("p b")?.textContent;
+  return [
+    panel.querySelector("strong").textContent + (value && value !== "—" ? " · " + value : ""),
+  ];
+}
 function initHeaderSignals() {
   if ($("modeSignal")) buildQuickSettings();
   const buttons = [...document.querySelectorAll(".signalIndicator[aria-controls]")];
-  function close() {
+  let sheetHome = null; // where the panel shown in the page sheet belongs
+  function close(focus) {
     if (uiState.quickDirty) flushEdits(quickAutosave, true);
+    if (sheetHome) closePageSheet(focus);
     for (const button of buttons) {
       $(button.getAttribute("aria-controls")).hidden = true;
       button.setAttribute("aria-expanded", "false");
     }
+  }
+  // On a phone the panel moves into the page sheet and back on close; its
+  // renderers keep updating it by id wherever it is.
+  function openSheet(button, panel) {
+    const label =
+      panel.id === "quickPanel"
+        ? $("modeSignal").dataset.label
+        : $(panel.getAttribute("aria-labelledby")).textContent;
+    const s = openPageSheet(label, (focus) => {
+      sheetHome[0].insertBefore(panel, sheetHome[1]);
+      sheetHome = null;
+      close();
+      if (focus) button.focus();
+    });
+    sheetHome = [panel.parentNode, panel.nextSibling];
+    s.head.replaceChildren(...signalSheetHead(panel));
+    s.body.append(panel);
   }
   for (const button of buttons)
     button.addEventListener("click", () => {
@@ -832,9 +870,10 @@ function initHeaderSignals() {
       close();
       panel.hidden = !open;
       button.setAttribute("aria-expanded", String(open));
+      if (open && narrowSheet()) openSheet(button, panel);
     });
   document.addEventListener("click", (e) => {
-    if (!e.target.closest(".headerSignals")) close();
+    if (!e.target.closest(".headerSignals, .pageSheet")) close();
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
@@ -1649,6 +1688,85 @@ function sheetGrip(sheet, grips, dismiss) {
     },
   };
   for (const grip of grips) pointerDrag(grip, handlers);
+}
+// Below 700 px menus, details and dialogs rise from the screen's bottom edge.
+const narrowSheet = () => matchMedia("(width < 700px)").matches;
+// The page's one bottom sheet for menus and details on phones, built on first
+// use. openPageSheet() closes the previous owner and hands the new one an
+// empty head and body; every way of closing runs that owner's done(focus).
+let pageSheet = null,
+  pageSheetDone = null;
+function openPageSheet(label, done) {
+  if (!pageSheet) {
+    const backdrop = document.createElement("div"),
+      box = document.createElement("section");
+    backdrop.className = "sheetBackdrop";
+    box.className = "sheet pageSheet";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.tabIndex = -1;
+    box.innerHTML =
+      '<div class="sheetGrab"><i aria-hidden="true"></i><p class="sheetHead"></p></div><div class="sheetBody"></div>';
+    backdrop.inert = box.inert = true;
+    document.body.append(backdrop, box);
+    box.getBoundingClientRect(); // laid out closed, so the first open slides in
+    pageSheet = {
+      box,
+      backdrop,
+      grab: box.firstChild,
+      head: box.querySelector(".sheetHead"),
+      body: box.lastChild,
+    };
+    sheetGrip(box, [pageSheet.grab], () => closePageSheet(true));
+    backdrop.onclick = () => closePageSheet(true);
+    box.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      closePageSheet(true);
+    });
+    // Modal: focus that leaves the open sheet returns to it.
+    box.addEventListener("focusout", (e) => {
+      if (pageSheetDone && e.relatedTarget && !box.contains(e.relatedTarget)) box.focus();
+    });
+  }
+  closePageSheet();
+  const s = pageSheet;
+  s.grab.querySelector(":scope > button")?.remove();
+  s.head.replaceChildren();
+  s.body.replaceChildren();
+  s.body.removeAttribute("role");
+  s.body.scrollTop = 0;
+  s.box.setAttribute("aria-label", label);
+  pageSheetDone = done;
+  showSheet(s.box, s.backdrop, true);
+  s.box.focus();
+  return s;
+}
+function closePageSheet(focus) {
+  const done = pageSheetDone;
+  if (!done) return;
+  pageSheetDone = null;
+  showSheet(pageSheet.box, pageSheet.backdrop, false);
+  done(focus);
+}
+// A modal <dialog> that rises as a bottom sheet on phones, set up on its first
+// opening: its grab handle drags it closed, a tap outside closes it unless it
+// must be answered (keep), and it rides on the on-screen keyboard.
+function sheetDialog(d, keep = false) {
+  if (d.dataset.sheet) return d;
+  d.dataset.sheet = 1;
+  sheetGrip(d, [d.querySelector(".sheetGrab")], () => d.close());
+  if (!keep)
+    d.addEventListener("click", (e) => {
+      const r = d.getBoundingClientRect();
+      if (e.target === d && narrowSheet() && e.clientY < r.top) d.close();
+    });
+  const vv = window.visualViewport;
+  vv?.addEventListener("resize", () => {
+    d.style.bottom =
+      d.open && narrowSheet() ? Math.max(0, innerHeight - vv.height - vv.offsetTop) + "px" : "";
+  });
+  return d;
 }
 // Arms a bar-top sentinel so the sticky toolbar after it carries the popup
 // shadow only while detached from its in-flow slot. Re-armed when the
@@ -3575,7 +3693,8 @@ function applyPairingPrompt(access) {
   paintPairExpiry();
   clearInterval(pairTimer);
   pairTimer = setInterval(paintPairExpiry, 1000);
-  if (!dialog.open) dialog.showModal();
+  // A tap outside never dismisses the request: once hidden it cannot come back.
+  if (!dialog.open) sheetDialog(dialog, true).showModal();
 }
 async function decidePairing(allow) {
   const id = pairShownId;
@@ -4409,32 +4528,39 @@ async function saveBrewPreset(patch, okMsg, failMsg) {
     return false;
   }
 }
-function commitRenamePreset(p, name) {
+// Why a preset name cannot be saved, or "" when it can.
+function renameError(p, name) {
   const t = (name || "").trim();
-  if (!t) {
-    message(__WEBUI_TEXT__("runtime.name_is_required"), "error");
-    return;
-  }
-  if (presetState.items.some((x) => x.id !== p.id && x.name === t)) {
-    message(__WEBUI_TEXT__("runtime.name_already_in_use"), "error");
-    return;
-  }
-  command("/api/v1/presets", { action: "rename", id: p.id, name: t });
+  return !t
+    ? __WEBUI_TEXT__("runtime.name_is_required")
+    : presetState.items.some((x) => x.id !== p.id && x.name === t)
+      ? __WEBUI_TEXT__("runtime.name_already_in_use")
+      : "";
 }
+function commitRenamePreset(p, name) {
+  const why = renameError(p, name);
+  if (why) return message(why, "error");
+  command("/api/v1/presets", { action: "rename", id: p.id, name: name.trim() });
+}
+// On a phone the name is edited in a sheet that keeps a refused name open
+// with its reason; wider screens edit it in place on the card.
 function startRenamePreset(p, titleEl) {
-  const isNarrow = window.matchMedia("(max-width:640px)").matches;
-  if (isNarrow && $("presetRenameDialog")) {
-    $("presetRenameInput").value = p.name;
-    $("presetRenameDialog").showModal();
-    $("presetRenameForm").onsubmit = async (ev) => {
+  const d = $("presetRenameDialog");
+  if (d && narrowSheet()) {
+    const input = $("presetRenameInput"),
+      error = $("presetRenameError");
+    $("presetRenameHead").textContent = p.name;
+    input.value = p.name;
+    error.hidden = true;
+    $("presetRenameForm").onsubmit = (ev) => {
       ev.preventDefault();
-      if (ev.submitter && ev.submitter.value === "cancel") {
-        $("presetRenameDialog").close();
-        return;
-      }
-      commitRenamePreset(p, $("presetRenameInput").value);
-      $("presetRenameDialog").close();
+      error.textContent = renameError(p, input.value);
+      error.hidden = !error.textContent;
+      if (!error.hidden) return input.focus();
+      d.close();
+      commitRenamePreset(p, input.value);
     };
+    sheetDialog(d).showModal();
     return;
   }
   if (!titleEl) {
@@ -7696,25 +7822,17 @@ async function startNewCoffee(id = presetState.activeId) {
 }
 // [Cancel][<ok>] confirmation in the shell dialog; resolves true on <ok>,
 // or "option" when the optional, unchecked box was ticked.
-function askConfirm(text, ok, danger = false, option = "") {
-  const d = $("confirmDialog"),
+function askConfirm(text, ok, danger = false) {
+  const d = sheetDialog($("confirmDialog")),
     b = $("confirmOk");
   $("confirmText").textContent = text;
-  $("confirmOptionRow").hidden = !option;
-  $("confirmOptionText").textContent = option;
-  $("confirmOption").checked = false;
   b.firstChild.textContent = ok;
   b.classList.toggle("btnInvert", !danger);
   b.classList.toggle("btnDanger", danger);
   d.returnValue = "";
   d.showModal();
   return new Promise((done) =>
-    d.addEventListener(
-      "close",
-      () =>
-        done(d.returnValue === "ok" && (option && $("confirmOption").checked ? "option" : true)),
-      { once: true },
-    ),
+    d.addEventListener("close", () => done(d.returnValue === "ok"), { once: true }),
   );
 }
 // "Last 10 shots: 28–33 s, median 30.4 s": arrival times since the preset's
@@ -8290,6 +8408,9 @@ export {
   pointerDrag,
   showSheet,
   sheetGrip,
+  openPageSheet,
+  closePageSheet,
+  sheetDialog,
   setStatsRenderers,
   registerStream,
   setSettingsForm,

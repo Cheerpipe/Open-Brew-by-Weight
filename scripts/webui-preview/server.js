@@ -98,8 +98,12 @@ function renderSignals() {
   const runtime = read('src/web/js/runtime.js');
   const start = runtime.indexOf('function updateHeaderSignals('), end = runtime.search(/^let homeBootDone\b/m);
   if (start < 0 || end < start) throw new Error('runtime.js header signal block not found');
-  const content = functionSource(runtime, 'escHtml') + runtime.match(/^const sub = .*$/m)[0] + '\n' +
-      runtime.slice(start, end).replace(/^export /gm, '');
+  // Phones show the panels in the page sheet: its frame and gestures come too.
+  const sheetStart = runtime.indexOf('const narrowSheet ='), sheetEnd = runtime.search(/^\/\/ A modal <dialog>/m);
+  if (sheetStart < 0 || sheetEnd < sheetStart) throw new Error('runtime.js page sheet block not found');
+  const content = ['escHtml', 'pointerDrag', 'showSheet', 'sheetGrip']
+      .map(name => functionSource(runtime, name)).join('') + runtime.slice(sheetStart, sheetEnd) +
+      runtime.match(/^const sub = .*$/m)[0] + '\n' + runtime.slice(start, end).replace(/^export /gm, '');
   return PREVIEW_HEADER_PRELUDE + renderSources([{file: 'src/web/js/runtime.js', type: 'js', content}],
       {language: 'en', allowUnused: true, profile: profile()}).sources[0].content;
 }

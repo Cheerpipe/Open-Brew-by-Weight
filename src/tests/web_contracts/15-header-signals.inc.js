@@ -20,7 +20,8 @@
     ['laMarzoccoRoute', {textContent: '—'}]]);
   const start = runtimeJs.indexOf('function updateHeaderSignals(');
   assert(start >= 0, 'Shared header must render cached signal status');
-  const context = vm.createContext({$: id => elements[id], __LA_MARZOCCO__: true,
+  // Wide screen: the panels stay popovers (phones move them into the page sheet).
+  const context = vm.createContext({$: id => elements[id], __LA_MARZOCCO__: true, narrowSheet: () => false,
     document: {querySelectorAll: () => buttons, querySelector: () => null,
       addEventListener: (name, fn) => {events[name] = fn;}},
     window: {addEventListener: (name, fn) => {events[name] = fn;}},
@@ -245,6 +246,24 @@
   assert.equal(elements.wifiName.textContent, '—');
   assert.equal(elements.wifiDetail.textContent, 'Signal unavailable');
   assert(codeIncludes(appJsSource, 'R.initHeaderSignals();'));
+  // On a phone each panel moves into the page sheet, headed by its context,
+  // and goes back to the header when the sheet closes; the modal dialogs rise
+  // as sheets too, and a pairing request ignores taps outside.
+  const headerInit = blockAt(rawRuntimeJs, 'function initHeaderSignals(');
+  assert(codeIncludes(headerInit, 'if (open && narrowSheet()) openSheet(button, panel);') &&
+      codeIncludes(headerInit, 'sheetHome[0].insertBefore(panel, sheetHome[1]);') &&
+      codeIncludes(headerInit, 'if (sheetHome) closePageSheet(focus);') &&
+      codeIncludes(headerInit, 'if (!e.target.closest(".headerSignals, .pageSheet")) close();'));
+  assert(codeIncludes(rawRuntimeJs, 'if (pageSheet?.body.contains($("quickPanel")))'),
+      'The Quick settings sheet head follows the guards');
+  for (const id of ['confirmDialog', 'pairDialog'])
+    assert(new RegExp(`<dialog id="${id}" class="sheetDialog"[^>]*>\\s*<div class="sheetGrab">`).test(shellHtml), id);
+  assert(/<dialog id="shotTraceDialog" class="sheetDialog"/.test(partialHtml.stats) &&
+      /<dialog\s+id="presetRenameDialog"\s+class="sheetDialog"/.test(rawPartialHtml.settings));
+  assert(codeIncludes(rawRuntimeJs, 'if (!dialog.open) sheetDialog(dialog, true).showModal();') &&
+      codeIncludes(rawRuntimeJs, 'const d = sheetDialog($("confirmDialog")),') &&
+      !rawRuntimeJs.includes('confirmOption') && !shellHtml.includes('confirmOption'),
+      'Confirm drops the unused checkbox; pairing must be answered');
   assert(codeIncludes(rawRuntimeJs, 'applyCommonStatus(s){if(s.connections||s.snapshotStale)updateHeaderSignals(s);'),
       'record-only envelopes must not erase live header signals');
   assert(codeIncludes(rawRuntimeJs, 'noteReachFail(err){clearCupWeights();updateHeaderSignals();'));

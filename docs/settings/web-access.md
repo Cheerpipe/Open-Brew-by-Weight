@@ -115,6 +115,8 @@ Home Assistant asks again):
   the Web UI shows **Home Assistant wants to connect** with the same code.
   Tap **Allow** only if the codes match. The request expires after 2 minutes,
   and it closes on its own if you type the password in Home Assistant instead.
+  On a phone it rises from the bottom of the screen, and a tap outside it
+  doesn't dismiss it, so a stray tap never loses the request.
 
 If Home Assistant was already set up when you turn the password on, it shows
 a "needs reauthentication" notice; answer it the same way. Its entities read

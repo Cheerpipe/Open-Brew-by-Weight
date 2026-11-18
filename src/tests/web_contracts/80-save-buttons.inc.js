@@ -290,7 +290,7 @@
     const els = {};
     const context = vm.createContext({
       $: id => els[id] ??= {dataset: {}, classList: {toggle() {}}, setAttribute() {}, querySelectorAll: () => []},
-      controlsMutable: true, configRevision: 7, presetState: {activeId: 1},
+      controlsMutable: true, configRevision: 7, presetState: {activeId: 1}, pageSheet: null,
       message: m => messages.push(m), setTimeout: () => 0, clearTimeout() {},
       refreshStatus: async () => {context.configRevision = live.revision;},
       command: async (path, payload) => {

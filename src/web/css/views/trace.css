@@ -1,12 +1,44 @@
-/* Shot trace view: the filterable event list */
-#shotTraceDialog {
-  border: 1px solid var(--ln);
-  border-radius: var(--r);
-  padding: 1rem;
-  width: min(48rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  background: var(--sf);
-  color: var(--fg);
+/* Shot trace view: the filterable event list, a centred box on wider
+   screens and on phones a sheet (components/sheet.css) as tall as the
+   screen, its filter pinned while the events scroll. */
+@media (width >= 700px) {
+  #shotTraceDialog {
+    border: 1px solid var(--ln);
+    border-radius: var(--r);
+    padding: 1rem;
+    width: min(48rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    background: var(--sf);
+    color: var(--fg);
+  }
+}
+
+@media (width < 700px) {
+  #shotTraceDialog {
+    height: calc(100dvh - 0.75rem);
+    max-height: none;
+  }
+
+  #shotTraceDialog .sheetGrab {
+    position: static;
+  }
+
+  #shotTraceDialog .traceFilter {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 0.6rem;
+    margin: 0.75rem -1rem 0.5rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--ln);
+    background: var(--sf);
+  }
+
+  #shotTraceDialog .traceFilter :is(.selBox, input) {
+    width: 100%;
+  }
 }
 
 .traceHead {

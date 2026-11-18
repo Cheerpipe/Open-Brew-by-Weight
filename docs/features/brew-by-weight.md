@@ -56,7 +56,9 @@ some are off, and faded when none are on. On a wider screen the shield opens
 up into the six guard icons, so you can see at a glance which one is off.
 Each guard has the same icon and name here as in Settings.
 
-Tap either icon to open the panel. There you can switch between **By weight**
+Tap either icon to open the panel. On a phone it rises from the bottom of the
+screen, with how shots stop and how many guards are on at the top; swipe it
+down or tap outside it to close it. There you can switch between **By weight**
 and **Manual**, and turn each guard on or off. These changes are temporary:
 they apply to your next shots right away but are never saved to the preset or
 to Settings. Picking another preset or restarting the controller always brings

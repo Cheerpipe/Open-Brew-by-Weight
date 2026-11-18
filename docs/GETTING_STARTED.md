@@ -159,7 +159,9 @@ update when reception moves between weak, medium, and strong; the popups show
 the level rather than a fluctuating dBm reading. The scale uses
 your friendly name when set; otherwise it shows the scale's model name when
 recognized, or the name reported over Bluetooth. Tap the same
-icon again, tap outside the popup, or press Escape to close it. When the
+icon again, tap outside the popup, or press Escape to close it. On a phone
+these details rise as a panel from the bottom of the screen instead; swipe it
+down, tap outside it, or press Escape to close it. When the
 whole scale icon fades out, the scale is disconnected. A crossed-out Wi-Fi
 icon means the home network is down. Dim bars or arcs under a visible symbol
 mean a reading is not available yet, or the page cannot refresh it. The Wi-Fi

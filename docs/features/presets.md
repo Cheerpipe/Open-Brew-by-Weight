@@ -141,6 +141,9 @@ afterwards shows the normal Home.
 2. Select **Duplicate** to copy that recipe, or **New** for an Untitled
    preset with the Double · Adaptive values.
 3. Rename the card and edit its settings; each change is saved as you go.
+   On a phone the name opens in a panel from the bottom of the screen: tap
+   **Save**, or swipe the panel down to keep the old name. An empty name or
+   one another preset already uses stays open with the reason.
    Values that conflict with another field are flagged in yellow and saved
    once the conflict is fixed. Shot statistics only count shots made with the
    preset's current window and a target within 1 g, so if you change the

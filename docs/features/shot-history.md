@@ -523,7 +523,9 @@ there for the times a shot does something you did not expect, such as
 stopping late, never stopping by weight, or ending early, so you can see why
 instead of guessing.
 
-Open a shot's **⋯** menu and choose **View trace**. The view shows:
+Open a shot's **⋯** menu and choose **View trace**. On a phone it fills the
+screen from the bottom, with **Show** and **Search** staying in view as you
+scroll. The view shows:
 
 - Every moment something happened, as a list in time order. **Show** narrows
   it to **Decisions**, **Scale and cup** events (tares, cup placed or lifted,

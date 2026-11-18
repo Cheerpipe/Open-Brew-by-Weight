@@ -112,39 +112,9 @@ export function createFilterMenu(buttonId, title, groups, onChange, matches) {
   sync();
   return clear;
 }
-// Below 700 px the record menus rise in one shared bottom sheet
-// (components/sheet.css), built on first use; wider, each anchors to its
-// trigger. sheetMenu is the open sheet's {close, ui}.
-let sheet = null,
-  sheetMenu = null;
-function recordSheet() {
-  if (sheet) return sheet;
-  const backdrop = document.createElement("div"),
-    box = document.createElement("section");
-  backdrop.className = "sheetBackdrop";
-  box.className = "sheet sheetMenu";
-  box.setAttribute("role", "dialog");
-  box.setAttribute("aria-modal", "true");
-  box.tabIndex = -1;
-  box.innerHTML =
-    '<div class="sheetGrab"><i aria-hidden="true"></i><p class="sheetHead"></p></div><div class="sheetBody"></div>';
-  backdrop.inert = box.inert = true;
-  document.body.append(backdrop, box);
-  box.getBoundingClientRect(); // laid out closed, so the first open slides in
-  sheet = {
-    box,
-    backdrop,
-    grab: box.firstChild,
-    head: box.querySelector(".sheetHead"),
-    body: box.lastChild,
-  };
-  R.sheetGrip(box, [sheet.grab], () => sheetMenu?.close(true));
-  // Modal: focus that leaves the open sheet returns to it.
-  box.addEventListener("focusout", (e) => {
-    if (sheetMenu && e.relatedTarget && !box.contains(e.relatedTarget)) box.focus();
-  });
-  return sheet;
-}
+// Below 700 px the record menus rise in the runtime's page sheet; wider,
+// each anchors to its trigger. sheetMenu is the open sheet's {close, ui}.
+let sheetMenu = null;
 // A filter sheet's head: how many records the list holds, none before it loads.
 export const recordCount = (n, one, many) =>
   typeof n !== "number" ? "" : n === 1 ? one : R.sub(many, [n]);
@@ -157,9 +127,9 @@ export const closeRecordSheet = () => sheetMenu?.close();
 // ui.aside() fill its head, and ui.ask() swaps in a confirmation; the head
 // starts as the trigger's data-sheet-head after a data-sheet-tag pill. The
 // panel sits below its trigger (above when that fits better). Either closes
-// by a second click on the trigger, a click elsewhere, Escape, or crossing
-// the breakpoint; the panel also when its trigger leaves the page, the sheet
-// by a drag down.
+// by Escape or crossing the breakpoint; the panel also by a second click on
+// the trigger, a click elsewhere or its trigger leaving the page, the sheet
+// by a drag down or a tap outside.
 function createPopup(label, fill) {
   const narrow = matchMedia("(width < 700px)");
   let panel = null,
@@ -184,18 +154,20 @@ function createPopup(label, fill) {
         innerWidth - panel.offsetWidth - 8,
       ) + "px";
   };
-  const close = (focus) => {
-    if (!mode) return;
-    if (mode === "sheet") {
-      sheetMenu = null;
-      R.showSheet(sheet.box, sheet.backdrop, false);
-    } else panel.hidden = true;
+  const done = (focus) => {
     mode = "";
+    sheetMenu = null;
     anchor.setAttribute("aria-expanded", "false");
     if (focus) anchor.focus();
   };
+  const close = (focus) => {
+    if (mode === "sheet") return R.closePageSheet(focus);
+    if (!mode) return;
+    panel.hidden = true;
+    done(focus);
+  };
   const openSheet = (...args) => {
-    const s = recordSheet(),
+    const s = R.openPageSheet(label, done),
       d = anchor.dataset,
       ui = {
         sheet: true,
@@ -218,21 +190,15 @@ function createPopup(label, fill) {
           no.focus();
         },
       };
-    s.grab.querySelector(":scope > button")?.remove();
     const tag = d.sheetTag && document.createElement("span");
     if (tag) Object.assign(tag, { className: "sheetTag", textContent: d.sheetTag });
     tag?.classList.toggle("muted", !!d.sheetTagMuted);
     ui.head(...(tag ? [tag, " "] : []), d.sheetHead || "");
-    s.box.setAttribute("aria-label", label);
     s.body.setAttribute("role", "menu");
     s.body.setAttribute("aria-label", label);
-    s.body.replaceChildren();
     fill(s.body, ui, ...args);
-    s.body.scrollTop = 0;
     mode = "sheet";
     sheetMenu = { close, ui };
-    R.showSheet(s.box, s.backdrop, true);
-    s.box.focus();
   };
   const open = (trigger, ...args) => {
     const again = mode && anchor === trigger;
@@ -255,12 +221,8 @@ function createPopup(label, fill) {
     panel.tabIndex = -1;
     panel.focus();
   };
-  // The event's path, not contains(): a confirmation step replaces the item
-  // that was clicked before the click reaches the document.
   document.addEventListener("click", (e) => {
-    const path = e.composedPath();
-    if (mode && !path.includes(mode === "sheet" ? sheet.box : panel) && !path.includes(anchor))
-      close(mode === "sheet");
+    if (mode === "panel" && !panel.contains(e.target) && !anchor.contains(e.target)) close();
   });
   document.addEventListener("keydown", (e) => e.key === "Escape" && close(true));
   const reposition = () => mode === "panel" && (anchor.isConnected ? place() : close());
