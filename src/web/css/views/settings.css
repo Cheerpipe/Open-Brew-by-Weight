@@ -683,7 +683,7 @@ summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   grid-template-areas: "dur dur dur actual actual actual" "goal goal err err avgflow avgflow";
-  gap: 0.5rem 0.4rem;
+  gap: 1.25rem 0.4rem;
   align-items: start;
   margin: 0.45rem 0 0.15rem;
 }
