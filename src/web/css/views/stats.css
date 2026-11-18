@@ -2,12 +2,9 @@
   margin-top: 1.35rem;
 }
 
-/* The chart toolbar: one button per choice, each naming the current one;
-labels give way to icons from Bands down (app.js fitBar). */
-#statsChartBar {
-  margin: 1rem 0 0;
-}
-
+/* The chart toolbar, floating at the top of Stats like the Shots one: one
+button per choice, each naming the current one; labels give way to icons
+from Bands down (app.js fitBar). */
 #statsChartBar .g svg {
   width: 1.1rem;
   height: 1.1rem;

@@ -1880,8 +1880,8 @@ if (!css.includes('.btnBar,.presetActions{display:flex;gap:.5rem') ||
     // flex:1 and the 2rem radius come from the base .btnGlyph rule.
     !css.includes('#actionsPanel .btnGlyph{border:1.5px solid var(--ac);background:transparent;color:var(--ac);min-height:3.25rem}') ||
     !css.includes('#actionsPanel .btnGlyph.btnDanger{background:var(--pri);color:var(--on);border-color:var(--pri)}') ||
-    !css.includes('#shotLogPanel .glassBar,#historyPanel .glassBar{') ||
-    !css.includes('#shotLogPanel .glassBar,#historyPanel .glassBar{position:sticky;top:var(--hdr);z-index:6;margin:0 0 .75rem') ||
+    !css.includes('#shotLogPanel .glassBar,#historyPanel .glassBar,#statsChartBar{') ||
+    !css.includes('#shotLogPanel .glassBar,#historyPanel .glassBar,#statsChartBar{position:sticky;top:var(--hdr);z-index:6;margin:0 0 .75rem') ||
     css.includes('#shotLogPanel .btnBar{position:sticky;top:var(--hdr);z-index:6;background:var(--sf);margin:0 0 .65rem;border:1px solid var(--ln);border-radius:var(--r);overflow:hidden}')) {
   throw new Error('Action buttons must be separate with a gap; btnDanger must not share invert fill');
 }

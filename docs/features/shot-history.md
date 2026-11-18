@@ -12,7 +12,8 @@ interface starts or after a dropped connection. From then on the data keeps
 refreshing in the background even while you are elsewhere in the interface, so
 the page always opens instantly with the latest shots.
 
-A toolbar under the averages holds the three chart choices. Each button shows
+A toolbar at the top of Stats holds the three chart choices and stays in view
+while you scroll through the charts. Each button shows
 your current choice; tap it to pick another from its menu. On a narrow screen
 the buttons may show only their icons, still opening the same menus. The first
 chooses how far back Stats looks: **Last 10**, **50**, or **100** shots. The

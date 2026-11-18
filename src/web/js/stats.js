@@ -3363,6 +3363,7 @@ export function init() {
   );
   armListSentinel("shotLogSentinel", loadMoreShots);
   pushedShotRead();
+  R.armStickyBar("statsStickySentinel");
   R.armStickyBar("shotStickySentinel");
   renderStatsDurChart();
 }

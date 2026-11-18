@@ -46,45 +46,7 @@
 <fieldset id="shotStatsPanel">
   <legend>{{webui:stats.stats}}</legend>
   <div class="panelWrap">
-    <div class="shotCard">
-      <div class="shotDur">
-        <svg
-          class="shotMetricIcon"
-          width="1.85rem"
-          height="1.85rem"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <use href="#shotMetricTime" /></svg
-        ><strong>{{webui:stats.avg_time}}</strong>
-        <div id="statsAvgDur">—</div>
-      </div>
-      <div class="shotActual">
-        <svg
-          class="shotMetricIcon"
-          width="1.85rem"
-          height="1.85rem"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <use href="#shotMetricYield" /></svg
-        ><strong>{{webui:stats.avg_yield}}</strong>
-        <div id="statsAvgWeight">—</div>
-      </div>
-      <div>
-        <strong>{{webui:stats.daily_shots}}</strong>
-        <div id="statsAvgDaily">—</div>
-      </div>
-      <div>
-        <strong>{{webui:stats.avg_error}}</strong>
-        <div id="statsAvgErr">—</div>
-      </div>
-      <div>
-        <strong>{{webui:stats.avg_flow}}</strong>
-        <div id="statsAvgFlow">—</div>
-      </div>
-    </div>
-    <p id="statsHeaderNote" class="fieldHint" role="status" hidden></p>
+    <div id="statsStickySentinel" class="stickyBarSentinel" aria-hidden="true"></div>
     <div
       id="statsChartBar"
       class="btnBar glassBar"
@@ -138,6 +100,45 @@
         ><svg class="caret" aria-hidden="true"><use href="#statsIcoCaret" /></svg>
       </button>
     </div>
+    <div class="shotCard">
+      <div class="shotDur">
+        <svg
+          class="shotMetricIcon"
+          width="1.85rem"
+          height="1.85rem"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <use href="#shotMetricTime" /></svg
+        ><strong>{{webui:stats.avg_time}}</strong>
+        <div id="statsAvgDur">—</div>
+      </div>
+      <div class="shotActual">
+        <svg
+          class="shotMetricIcon"
+          width="1.85rem"
+          height="1.85rem"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <use href="#shotMetricYield" /></svg
+        ><strong>{{webui:stats.avg_yield}}</strong>
+        <div id="statsAvgWeight">—</div>
+      </div>
+      <div>
+        <strong>{{webui:stats.daily_shots}}</strong>
+        <div id="statsAvgDaily">—</div>
+      </div>
+      <div>
+        <strong>{{webui:stats.avg_error}}</strong>
+        <div id="statsAvgErr">—</div>
+      </div>
+      <div>
+        <strong>{{webui:stats.avg_flow}}</strong>
+        <div id="statsAvgFlow">—</div>
+      </div>
+    </div>
+    <p id="statsHeaderNote" class="fieldHint" role="status" hidden></p>
     <div id="statsDurChart"></div>
     <div id="statsConsistency" class="ruleChart" hidden></div>
     <div id="statsCutAccuracy" class="ruleChart" hidden></div>

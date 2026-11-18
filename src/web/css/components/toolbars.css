@@ -12,7 +12,8 @@
 }
 
 #shotLogPanel .glassBar,
-#historyPanel .glassBar {
+#historyPanel .glassBar,
+#statsChartBar {
   position: sticky;
   top: var(--hdr);
   z-index: 6;
@@ -25,7 +26,8 @@
 }
 
 #shotLogPanel .glassBar.isStuck,
-#historyPanel .glassBar.isStuck {
+#historyPanel .glassBar.isStuck,
+#statsChartBar.isStuck {
   box-shadow: var(--popSh);
 }
 
