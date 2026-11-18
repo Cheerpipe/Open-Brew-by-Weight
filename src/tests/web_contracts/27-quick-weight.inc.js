@@ -11,8 +11,8 @@
 
   qwAssert.ok(!qwHomeHtml.includes('qeditPen') && !runtimeJs.includes('shotGoalEdit'),
     'The hero card must not offer a target-weight pencil');
-  qwAssert.ok(/<div id="qwBackdrop" class="qwBackdrop" inert>/.test(qwHomeHtml) &&
-      /<section id="qwSheet" class="qwSheet" role="dialog" aria-modal="true"/.test(qwHomeHtml),
+  qwAssert.ok(/<div id="qwBackdrop" class="sheetBackdrop" inert>/.test(qwHomeHtml) &&
+      /<section id="qwSheet" class="sheet qwSheet" role="dialog" aria-modal="true"/.test(qwHomeHtml),
     'Sheet and backdrop must ship inert until opened');
   for (const id of ['qwGrab', 'qwDone', 'qwHead', 'qwPreset', 'qwNum', 'qwRatio', 'qwDef',
     'qwReset', 'qwZone', 'qwScale', 'qwMinus', 'qwPlus'])
@@ -107,15 +107,19 @@
       codeIncludes(qwHomeJs, 'e.target.closest(".presetAccEdit") && open()'),
     'Only the already-active preset row may offer the quick-weight pencil');
 
-  qwAssert.ok(/position:fixed[^}]*bottom:0[^}]*background:var\(--sf\)/.test(qwCssRule('qwSheet')) &&
-      !/\.qwSheet\{[^}]*backdrop-filter/.test(css),
+  // The shared sheet frame (components/sheet.css); Home keeps only its height.
+  const sheetRule = css.match(/(?:^|\})\.sheet\{[^}]*\}/)?.[0] || '';
+  qwAssert.ok(/position:fixed[^}]*bottom:0[^}]*background:var\(--sf\)/.test(sheetRule) &&
+      !/\.(?:qwSheet|sheet)\{[^}]*backdrop-filter/.test(css),
     'The sheet anchors to the viewport bottom on a solid surface, not frosted glass');
-  qwAssert.ok(qwCssRule('qwSheet').includes('translateY(calc(100% + 4rem))') &&
-      qwCssRule('qwSheet').includes('box-shadow:0 -1.1rem 2.6rem'),
+  qwAssert.ok(sheetRule.includes('translateY(calc(100% + 4rem))') &&
+      sheetRule.includes('box-shadow:0 -1.1rem 2.6rem'),
     'Closed, the sheet sits past its own 3.7rem shadow so none falls on the page');
+  qwAssert.ok(qwCssRule('qwSheet').includes('max-height:46dvh'),
+    'The quick-weight sheet keeps its own height on the shared frame');
   qwAssert.ok(/touch-action:none/.test(qwCssRule('qwZone')),
     'The tick zone must own touch gestures');
-  qwAssert.ok(/body\.qwOpen\{overflow:hidden\}/.test(css),
+  qwAssert.ok(/body\.sheetOpen\{overflow:hidden\}/.test(css),
     'Page scroll must lock while the sheet is open');
   qwAssert.ok(/\.qeditPen:disabled\{display:none\}/.test(css),
     'A locked UI must hide the pencil');
@@ -183,16 +187,22 @@
       saved: 0,
     };
     const qwAccListeners = {};
+    const qwDocument = {
+      body: (() => { const body = qwNode(); body.classList = qwClassSet(body); return body; })(),
+      createElement: () => {
+        const node = qwNode();
+        node.classList = qwClassSet(node);
+        return node;
+      },
+    };
+    // The shared sheet frame runs as runtime.js ships it.
+    Object.assign(qwRuntime, new Function('document', ['pointerDrag', 'showSheet', 'sheetGrip']
+      .map((name) => blockAt(rawRuntimeJs, `function ${name}(`)).join('\n') +
+      ';return {pointerDrag, showSheet, sheetGrip};')(qwDocument));
     const qwInit = new Function('R', '$', 'document', 'addEventListener', 'performance',
       viewJs.home.slice(viewJs.home.indexOf('function initQuickWeight(')) +
       ';return initQuickWeight;')(
-        qwRuntime, (id) => qwEls[id],
-        {body: (() => { const body = qwNode(); body.classList = qwClassSet(body); return body; })(),
-        createElement: () => {
-          const node = qwNode();
-          node.classList = qwClassSet(node);
-          return node;
-        }},
+        qwRuntime, (id) => qwEls[id], qwDocument,
         (type, fn) => { (qwAccListeners[type] ||= []).push(fn); },
         {now: () => qwNow});
     const qwFire = (node, type, event) =>

@@ -288,7 +288,7 @@ const CSS_SOURCES = [
   'components/fields.css',
   'views/settings.css', 'views/home.css', 'views/admin.css', 'views/live.css',
   'views/diagnostic.css', 'views/stats.css',
-  'components/bars.css', 'components/toolbars.css',
+  'components/bars.css', 'components/toolbars.css', 'components/sheet.css',
   'views/history.css', 'views/trace.css', 'views/preset.css',
   'global.css', 'views/setup.css',
 ];

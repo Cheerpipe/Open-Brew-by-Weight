@@ -7,12 +7,15 @@ import {
   archiveMark,
   archiveSource,
   armListSentinel,
+  closeRecordSheet,
   createFilterMenu,
   deleteItem,
   downloadCsv,
   loadArchive,
   mergeRecords,
+  recordCount,
   recordOrder,
+  refreshRecordSheet,
   removeRecord,
   streamArchive,
   streamArchives,
@@ -156,6 +159,7 @@ function renderHistory() {
       btn.setAttribute("aria-expanded", "false");
       btn.innerHTML = '<span class="g" aria-hidden="true">' + "⋯" + "</span>";
       btn.onclick = () => entryMenu.open(btn, r);
+      btn.dataset.sheetHead = historyTypeLabel(r.type) + " · " + time.textContent;
       del.append(btn);
     }
     if (HIST_TYPE_SVG[r.type]) {
@@ -171,6 +175,7 @@ function renderHistory() {
   }
   for (const [th, n] of days) th.append(dayTally(n));
   R.lockControls(body);
+  refreshRecordSheet();
   archiveListNote("historyArchiveNote", R.uiState.historyData.hasMore);
   R.setEmptyState(
     "historyTableState",
@@ -183,15 +188,7 @@ function renderHistory() {
   updateHistorySentinel();
 }
 let entryMenu;
-async function deleteOneHistory(r) {
-  if (
-    !(await R.askConfirm(
-      __WEBUI_TEXT__("runtime.delete_this_history_record"),
-      __WEBUI_TEXT__("records.delete"),
-      true,
-    ))
-  )
-    return;
+function deleteOneHistory(r) {
   return R.withCommandGate(async () => {
     try {
       await removeRecord(
@@ -513,6 +510,7 @@ const historyStream = {
     historySynced = false;
   },
   leave() {
+    closeRecordSheet();
     historyResolve?.(false);
     historyResolve = null;
   },
@@ -527,7 +525,11 @@ export function init() {
   ready = true;
   R.registerStream("history", historyStream);
   entryMenu = actionMenu(__WEBUI_TEXT__("history.entry_actions"), (r) =>
-    deleteItem(__WEBUI_TEXT__("history.delete_entry"), () => deleteOneHistory(r)),
+    deleteItem(
+      __WEBUI_TEXT__("history.delete_entry"),
+      () => deleteOneHistory(r),
+      __WEBUI_TEXT__("runtime.delete_this_history_record"),
+    ),
   );
   historyFilterReset = createFilterMenu(
     "historyFilterButton",
@@ -542,6 +544,12 @@ export function init() {
       R.uiState.historyTypes = sel.type || [];
       historySendSubscribe();
     },
+    () =>
+      recordCount(
+        R.uiState.historyData.total,
+        __WEBUI_TEXT__("history.filter_count_one"),
+        __WEBUI_TEXT__("history.filter_count"),
+      ),
   );
   $("exportHistoryButton").onclick = exportActivationHistory;
   const h = $("historySort");

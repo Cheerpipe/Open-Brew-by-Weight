@@ -965,85 +965,8 @@
   stroke-linejoin: round;
 }
 
-body.qwOpen {
-  overflow: hidden;
-}
-
-.qwBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 32;
-  background: rgb(21 21 21 / 42%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.28s;
-}
-
-.qwBackdrop.show {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 .qwSheet {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 33;
-  display: flex;
-  flex-direction: column;
   max-height: 46dvh;
-
-  /* Closed, it sits past its own 3.7rem shadow, which would fall on the page. */
-  transform: translateY(calc(100% + 4rem));
-  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0.32, 1);
-  border-top: 1px solid var(--ln);
-  border-radius: 1.35rem 1.35rem 0 0;
-  background: var(--sf);
-  box-shadow: 0 -1.1rem 2.6rem rgb(0 0 0 / 30%);
-}
-
-.qwSheet.open {
-  transform: none;
-}
-
-.qwSheet.nodrag {
-  transition: none;
-}
-
-@media (width >= 700px) {
-  .qwSheet {
-    left: max(1rem, env(safe-area-inset-left));
-    right: max(1rem, env(safe-area-inset-right));
-    max-width: 760px;
-    margin: 0 auto;
-  }
-}
-
-.qwGrab {
-  position: relative;
-  flex: none;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 0.7rem;
-  padding: 0.55rem 1rem 0.2rem;
-  cursor: grab;
-  touch-action: none;
-}
-
-.qwGrab:active {
-  cursor: grabbing;
-}
-
-.qwGrab i {
-  grid-column: 1/-1;
-  justify-self: center;
-  width: 2.4rem;
-  height: 0.26rem;
-  border-radius: 2rem;
-  background: var(--ln);
-  margin-bottom: 0.35rem;
 }
 
 .qwDone {

@@ -1267,6 +1267,56 @@
   border-top: 1px solid var(--ln);
 }
 
+/* In the phone sheet (components/sheet.css) the same items take a thumb's size. */
+.sheetBody .histFilterGroup {
+  padding: 0.7rem 0.7rem 0.25rem;
+}
+
+.sheetBody .histFilterItem {
+  min-height: 3rem;
+  gap: 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.85rem;
+}
+
+.sheetBody .menuAction {
+  min-height: 3.4rem;
+}
+
+.sheetBody .histFilterIcon {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.sheetBody .histFilterItem input {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.sheetBody .menuText b {
+  font-size: 0.95rem;
+}
+
+.sheetBody .menuText small {
+  font-size: 0.76rem;
+}
+
+.sheetBody .menuAction:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sheetBody hr {
+  margin: 0.4rem 0.7rem;
+  border: 0;
+  border-top: 1px solid var(--ln);
+}
+
+.sheetMenu .histFilterReset {
+  min-height: 2.4rem;
+  padding: 0 0.9rem;
+}
+
 .otaProgress {
   display: block;
   width: 100%;

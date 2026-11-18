@@ -640,11 +640,7 @@ function initQuickWeight() {
     zone.setAttribute("aria-valuemin", (lo / 10).toFixed(1));
     zone.setAttribute("aria-valuemax", (hi / 10).toFixed(1));
     paint();
-    sheet.inert = false;
-    backdrop.inert = false;
-    sheet.classList.add("open");
-    backdrop.classList.add("show");
-    document.body.classList.add("qwOpen");
+    R.showSheet(sheet, backdrop, true);
     opener = document.activeElement;
     zone.focus();
   };
@@ -670,38 +666,9 @@ function initQuickWeight() {
     if (!sheet.classList.contains("open")) return;
     halt();
     stop();
-    sheet.classList.remove("open");
-    backdrop.classList.remove("show");
-    sheet.inert = true;
-    backdrop.inert = true;
-    document.body.classList.remove("qwOpen");
+    R.showSheet(sheet, backdrop, false);
     opener?.focus?.();
     if (save && value !== openValue) commit(value);
-  };
-  const drag = (node, handlers) => {
-    node.addEventListener("pointerdown", (event) => {
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      // Pointer capture would retarget the click of interactive children
-      // (Done lives inside the grab bar) onto the drag node, swallowing it.
-      if (event.target?.closest("button,a,input")) return;
-      event.preventDefault();
-      try {
-        node.setPointerCapture(event.pointerId);
-      } catch {
-        /* synthetic pointers cannot be captured */
-      }
-      const ctx = handlers.start ? handlers.start(event) : {};
-      const move = (ev) => handlers.move && handlers.move(ev, ctx);
-      const end = (ev) => {
-        node.removeEventListener("pointermove", move);
-        node.removeEventListener("pointerup", end);
-        node.removeEventListener("pointercancel", end);
-        handlers.end && handlers.end(ev, ctx);
-      };
-      node.addEventListener("pointermove", move);
-      node.addEventListener("pointerup", end);
-      node.addEventListener("pointercancel", end);
-    });
   };
   const vel = { t: 0, v: 0 };
   let pending = 0,
@@ -726,7 +693,7 @@ function initQuickWeight() {
     };
     if (Math.abs(fling) > 0.02) glide = requestAnimationFrame(run);
   };
-  drag(zone, {
+  R.pointerDrag(zone, {
     start: (e) => {
       halt();
       vel.t = performance.now();
@@ -765,30 +732,7 @@ function initQuickWeight() {
       else if (globalThis.requestAnimationFrame) coast();
     },
   });
-  const dismissDrag = {
-    start: (e) => {
-      sheet.classList.add("nodrag");
-      return { y: e.clientY, dy: 0 };
-    },
-    move: (e, ctx) => {
-      ctx.dy = Math.max(0, e.clientY - ctx.y);
-      sheet.style.transform = "translateY(" + ctx.dy + "px)";
-    },
-    end: (e, ctx) => {
-      sheet.classList.remove("nodrag");
-      if (ctx.dy > 90) {
-        sheet.style.transition = "transform .3s ease-in";
-        sheet.style.transform = "translateY(105%)";
-        setTimeout(() => {
-          sheet.style.transition = "";
-          sheet.style.transform = "";
-          close(true);
-        }, 290);
-      } else sheet.style.transform = "";
-    },
-  };
-  drag(grab, dismissDrag);
-  drag(head, dismissDrag);
+  R.sheetGrip(sheet, [grab, head], () => close(true));
   const nudge = (d) => {
     halt();
     value = clamp(value + d);

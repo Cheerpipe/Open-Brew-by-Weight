@@ -15,15 +15,16 @@ export function armListSentinel(id, onLoad) {
     rootMargin: "240px",
   }).observe(el);
 }
-// A record list's filter menu, anchored to its toolbar button: checkbox
-// groups under a Reset header. An empty group does not restrict and the
-// button carries the selected count. The firmware filters the pages, so
-// onChange(selection) only re-subscribes; groups() returns
+// A record list's filter menu on the shared popup: checkbox groups under a
+// Reset header. An empty group does not restrict and the button carries the
+// selected count. The firmware filters the pages, so onChange(selection)
+// only re-subscribes; groups() returns
 // [{key, label?, options: [[value, text, iconHtml?]]}] and is read on every
-// open, so the options follow the data.
+// open, so the options follow the data. In the phone sheet, Reset sits beside
+// a head that reads matches(), the list's count, refreshed with the list.
 // Returns the menu's Reset, which the view also runs when the firmware rejects
 // a list subscription.
-export function createFilterMenu(buttonId, title, groups, onChange) {
+export function createFilterMenu(buttonId, title, groups, onChange, matches) {
   const sel = {};
   let panel = null;
   const count = () => Object.values(sel).reduce((n, s) => n + s.size, 0);
@@ -41,23 +42,32 @@ export function createFilterMenu(buttonId, title, groups, onChange) {
       for (const box of panel.querySelectorAll("input"))
         box.checked = !!sel[box.name]?.has(box.value);
     sync();
+    refreshRecordSheet();
     onChange(Object.fromEntries(Object.entries(sel).map(([k, s]) => [k, [...s]])));
   };
   const clear = () => {
     for (const k in sel) sel[k].clear();
     changed();
   };
-  const popup = createPopup(title, (p) => {
-    const head = document.createElement("div"),
-      reset = document.createElement("button");
+  const popup = createPopup(title, (p, ui) => {
+    const reset = document.createElement("button");
     panel = p;
-    head.className = "histFilterHead";
     reset.type = "button";
     reset.className = "histFilterReset";
     reset.textContent = __WEBUI_TEXT__("history.filter_reset");
     reset.onclick = clear;
-    head.append(Object.assign(document.createElement("span"), { textContent: title }), reset);
-    p.append(head);
+    if (ui.sheet) {
+      ui.aside(reset);
+      ui.refresh = () => {
+        ui.head(matches());
+        reset.disabled = !count();
+      };
+    } else {
+      const head = document.createElement("div");
+      head.className = "histFilterHead";
+      head.append(Object.assign(document.createElement("span"), { textContent: title }), reset);
+      p.append(head);
+    }
     for (const g of groups()) {
       if (g.label)
         p.append(
@@ -95,20 +105,66 @@ export function createFilterMenu(buttonId, title, groups, onChange) {
     p.onchange = () => (pick(), changed());
     const n = count();
     pick();
+    ui.refresh?.();
     count() < n && changed();
   });
   $(buttonId).onclick = () => popup.open($(buttonId));
   sync();
   return clear;
 }
-// The popup panel shared by the filter and action menus: built by fill(panel,
-// ...args) on every open, placed below its trigger (above when that fits
-// better), and closed by a second click on the trigger, a click elsewhere,
-// Escape, or the trigger leaving the page.
+// Below 700 px the record menus rise in one shared bottom sheet
+// (components/sheet.css), built on first use; wider, each anchors to its
+// trigger. sheetMenu is the open sheet's {close, ui}.
+let sheet = null,
+  sheetMenu = null;
+function recordSheet() {
+  if (sheet) return sheet;
+  const backdrop = document.createElement("div"),
+    box = document.createElement("section");
+  backdrop.className = "sheetBackdrop";
+  box.className = "sheet sheetMenu";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  box.tabIndex = -1;
+  box.innerHTML =
+    '<div class="sheetGrab"><i aria-hidden="true"></i><p class="sheetHead"></p></div><div class="sheetBody"></div>';
+  backdrop.inert = box.inert = true;
+  document.body.append(backdrop, box);
+  box.getBoundingClientRect(); // laid out closed, so the first open slides in
+  sheet = {
+    box,
+    backdrop,
+    grab: box.firstChild,
+    head: box.querySelector(".sheetHead"),
+    body: box.lastChild,
+  };
+  R.sheetGrip(box, [sheet.grab], () => sheetMenu?.close(true));
+  // Modal: focus that leaves the open sheet returns to it.
+  box.addEventListener("focusout", (e) => {
+    if (sheetMenu && e.relatedTarget && !box.contains(e.relatedTarget)) box.focus();
+  });
+  return sheet;
+}
+// A filter sheet's head: how many records the list holds, none before it loads.
+export const recordCount = (n, one, many) =>
+  typeof n !== "number" ? "" : n === 1 ? one : R.sub(many, [n]);
+// The open sheet's head follows its list: the views call this as they render.
+export const refreshRecordSheet = () => sheetMenu?.ui.refresh?.();
+// Leaving the page closes an open sheet, which would otherwise cover the next.
+export const closeRecordSheet = () => sheetMenu?.close();
+// The popup shared by the filter and action menus, built by fill(host, ui,
+// ...args) on every open. In the sheet, ui.sheet is set, ui.head() and
+// ui.aside() fill its head, and ui.ask() swaps in a confirmation; the head
+// starts as the trigger's data-sheet-head after a data-sheet-tag pill. The
+// panel sits below its trigger (above when that fits better). Either closes
+// by a second click on the trigger, a click elsewhere, Escape, or crossing
+// the breakpoint; the panel also when its trigger leaves the page, the sheet
+// by a drag down.
 function createPopup(label, fill) {
+  const narrow = matchMedia("(width < 700px)");
   let panel = null,
-    anchor = null;
-  const shown = () => panel && !panel.hidden;
+    anchor = null,
+    mode = "";
   const place = () => {
     const r = anchor.getBoundingClientRect(),
       below = innerHeight - r.bottom;
@@ -129,44 +185,96 @@ function createPopup(label, fill) {
       ) + "px";
   };
   const close = (focus) => {
-    if (!shown()) return;
-    panel.hidden = true;
+    if (!mode) return;
+    if (mode === "sheet") {
+      sheetMenu = null;
+      R.showSheet(sheet.box, sheet.backdrop, false);
+    } else panel.hidden = true;
+    mode = "";
     anchor.setAttribute("aria-expanded", "false");
     if (focus) anchor.focus();
   };
+  const openSheet = (...args) => {
+    const s = recordSheet(),
+      d = anchor.dataset,
+      ui = {
+        sheet: true,
+        head: (...nodes) => s.head.replaceChildren(...nodes),
+        aside: (node) => s.grab.append(node),
+        ask: (text, ok, run) => {
+          const step = document.createElement("div"),
+            yes = document.createElement("button"),
+            no = document.createElement("button");
+          step.className = "sheetAsk";
+          step.append(Object.assign(document.createElement("p"), { textContent: text }), yes, no);
+          yes.type = no.type = "button";
+          yes.className = "sheetYes";
+          yes.textContent = ok;
+          no.textContent = __WEBUI_TEXT__("shell.cancel");
+          yes.onclick = () => (close(), run());
+          no.onclick = () => close(true);
+          s.body.removeAttribute("role");
+          s.body.replaceChildren(step);
+          no.focus();
+        },
+      };
+    s.grab.querySelector(":scope > button")?.remove();
+    const tag = d.sheetTag && document.createElement("span");
+    if (tag) Object.assign(tag, { className: "sheetTag", textContent: d.sheetTag });
+    tag?.classList.toggle("muted", !!d.sheetTagMuted);
+    ui.head(...(tag ? [tag, " "] : []), d.sheetHead || "");
+    s.box.setAttribute("aria-label", label);
+    s.body.setAttribute("role", "menu");
+    s.body.setAttribute("aria-label", label);
+    s.body.replaceChildren();
+    fill(s.body, ui, ...args);
+    s.body.scrollTop = 0;
+    mode = "sheet";
+    sheetMenu = { close, ui };
+    R.showSheet(s.box, s.backdrop, true);
+    s.box.focus();
+  };
   const open = (trigger, ...args) => {
-    const again = shown() && anchor === trigger;
+    const again = mode && anchor === trigger;
     close();
     if (again) return;
+    anchor = trigger;
+    anchor.setAttribute("aria-expanded", "true");
+    if (narrow.matches) return openSheet(...args);
     panel?.remove();
     panel = document.createElement("div");
     panel.className = "histFilterPanel";
     panel.setAttribute("role", "menu");
     panel.setAttribute("aria-label", label);
-    fill(panel, ...args);
+    fill(panel, {}, ...args);
     document.body.append(panel);
-    anchor = trigger;
-    anchor.setAttribute("aria-expanded", "true");
+    mode = "panel";
     place();
     // Focus the panel host, not an item: an item focused by script matches
     // :focus-visible after any keyboard use, ringing a pointer-opened menu.
     panel.tabIndex = -1;
     panel.focus();
   };
+  // The event's path, not contains(): a confirmation step replaces the item
+  // that was clicked before the click reaches the document.
   document.addEventListener("click", (e) => {
-    if (shown() && !panel.contains(e.target) && !anchor.contains(e.target)) close();
+    const path = e.composedPath();
+    if (mode && !path.includes(mode === "sheet" ? sheet.box : panel) && !path.includes(anchor))
+      close(mode === "sheet");
   });
   document.addEventListener("keydown", (e) => e.key === "Escape" && close(true));
-  const reposition = () => shown() && (anchor.isConnected ? place() : close());
+  const reposition = () => mode === "panel" && (anchor.isConnected ? place() : close());
   window.addEventListener("scroll", reposition, { passive: true });
   window.addEventListener("resize", reposition, { passive: true });
+  narrow.addEventListener("change", () => close());
   return { open, close };
 }
 // An action menu on the shared popup: a string starts a group, null draws a
-// separator, and [icon path, title, hint, run, danger, disabled] is an item
-// (a disabled one says why in its hint).
+// separator, and [icon path, title, hint, run, danger, disabled, ask] is an
+// item (a disabled one says why in its hint). An item with ask is a delete:
+// it runs only once confirmed, in the sheet itself on a phone.
 export function actionMenu(label, items) {
-  const menu = createPopup(label, (p, ...args) => {
+  const menu = createPopup(label, (p, ui, ...args) => {
     for (const item of items(...args)) {
       if (item === null) {
         p.append(document.createElement("hr"));
@@ -181,7 +289,7 @@ export function actionMenu(label, items) {
         );
         continue;
       }
-      const [icon, title, hint, run, danger, off] = item,
+      const [icon, title, hint, run, danger, off, ask] = item,
         b = document.createElement("button");
       b.type = "button";
       b.disabled = !!off;
@@ -193,7 +301,13 @@ export function actionMenu(label, items) {
         '"/></svg></span><span class="menuText"><b></b><small></small></span>';
       b.querySelector("b").textContent = title;
       b.querySelector("small").textContent = hint;
-      b.onclick = () => (menu.close(), run());
+      const ok = __WEBUI_TEXT__("records.delete");
+      b.onclick = () =>
+        !ask
+          ? (menu.close(), run())
+          : ui.sheet
+            ? ui.ask(ask, ok, run)
+            : (menu.close(), R.askConfirm(ask, ok, true).then((yes) => yes && run()));
       p.append(b);
     }
   });
@@ -429,9 +543,10 @@ const archiveHere = () => !!R.uiState.companionHere?.archive?.on;
 const archiveDirect = () =>
   location.protocol !== "https:" && !!R.homeStatusCache()?.companion?.archive;
 // A record's Delete, offered only while Admin is unlocked for this screen and
-// never in the read-only archive view: one action wherever the record is kept.
-export const deleteItem = (label, run) =>
-  R.archiveView || !R.adminUnlockedHere() ? [] : [[ICON_TRASH, label, "", run, true]];
+// never in the read-only archive view: one action wherever the record is kept,
+// run once the reader confirms ask.
+export const deleteItem = (label, run, ask) =>
+  R.archiveView || !R.adminUnlockedHere() ? [] : [[ICON_TRASH, label, "", run, true, false, ask]];
 // Deletes a record, after one confirmation. The controller deletes its own
 // records and the companion's copy follows on its next sync; a record only
 // the companion keeps (`_archive`) is deleted there. `drop()` removes the row

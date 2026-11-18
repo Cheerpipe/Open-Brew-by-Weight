@@ -1588,6 +1588,68 @@ function resetNetworkAddressLoaded() {
 function noteBootId(b) {
   bootId = b;
 }
+// A pointer drag on node: handlers.start(event) returns the gesture's
+// context, move(event, ctx) and end(event, ctx) receive it.
+function pointerDrag(node, handlers) {
+  node.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    // Pointer capture would retarget the click of interactive children
+    // (a sheet's header buttons) onto the drag node, swallowing it.
+    if (event.target?.closest("button,a,input")) return;
+    event.preventDefault();
+    try {
+      node.setPointerCapture(event.pointerId);
+    } catch {
+      /* synthetic pointers cannot be captured */
+    }
+    const ctx = handlers.start ? handlers.start(event) : {};
+    const move = (ev) => handlers.move && handlers.move(ev, ctx);
+    const end = (ev) => {
+      node.removeEventListener("pointermove", move);
+      node.removeEventListener("pointerup", end);
+      node.removeEventListener("pointercancel", end);
+      handlers.end && handlers.end(ev, ctx);
+    };
+    node.addEventListener("pointermove", move);
+    node.addEventListener("pointerup", end);
+    node.addEventListener("pointercancel", end);
+  });
+}
+// Shows or hides a bottom sheet (components/sheet.css) and its backdrop; the
+// page behind stops scrolling while one is open.
+function showSheet(sheet, backdrop, on) {
+  sheet.inert = backdrop.inert = !on;
+  sheet.classList.toggle("open", on);
+  backdrop.classList.toggle("show", on);
+  document.body.classList.toggle("sheetOpen", on);
+}
+// Dragging a sheet's grips down follows the finger; past 90 px the sheet
+// slides away and dismiss() runs, short of it the sheet springs back.
+function sheetGrip(sheet, grips, dismiss) {
+  const handlers = {
+    start: (e) => {
+      sheet.classList.add("nodrag");
+      return { y: e.clientY, dy: 0 };
+    },
+    move: (e, ctx) => {
+      ctx.dy = Math.max(0, e.clientY - ctx.y);
+      sheet.style.transform = "translateY(" + ctx.dy + "px)";
+    },
+    end: (e, ctx) => {
+      sheet.classList.remove("nodrag");
+      if (ctx.dy > 90) {
+        sheet.style.transition = "transform .3s ease-in";
+        sheet.style.transform = "translateY(105%)";
+        setTimeout(() => {
+          sheet.style.transition = "";
+          sheet.style.transform = "";
+          dismiss();
+        }, 290);
+      } else sheet.style.transform = "";
+    },
+  };
+  for (const grip of grips) pointerDrag(grip, handlers);
+}
 // Arms a bar-top sentinel so the sticky toolbar after it carries the popup
 // shadow only while detached from its in-flow slot. Re-armed when the
 // --hdr breakpoint flips so the trigger keeps matching the sticky offset.
@@ -8223,6 +8285,9 @@ export {
   stopDiagnosticStream,
   ensureBackgroundStreams,
   armStickyBar,
+  pointerDrag,
+  showSheet,
+  sheetGrip,
   setStatsRenderers,
   registerStream,
   setSettingsForm,

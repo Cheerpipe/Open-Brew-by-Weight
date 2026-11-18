@@ -35,7 +35,7 @@ html.themeDark :is(.pageNav, .quickPanel, #presetRenameDialog, #confirmDialog) {
   box-shadow: var(--popSh);
 }
 
-html.themeDark :is(.qwSheet, #actionsPanel) {
+html.themeDark :is(.sheet, #actionsPanel) {
   box-shadow: 0 -8px 28px rgb(0 0 0 / 45%);
 }
 
@@ -44,7 +44,7 @@ html.themeDark :is(.qwSheet, #actionsPanel) {
     box-shadow: var(--popSh);
   }
 
-  html:not(.themeLight) :is(.qwSheet, #actionsPanel) {
+  html:not(.themeLight) :is(.sheet, #actionsPanel) {
     box-shadow: 0 -8px 28px rgb(0 0 0 / 45%);
   }
 }

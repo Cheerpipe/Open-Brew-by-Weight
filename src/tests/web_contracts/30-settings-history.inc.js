@@ -998,7 +998,7 @@ if (!codeIncludes(viewJs.stats, 'SHOTS_PAGE_SIZE=10') ||
     // Navigation must settle a pending cold record entry so the serialized
     // poll gate never waits on an abandoned view's page.
     !codeIncludes(runtimeJs, 'if(activeView!==name)eachStream(leave)') ||
-    !codeIncludes(viewJs.stats, 'leave(){statsResolve?.(false);statsResolve=null;}') ||
+    !codeIncludes(viewJs.stats, 'leave(){closeRecordSheet();statsResolve?.(false);statsResolve=null;}') ||
     !codeIncludes(viewJs.stats, 'function statsStreamFrame(') ||
     !codeIncludes(viewJs.stats, 'function applyStatsStream(') ||
     !codeIncludes(viewJs.stats, 'subscribe:()=>(statsStreamWanted?statsSubscribeOp():null)') ||

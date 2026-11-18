@@ -361,8 +361,10 @@ other, and ticks in different groups must all match: Slow plus your house
 preset shows only the house preset's slow shots. The filter works with either
 sort order, every page you scroll to is full of matching shots, and the Filter
 button shows a count badge while a filter is active; Reset clears it, and
-tapping outside or pressing Escape closes the checklist. When nothing matches,
-the list says so. The filter changes only the list: the averages, charts, and
+tapping outside or pressing Escape closes the checklist. On a phone the
+checklist rises as a panel from the bottom of the screen, with how many shots
+match at the top next to Reset; swipe it down to close it. When nothing
+matches, the list says so. The filter changes only the list: the averages, charts, and
 **Export** still cover your good shots as described below.
 
 The list shows good shots only. Tick **Show bad shots**, at the bottom of the
@@ -576,8 +578,9 @@ controller, a short message says so.
 
 ## Export and share shots
 
-**Export**, next to Filter, opens a small menu with two choices. They
-include every shot whatever the list's filter or sort:
+**Export**, next to Filter, opens a small menu with two choices (on a phone,
+a panel from the bottom of the screen). They include every shot whatever the
+list's filter or sort:
 
 - **CSV** is a table for Excel, Numbers, or Google Sheets, one row per good
   shot.
@@ -602,8 +605,10 @@ is over. If the controller is briefly busy, the export waits a few seconds
 and tries again; if a shot's trace still cannot be read, the diagnostics file
 includes the shot and marks its trace as unavailable.
 
-Each shot card has a **⋯** button in its top right corner. Its menu acts on
-that shot only:
+Each shot card has a **⋯** button in its top right corner. On a phone its
+menu rises as a panel from the bottom of the screen, headed by the shot's
+number, preset, yield and time; swipe it down or tap outside to close it. The
+menu acts on that shot only:
 
 - **View trace** opens the shot's trace; see
   [See what the controller decided](#see-what-the-controller-decided).
@@ -637,7 +642,7 @@ that shot only:
   in on Visualizer. A shot recorded before the controller knew the time is
   dated when you download it.
 - **Delete**, at the bottom of the menu while Admin is unlocked, removes
-  the shot after you confirm.
+  the shot after you confirm. On a phone you confirm in the same panel.
 
 Exporting never changes your shots, so it also works while settings are locked.
 

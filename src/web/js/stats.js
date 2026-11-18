@@ -10,13 +10,16 @@ import {
   archiveSources,
   archiveStatsReady,
   armListSentinel,
+  closeRecordSheet,
   companionArchive,
   createFilterMenu,
   deleteItem,
   downloadCsv,
   loadArchive,
   mergeRecords,
+  recordCount,
   recordOrder,
+  refreshRecordSheet,
   removeRecord,
   streamArchive,
   streamArchives,
@@ -1595,6 +1598,7 @@ function renderShots() {
       num.title = bad
         ? __WEBUI_TEXT__("stats.bad_hint")
         : __WEBUI_TEXT__("runtime.shot") + " " + (r.number ?? r.id);
+      const tag = num.textContent;
       archiveMark(num, r);
       row.cells[0].prepend(num);
       // The verdict, then any channeling, sit beside the time so each card
@@ -1634,11 +1638,18 @@ function renderShots() {
       btn.setAttribute("aria-expanded", "false");
       btn.innerHTML = '<span class="g" aria-hidden="true">' + "⋯" + "</span>";
       btn.onclick = () => shotMenu.open(btn, r);
+      // The phone sheet's head names the shot: its tag, then what it was.
+      btn.dataset.sheetTag = tag;
+      if (bad || num.classList.contains("archiveKept")) btn.dataset.sheetTagMuted = 1;
+      btn.dataset.sheetHead = [shotPresetName(r), vals[3], vals[1]]
+        .filter((v) => v && v !== "—")
+        .join(" · ");
       del.appendChild(btn);
       row.appendChild(del);
     }
   }
   R.lockControls(body);
+  refreshRecordSheet();
   pushedShotShow(list);
   archiveListNote("shotArchiveNote", R.uiState.shotHistory.hasMore);
   R.setEmptyState(
@@ -1680,15 +1691,7 @@ const rateArchivedShot = (r, n, star) =>
     },
     (e) => R.message(R.sub(__WEBUI_TEXT__("records.archive_failed"), [e.message]), "error"),
   );
-async function deleteOneShot(r) {
-  if (
-    !(await R.askConfirm(
-      __WEBUI_TEXT__("runtime.delete_this_shot_record"),
-      __WEBUI_TEXT__("records.delete"),
-      true,
-    ))
-  )
-    return;
+function deleteOneShot(r) {
   return R.withCommandGate(async () => {
     try {
       await removeRecord(
@@ -3140,8 +3143,9 @@ const statsStream = {
     statsSynced = false;
   },
   // Navigation settles a pending cold entry so the poll gate never waits on
-  // an abandoned view's page.
+  // an abandoned view's page, and closes an open menu sheet.
   leave() {
+    closeRecordSheet();
     statsResolve?.(false);
     statsResolve = null;
   },
@@ -3237,10 +3241,11 @@ export function init() {
       () => downloadJson(`openbrewbyweight-shot-${r.id}-visualizer.json`, shotVisualizer(r)),
     ],
     // Delete, while Admin is unlocked, sits apart after a separator.
-    ...deleteItem(__WEBUI_TEXT__("stats.delete_shot"), () => deleteOneShot(r)).flatMap((item) => [
-      null,
-      item,
-    ]),
+    ...deleteItem(
+      __WEBUI_TEXT__("stats.delete_shot"),
+      () => deleteOneShot(r),
+      __WEBUI_TEXT__("runtime.delete_this_shot_record"),
+    ).flatMap((item) => [null, item]),
   ]);
   if ($("shotSort")) {
     $("sortDateButton").onclick = () => setShotSort("date");
@@ -3266,6 +3271,12 @@ export function init() {
       );
       statsSendSubscribe();
     },
+    () =>
+      recordCount(
+        R.uiState.shotHistory.total,
+        __WEBUI_TEXT__("stats.filter_count_one"),
+        __WEBUI_TEXT__("stats.filter_count"),
+      ),
   );
   armListSentinel("shotLogSentinel", loadMoreShots);
   pushedShotRead();

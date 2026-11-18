@@ -80,9 +80,10 @@ like. With nothing ticked the diary shows everything; ticking one or more
 types shows only those, and the list updates as you tick. While a filter is
 active the Filter button shows a count badge and stays highlighted, so the
 state is visible at a glance, and Reset at the top of the checklist clears it
-in one tap. The checklist closes when you tap outside it or press Escape, and
-it works the same on a phone and on a computer. The controller does the
-filtering, so the diary still loads 20 entries at a time as you scroll and
+in one tap. The checklist closes when you tap outside it or press Escape. On
+a phone it rises as a panel from the bottom of the screen, with how many
+entries match at the top next to Reset; swipe it down to close it. The
+controller does the filtering, so the diary still loads 20 entries at a time as you scroll and
 every page is full of the types you picked, even when they are spread through
 a long history; when a filter matches nothing at all, the page says so
 instead of showing an empty diary. Export always downloads every entry,
@@ -98,8 +99,9 @@ oldest first, exactly as the page is set.
 Deleting needs Admin unlocked on the screen you use: then each card's ⋯ menu
 offers **Delete entry**, and Admin offers **Clear activation history** for the
 whole diary (see [Clear a history](../settings/factory-reset.md#clear-a-history)).
-Both ask you to confirm and cannot be undone. While Admin is locked, the cards
-show no ⋯ menu.
+Both ask you to confirm and cannot be undone; on a phone the ⋯ menu rises from
+the bottom of the screen and you confirm Delete entry in the same panel. While
+Admin is locked, the cards show no ⋯ menu.
 
 With a [companion](companion.md#your-whole-history) keeping a shot archive,
 the companion keeps every activation too, also after it leaves the

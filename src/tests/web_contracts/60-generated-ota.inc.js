@@ -181,7 +181,7 @@ for (const [machineType, remoteControl, kept] of [
   ['momentary_reed', true, ['html:not(.reedMachine) .reedOnly']],
   ['momentary', false, ['html:not(.momentaryMachine) .switchOnly']],
   ['paddle', false, ['html.momentaryMachine .paddleOnly',
-    'html.themeDark .qwSheet{box-shadow:0 -8px']]]) {
+    'html.themeDark .sheet{box-shadow:0 -8px']]]) {
   const {css: typedCss} = await webUi.generate({profile: profileByType[machineType], remoteControl,
     write: false});
   const lost = kept.filter((needle) => !typedCss.includes(needle));

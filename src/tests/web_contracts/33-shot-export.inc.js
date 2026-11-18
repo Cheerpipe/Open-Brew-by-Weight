@@ -501,11 +501,32 @@
   assert.ok(partialHtml.stats.includes('id="exportShotsButton" class="btnGlyph" type="button" aria-haspopup="true" aria-expanded="false"'));
   assert.ok(codeIncludes(viewJs.stats, '$("exportShotsButton").onclick = () => exportMenu.open($("exportShotsButton"))'));
   assert.ok(codeIncludes(viewJs.stats, 'btn.onclick = () => shotMenu.open(btn, r)'));
-  assert.ok(codeIncludes(rawViewJs.stats, 'deleteItem(__WEBUI_TEXT__("stats.delete_shot"), () => deleteOneShot(r))'));
+  assert.ok(codeIncludes(rawViewJs.stats, 'deleteItem(__WEBUI_TEXT__("stats.delete_shot"), () => deleteOneShot(r), __WEBUI_TEXT__("runtime.delete_this_shot_record"),)'));
   assert.ok(!codeIncludes(viewJs.stats, 'btnGlyph btnDanger'));
   assert.ok(!codeIncludes(viewJs.history, 'btnGlyph btnDanger'));
   assert.ok(codeIncludes(viewJs.history, 'btn.onclick = () => entryMenu.open(btn, r)'));
-  assert.ok(codeIncludes(rawViewJs.history, 'deleteItem(__WEBUI_TEXT__("history.delete_entry"), () => deleteOneHistory(r))'));
+  assert.ok(codeIncludes(rawViewJs.history, 'deleteItem(__WEBUI_TEXT__("history.delete_entry"), () => deleteOneHistory(r), __WEBUI_TEXT__("runtime.delete_this_history_record"),)'));
+  // On a phone every record menu rises as the shared bottom sheet; wider, it
+  // stays anchored to its trigger. A delete is confirmed once, by the menu:
+  // in the sheet itself on a phone, with the confirm dialog elsewhere.
+  const popup = blockAt(viewJs.records, 'function createPopup(');
+  assert.ok(codeIncludes(popup, 'const narrow = matchMedia("(width < 700px)")') &&
+      codeIncludes(popup, 'if (narrow.matches) return openSheet(...args);') &&
+      codeIncludes(popup, 'R.showSheet(s.box, s.backdrop, true)') &&
+      codeIncludes(popup, 'narrow.addEventListener("change", () => close())'));
+  assert.ok(codeIncludes(blockAt(viewJs.records, 'function recordSheet('),
+      'R.sheetGrip(box, [sheet.grab], () => sheetMenu?.close(true))'));
+  assert.ok(codeIncludes(blockAt(viewJs.records, 'function actionMenu('),
+      ': ui.sheet ? ui.ask(ask, ok, run) : (menu.close(), R.askConfirm(ask, ok, true).then((yes) => yes && run()))'));
+  for (const [source, marker] of [[viewJs.stats, 'function deleteOneShot('],
+    [viewJs.history, 'function deleteOneHistory(']])
+    assert.ok(!blockAt(source, marker).includes('askConfirm'), marker + ' must not ask again');
+  // The sheet's head names the record and, for a filter, counts the list.
+  assert.ok(codeIncludes(viewJs.stats, 'btn.dataset.sheetTag = tag;') &&
+      codeIncludes(viewJs.history, 'btn.dataset.sheetHead = historyTypeLabel(r.type) + " · " + time.textContent;'));
+  for (const [source, marker] of [[viewJs.stats, 'function renderShots('],
+    [viewJs.history, 'function renderHistory(']])
+    assert.ok(codeIncludes(blockAt(source, marker), 'refreshRecordSheet();'), marker + ' must refresh the sheet head');
   assert.ok(codeIncludes(viewJs.history, 'if (R.adminUnlockedHere()) {'), 'locked History rows show no button');
   assert.ok(codeIncludes(viewJs.stats, 'admin: () => shotStatsViewActive() && R.paint(renderShots)') &&
             codeIncludes(viewJs.history, 'admin: () => historyViewActive() && R.paint(renderHistory)') &&

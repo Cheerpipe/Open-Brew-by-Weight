@@ -1,0 +1,172 @@
+/* Bottom sheet: a panel that rises from the screen's bottom edge over a
+dimmed page, with a grab handle that drags it closed. Home's quick-weight
+sheet sizes itself in views/preset.css; the Stats and History record menus
+use it on phones, sized to their items. */
+body.sheetOpen {
+  overflow: hidden;
+}
+
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  background: rgb(21 21 21 / 42%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s;
+}
+
+.sheetBackdrop.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 33;
+  display: flex;
+  flex-direction: column;
+  max-height: min(88dvh, 40rem);
+
+  /* Closed, it sits past its own 3.7rem shadow, which would fall on the page. */
+  transform: translateY(calc(100% + 4rem));
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0.32, 1);
+  border-top: 1px solid var(--ln);
+  border-radius: 1.35rem 1.35rem 0 0;
+  background: var(--sf);
+  box-shadow: 0 -1.1rem 2.6rem rgb(0 0 0 / 30%);
+}
+
+.sheet.open {
+  transform: none;
+}
+
+.sheet.nodrag {
+  transition: none;
+}
+
+@media (width >= 700px) {
+  .sheet {
+    left: max(1rem, env(safe-area-inset-left));
+    right: max(1rem, env(safe-area-inset-right));
+    max-width: 760px;
+    margin: 0 auto;
+  }
+}
+
+.sheetGrab {
+  position: relative;
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.7rem;
+  padding: 0.55rem 1rem 0.2rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheetGrab:active {
+  cursor: grabbing;
+}
+
+.sheetGrab i {
+  grid-column: 1/-1;
+  justify-self: center;
+  width: 2.4rem;
+  height: 0.26rem;
+  border-radius: 2rem;
+  background: var(--ln);
+  margin-bottom: 0.35rem;
+}
+
+/* A record menu's sheet: an optional one-line head over its scrolling items,
+and the confirmation step a destructive item swaps in. */
+.sheetMenu .sheetGrab {
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--ln);
+}
+
+.sheetMenu .sheetGrab:has(> .sheetHead:empty):not(:has(> button)) {
+  padding-bottom: 0.2rem;
+  border-bottom: 0;
+}
+
+.sheetHead {
+  min-width: 0;
+  margin: 0;
+  color: var(--mu);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The record's own tag, in the colours of its card's corner tag. */
+.sheetTag {
+  display: inline-block;
+  margin-right: 0.2rem;
+  padding: 0.2rem 0.55rem 0.17rem;
+  border-radius: 1rem;
+  background: var(--ac);
+  color: var(--on);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  vertical-align: 0.08em;
+}
+
+.sheetTag.muted {
+  background: var(--mu);
+  color: var(--sf);
+}
+
+.sheetMenu .histFilterReset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sheetBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.35rem 0.6rem calc(0.6rem + env(safe-area-inset-bottom));
+}
+
+.sheetAsk {
+  padding: 0.9rem 0.4rem 0.2rem;
+  text-align: center;
+}
+
+.sheetAsk p {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.sheetAsk button {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  margin-top: 0.55rem;
+  border: 1px solid var(--ln);
+  border-radius: 1.6rem;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheetAsk .sheetYes {
+  border-color: var(--dn);
+  background: var(--dn);
+  color: var(--sf);
+}
