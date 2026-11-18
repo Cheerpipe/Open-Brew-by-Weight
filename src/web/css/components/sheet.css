@@ -86,6 +86,10 @@ body.sheetOpen {
 
 /* The page sheet: an optional one-line head over its scrolling content, and
 the confirmation step a destructive menu item swaps in. */
+.pageSheet {
+  max-height: 88dvh;
+}
+
 .pageSheet .sheetGrab {
   padding-bottom: 0.55rem;
   border-bottom: 1px solid var(--ln);
