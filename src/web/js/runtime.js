@@ -277,6 +277,7 @@ const uiState = {
   historyTypes: [],
   shotFilter: {},
   statsWindow: 10,
+  statsBand: "range",
   statsPreset: null,
   scanTimer: 0,
   configDirty: false,

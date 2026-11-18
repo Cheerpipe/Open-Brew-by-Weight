@@ -206,6 +206,36 @@
   fill: var(--gFast);
 }
 
+/* The moving range: the spread of the last five shots, fading from its edges
+   to the centre, each half in the colour of its own farthest shot. */
+.consRange {
+  stroke: none;
+}
+
+#statsConsistency .consRange.near {
+  fill: url("#consBandnear");
+}
+
+#statsConsistency .consRange.mid {
+  fill: url("#consBandmid");
+}
+
+#statsConsistency .consRange.far {
+  fill: url("#consBandfar");
+}
+
+#statsCutAccuracy .consRange.near {
+  fill: url("#cutBandnear");
+}
+
+#statsCutAccuracy .consRange.mid {
+  fill: url("#cutBandmid");
+}
+
+#statsCutAccuracy .consRange.far {
+  fill: url("#cutBandfar");
+}
+
 .consMean {
   fill: none;
   stroke: var(--fg);

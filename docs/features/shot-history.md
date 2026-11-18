@@ -17,8 +17,7 @@ averages. The averages and the charts follow your choice. Only the choices that 
 difference appear: every size smaller than the number of good shots in the
 list, plus the first one that covers them all, and none with ten shots or
 fewer. Filtering the list down to fewer shots moves the selection to the
-largest size still shown. Every time you open the Web UI it starts again at
-10. Through [the companion](companion.md#your-whole-history) with its archive,
+largest size still shown. Every time you open the Web UI it starts again at 10. Through [the companion](companion.md#your-whole-history) with its archive,
 Stats covers your whole history and also offers 500 and 1,000. While the
 companion is still catching up with the controller's newest shots, or cannot
 answer, Stats show the controller's own figures instead, with a note saying so,
@@ -72,7 +71,15 @@ green within 5 %, about 1.4 seconds on a 28-second shot, yellow from 5 % to
 10 %, and red beyond 10 %. A shot far outside the chart stops at its edge
 with a dashed cap; move the cursor to it to read its real time.
 
-Behind the columns, a shaded band follows your recent shots, with the newest
+Behind the columns, a shaded band shows how your recent shots spread. The
+**Band** pill above the charts switches between two styles, for both this chart
+and Cut accuracy. **Moving range** (the default) shades the spread of your last
+five shots, from the quickest to the slowest: a narrowing band means your shots
+are settling, a widening one that they are drifting apart. Each half takes the
+color of its own farthest shot among those five, on the same scale as the
+columns. **Weighted trend** is described next.
+
+With Weighted trend, the band follows your recent shots, with the newest
 counting the most: each older shot weighs half as much as the one after it, so
 the band reacts within a few shots when your routine changes. A thin line
 inside it marks your recent average. The band always starts at the dashed line
@@ -767,16 +774,16 @@ post-stop drips; the flow chart also shows their supported rates as a dashed
 continuation. See
 [BBW learning](brew-by-weight.md#cutoff-behavior-and-learning).
 
-| Stop detail | Meaning |
-| --- | --- |
-| `normal_target` | Normal weight endpoint, including offset/prediction |
-| `touch_weight_fallback` | Touch protection blocked the weight stop and the sustained-weight backup ended the shot; Ended shows Sustained weight on Home and Stats, matching Home Assistant's Last shot stop detail |
-| `extended_max_weight` / `extended_min_time` | A fast shot stopped on a raised cut line (**EXTENDED**) |
-| `slow_max_time` / `slow_min_weight` | A slow shot stopped on a lowered cut line (**STOPPED EARLY**) |
-| `auto_to_manual` | The [scale-loss backup](auto-to-manual.md) finished the shot by time |
-| `activator` / `web_stop` | Physical / authenticated Web stop |
-| `wall_limit` / `hard_limit` | Operational / hard time limit |
-| `cup_removed` | Cup-removal protection requested stop |
+| Stop detail                                 | Meaning                                                                                                                                                                                  |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `normal_target`                             | Normal weight endpoint, including offset/prediction                                                                                                                                      |
+| `touch_weight_fallback`                     | Touch protection blocked the weight stop and the sustained-weight backup ended the shot; Ended shows Sustained weight on Home and Stats, matching Home Assistant's Last shot stop detail |
+| `extended_max_weight` / `extended_min_time` | A fast shot stopped on a raised cut line (**EXTENDED**)                                                                                                                                  |
+| `slow_max_time` / `slow_min_weight`         | A slow shot stopped on a lowered cut line (**STOPPED EARLY**)                                                                                                                            |
+| `auto_to_manual`                            | The [scale-loss backup](auto-to-manual.md) finished the shot by time                                                                                                                     |
+| `activator` / `web_stop`                    | Physical / authenticated Web stop                                                                                                                                                        |
+| `wall_limit` / `hard_limit`                 | Operational / hard time limit                                                                                                                                                            |
+| `cup_removed`                               | Cup-removal protection requested stop                                                                                                                                                    |
 
 For example, 39 g against a 36 g goal with a Fast stop detail is not the same
 calibration problem as a normal target cut followed by excess drip. Check the

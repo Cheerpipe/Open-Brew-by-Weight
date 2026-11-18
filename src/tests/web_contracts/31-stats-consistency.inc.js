@@ -64,7 +64,7 @@
 // limits included), and beyond. Bullseyes and guards keep their own marks.
 {
   const assert = require('assert');
-  const {cutModel, statsBand} = new Function(`${blockAt(viewJs.stats, 'const BAND_WEIGHT = ')}
+  const {cutModel, statsBand} = new Function(`${blockAt(viewJs.stats, 'const SPREAD_SHOTS = ')}
       ${blockAt(viewJs.stats, 'const CUT_CLOSE_G = ')};return {cutModel, statsBand};`)();
   const m = cutModel({t: 360, e: [0, 20, -20, 21, -50, 51, -51, 300], g: [0, 0, 0, 0, 0, 0, 0, 1]});
   assert.deepEqual(m.rows.map(m.kind), ['bull', 'near', 'near', 'mid', 'mid', 'far', 'far', 'guard g1']);

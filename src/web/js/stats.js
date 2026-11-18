@@ -733,6 +733,12 @@ function renderStatsDurChart() {
   host.hidden = !d;
   renderStatsConsistency(shots);
   renderStatsCutAccuracy(st, want, !only && nameOf(want));
+  const mode = $("statsBandMode");
+  if (mode) {
+    mode.hidden = $("statsConsistency").hidden && $("statsCutAccuracy").hidden;
+    for (const b of mode.querySelectorAll("button"))
+      b.setAttribute("aria-pressed", String(b.dataset.v === R.uiState.statsBand));
+  }
   if (!d) {
     host.innerHTML = "";
     return;
@@ -890,7 +896,9 @@ function statsSizeLegend(near, mid, far) {
     ["near", R.sub(__WEBUI_TEXT__("runtime.stats_legend_within"), [near])],
     ["mid", R.sub(__WEBUI_TEXT__("runtime.stats_legend_off_range"), mid)],
     ["far", R.sub(__WEBUI_TEXT__("runtime.stats_legend_off_more"), [far])],
-    ["spread", __WEBUI_TEXT__("runtime.stats_legend_spread")],
+    R.uiState.statsBand === "ewma"
+      ? ["spread", __WEBUI_TEXT__("runtime.stats_legend_spread")]
+      : ["spread", R.sub(__WEBUI_TEXT__("runtime.stats_legend_range"), [SPREAD_SHOTS])],
     ["guard g1", __WEBUI_TEXT__("runtime.stats_legend_guard_fast")],
     ["guard g2", __WEBUI_TEXT__("runtime.stats_legend_guard_slow")],
   ];
@@ -904,7 +912,8 @@ function statsSizeLegend(near, mid, far) {
 // and pill, and the `near` and `far` limits that size the band's colours.
 // Colour says how far a shot landed, never which way: the side of the line
 // already says that. Within `near` is green, up to `far` amber, beyond red.
-const BAND_WEIGHT = 0.5,
+const SPREAD_SHOTS = 5,
+  BAND_WEIGHT = 0.5,
   BAND_MIN_SHOTS = 3,
   SIZE_COLORS = { near: "var(--ok)", mid: "var(--lw)", far: "var(--gFast)" },
   sizeOf = (v, near, far) =>
@@ -932,16 +941,9 @@ function statsBand(vals, counts, near, far) {
   }
   return band;
 }
-function missChart(root, c) {
-  const { vals, M } = c,
-    n = vals.length,
-    W = Math.max(10, n),
-    gap = 94 / (W - 1),
-    half = gap * 0.27,
-    X = (i) => 3 + (W - n + i) * gap,
-    Y = (v) => 25 - (23 * Math.max(-M, Math.min(M, v))) / M,
-    f = (v) => v.toFixed(2),
-    band = statsBand(vals, c.counts, c.near, c.far);
+// "ewma": the weighted band, one solid-colour stretch per shot, the recent
+// average drawn over it.
+function statsEwmaBand(band, { X, Y, f }) {
   let svg = "";
   for (let i = 1; i < band.length; i++) {
     const p = band[i - 1],
@@ -965,6 +967,93 @@ function missChart(root, c) {
       '<path class="consMean" d="M' +
       band.map((p) => f(X(p.i)) + " " + f(Y(p.m))).join("L") +
       '"/>';
+  return svg;
+}
+// "range": the spread of the last SPREAD_SHOTS counted shots, fading from its
+// edges to the centre line. A shot's spread starts at its bar's left edge and
+// holds across the bar, then slopes to the next shot's in the gap, keeping its
+// colours. Each half takes the size of its own farthest shot: the highest
+// above the line, the lowest below it.
+function statsRangeBand(c, vals, { n, X, Y, half, f }) {
+  const spread = [];
+  for (let i = 0, win = []; i < n; i++) {
+    if (c.counts(i)) win = [...win, vals[i]].slice(-SPREAD_SHOTS);
+    spread.push(win.length ? win : null);
+  }
+  let svg =
+    "<defs>" +
+    Object.entries(SIZE_COLORS)
+      .map(
+        ([k, color]) =>
+          '<linearGradient id="' +
+          c.id +
+          "Band" +
+          k +
+          '" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="48">' +
+          [0, 0.5, 1]
+            .map(
+              (o) =>
+                '<stop offset="' +
+                o +
+                '" stop-color="' +
+                color +
+                '" stop-opacity="' +
+                (o === 0.5 ? 0.02 : 0.45) +
+                '"/>',
+            )
+            .join("") +
+          "</linearGradient>",
+      )
+      .join("") +
+    "</defs>";
+  const up = (y) => Math.min(y, 25),
+    down = (y) => Math.max(y, 25),
+    part = (k, x0, a0, b0, x1, a1, b1) =>
+      Math.max(b0 - a0, b1 - a1) > 0.01
+        ? '<path class="consRange ' +
+          k +
+          '" d="M' +
+          [x0, a0, x1, a1, x1, b1, x0, b0]
+            .map((v, i) => (i % 2 ? " " : i ? "L" : "") + f(v))
+            .join("") +
+          'Z"/>'
+        : "";
+  for (let i = 0, prev = null; i < n; i++) {
+    const w = spread[i];
+    if (!w) continue;
+    const s = {
+        x: X(i),
+        hi: Y(Math.max(...w)),
+        lo: Y(Math.min(...w)),
+        up: sizeOf(Math.max(0, ...w), c.near, c.far),
+        down: sizeOf(Math.min(0, ...w), c.near, c.far),
+      },
+      L = s.x - half;
+    if (prev)
+      svg +=
+        part(prev.up, prev.x + half, up(prev.hi), up(prev.lo), L, up(s.hi), up(s.lo)) +
+        part(prev.down, prev.x + half, down(prev.hi), down(prev.lo), L, down(s.hi), down(s.lo));
+    svg +=
+      part(s.up, L, up(s.hi), up(s.lo), s.x + half, up(s.hi), up(s.lo)) +
+      part(s.down, L, down(s.hi), down(s.lo), s.x + half, down(s.hi), down(s.lo));
+    prev = s;
+  }
+  return svg;
+}
+function missChart(root, c) {
+  const { vals, M } = c,
+    n = vals.length,
+    W = Math.max(10, n),
+    gap = 94 / (W - 1),
+    half = gap * 0.27,
+    X = (i) => 3 + (W - n + i) * gap,
+    Y = (v) => 25 - (23 * Math.max(-M, Math.min(M, v))) / M,
+    f = (v) => v.toFixed(2),
+    geo = { n, X, Y, half, f };
+  let svg =
+    R.uiState.statsBand === "ewma"
+      ? statsEwmaBand(statsBand(vals, c.counts, c.near, c.far), geo)
+      : statsRangeBand(c, vals, geo);
   let rings = "";
   for (let i = 0; i < n; i++) {
     const v = vals[i],
@@ -3188,6 +3277,11 @@ export function init() {
     $("sortRatingButton").onclick = () => setShotSort("rating");
     syncShotSortButtons();
   }
+  for (const b of $("statsBandMode").querySelectorAll("button"))
+    b.onclick = () => {
+      R.uiState.statsBand = b.dataset.v;
+      renderShotStats();
+    };
   for (const b of $("statsWindow").querySelectorAll("button"))
     b.onclick = () => {
       R.uiState.statsWindow = +b.dataset.v;

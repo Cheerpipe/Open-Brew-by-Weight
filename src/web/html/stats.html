@@ -83,6 +83,19 @@
       </div>
     </div>
     <div id="statsDurChart"></div>
+    <div class="statsWindowBar">
+      <div
+        id="statsBandMode"
+        class="shotSort"
+        role="group"
+        aria-label="{{webui:stats.band_choice}}"
+        hidden
+      >
+        <span class="sortLbl">{{webui:stats.band}}</span
+        ><button type="button" data-v="range">{{webui:stats.band_range}}</button
+        ><button type="button" data-v="ewma">{{webui:stats.band_ewma}}</button>
+      </div>
+    </div>
     <div id="statsConsistency" class="ruleChart" hidden></div>
     <div id="statsCutAccuracy" class="ruleChart" hidden></div>
   </div>
