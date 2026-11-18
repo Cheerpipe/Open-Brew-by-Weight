@@ -141,8 +141,10 @@ dialog .btnBar {
   margin-left: auto;
   padding: 0 1rem;
   border: 0;
+  outline: 0;
   border-radius: 2rem;
   background: transparent;
+  -webkit-tap-highlight-color: transparent;
   color: var(--ac);
   font: inherit;
   font-weight: 700;
