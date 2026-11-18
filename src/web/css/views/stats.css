@@ -1,5 +1,18 @@
 #statsDurChart {
-  margin-top: 1.35rem;
+  margin-top: 1rem;
+}
+
+/* Each chart is a card of its own, like a Shots card, titled at its top. */
+:is(#statsDurChartPlot, #statsConsistency, #statsCutAccuracy) {
+  padding: 1rem;
+  background: var(--sf);
+  border: 1px solid var(--ln);
+  border-radius: var(--r);
+}
+
+/* The averages under the first row sit centred in their columns. */
+.shotCard > :nth-child(n + 3) {
+  text-align: center;
 }
 
 /* The chart toolbar, floating at the top of Stats like the Shots one: one
@@ -67,7 +80,7 @@ from Bands down (app.js fitBar). */
 
 /* The section titles: one per chart, with room above each later chart. */
 :is(#statsDurChartPlot, #statsConsistency, #statsCutAccuracy) > .dcTitle {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.6rem;
   font-size: 0.95rem;
   font-weight: 650;
   color: var(--fg);
@@ -75,7 +88,7 @@ from Bands down (app.js fitBar). */
 
 #statsConsistency,
 #statsCutAccuracy {
-  margin-top: 2.4rem;
+  margin-top: 1rem;
 }
 
 /* The verdict's colour; amber text takes the darker --wn to stay readable. */
