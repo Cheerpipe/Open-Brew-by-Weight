@@ -6,7 +6,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem;
 }
 
@@ -63,28 +63,23 @@
   margin-top: 2.4rem;
 }
 
+/* The verdict's colour; amber text takes the darker --wn to stay readable. */
 #statsConsistency {
   --zf: 33.333%;
   --zo: 33.333%;
   --z: var(--mu);
-  --zl: var(--mu);
-  --zs: color-mix(in srgb, var(--zl) 55%, var(--sf));
-  --bc: var(--zs);
 }
 
 #statsConsistency[data-level="good"] {
   --z: var(--ok);
-  --zl: var(--ok);
 }
 
 #statsConsistency[data-level="fair"] {
   --z: var(--wn);
-  --zl: var(--lw);
 }
 
 #statsConsistency[data-level="poor"] {
   --z: var(--ac);
-  --zl: var(--ac);
 }
 
 #statsConsistency span,
@@ -94,11 +89,6 @@
 
 #statsConsistency .statsDensZones > :first-child {
   color: var(--z);
-}
-
-/* Cut accuracy: four figures; bars coloured by where each stop settled. */
-#statsCutAccuracy {
-  --cutIn: color-mix(in srgb, var(--ok) 50%, var(--sf));
 }
 
 /* With All, the active preset it follows, beside its title. */
@@ -148,21 +138,17 @@
   white-space: nowrap;
 }
 
-/* Each bar's colour: --bc from its class, the level's tones in Consistency. */
-#statsConsistency .out {
-  --bc: var(--zl);
+/* Each bar's colour: --bc from its class, by how far the shot landed. */
+:is(#statsConsistency, #statsCutAccuracy) .near {
+  --bc: var(--ok);
 }
 
-#statsCutAccuracy .in {
-  --bc: var(--cutIn);
+:is(#statsConsistency, #statsCutAccuracy) .mid {
+  --bc: var(--lw);
 }
 
-#statsCutAccuracy .over {
+:is(#statsConsistency, #statsCutAccuracy) .far {
   --bc: var(--gFast);
-}
-
-#statsCutAccuracy .under {
-  --bc: var(--gSlow);
 }
 
 :is(#statsConsistency, #statsCutAccuracy) .g1 {
@@ -201,33 +187,34 @@
   stroke-dasharray: 3 2;
 }
 
-/* The spread of the last five shots, fading from its edges to the centre. */
+/* The spread of the last five shots, fading from its edges to the centre,
+   each half in the colour of its own farthest shot. */
 .consSpread {
   stroke: none;
 }
 
-#statsConsistency .consSpread.good {
-  fill: url("#consBandgood");
+#statsConsistency .consSpread.near {
+  fill: url("#consBandnear");
 }
 
-#statsConsistency .consSpread.fair {
-  fill: url("#consBandfair");
+#statsConsistency .consSpread.mid {
+  fill: url("#consBandmid");
 }
 
-#statsConsistency .consSpread.poor {
-  fill: url("#consBandpoor");
+#statsConsistency .consSpread.far {
+  fill: url("#consBandfar");
 }
 
-#statsCutAccuracy .consSpread.over {
-  fill: url("#cutBandover");
+#statsCutAccuracy .consSpread.near {
+  fill: url("#cutBandnear");
 }
 
-#statsCutAccuracy .consSpread.in {
-  fill: url("#cutBandin");
+#statsCutAccuracy .consSpread.mid {
+  fill: url("#cutBandmid");
 }
 
-#statsCutAccuracy .consSpread.under {
-  fill: url("#cutBandunder");
+#statsCutAccuracy .consSpread.far {
+  fill: url("#cutBandfar");
 }
 
 .cutRing {
@@ -332,8 +319,7 @@
   --bc: var(--gFast);
 }
 
-.statsLegend .on,
-.statsLegend .good {
+.statsLegend .on {
   --bc: var(--ok);
 }
 
@@ -341,12 +327,15 @@
   --bc: var(--gSlow);
 }
 
-.statsLegend .fair {
-  --bc: var(--lw);
-}
-
-.statsLegend .poor {
-  --bc: var(--ac);
+/* The band's swatch has no tip: one stripe per colour the band can take. */
+.statsLegend .spread {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ok) 35%, var(--sf)) 0 33%,
+    color-mix(in srgb, var(--lw) 35%, var(--sf)) 33% 67%,
+    color-mix(in srgb, var(--gFast) 35%, var(--sf)) 67%
+  );
+  box-shadow: none;
 }
 
 .statsLegend .bull {
@@ -355,9 +344,10 @@
   box-shadow: inset 0 0 0 2px var(--ok);
 }
 
+/* A guard's swatch: neutral under a dashed border in the guard's colour. */
 .statsLegend .guard {
   background: color-mix(in srgb, var(--fg) 12%, var(--sf));
   box-shadow: none;
-  outline: 1.5px dashed var(--mu);
+  outline: 1.5px dashed var(--bc, var(--mu));
   outline-offset: -1.5px;
 }

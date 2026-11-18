@@ -1324,7 +1324,6 @@ if (!statsSection ||
     !statsSection[1].includes('id="statsAvgDaily"') ||
     !statsSection[1].includes('id="statsAvgErr"') ||
     !statsSection[1].includes('id="statsAvgFlow"') ||
-    !statsSection[1].includes('id="statsWindowHint" class="fieldHint"') ||
     !statsSection[1].includes('id="statsWindow" class="shotSort" role="group"') ||
     !['10', '50', '100'].every((n) => statsSection[1].includes(`data-v="${n}">${n}</button`)) ||
     !codeIncludes(viewJs.stats, 'R.sendUiOperation({op:"stats",on:true,window:Math.min(R.uiState.statsWindow,100)});') ||

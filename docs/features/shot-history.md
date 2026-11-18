@@ -13,8 +13,7 @@ refreshing in the background even while you are elsewhere in the interface, so
 the page always opens instantly with the latest shots.
 
 Choose how far back Stats looks with **Last 10**, **50**, or **100** under the
-averages. The averages and the charts follow your choice, and the note beside
-it says how many shots they actually cover. Only the choices that make a
+averages. The averages and the charts follow your choice. Only the choices that make a
 difference appear: every size smaller than the number of good shots in the
 list, plus the first one that covers them all, and none with ten shots or
 fewer. Filtering the list down to fewer shots moves the selection to the
@@ -68,19 +67,21 @@ older ones move left. The chart always has room for at least 10 columns; with
 width, so 20 shots look the same under both choices and only grow thinner when
 you have more shots to show. Each column starts at your average time to the target,
 the dashed line, and shows how much slower (up) or faster (down) that shot was.
-Columns more than 5 % from the average, about 1.4 seconds on a 28-second shot,
-are drawn in a stronger color. A shot far outside the chart stops at its edge
+A column's color says how far that shot landed from the average, whichever way:
+green within 5 %, about 1.4 seconds on a 28-second shot, yellow from 5 % to
+10 %, and red beyond 10 %. A shot far outside the chart stops at its edge
 with a dashed cap; move the cursor to it to read its real time.
 
 Behind the columns, a shaded band follows your last five shots, from the
 quickest to the slowest of them: a narrowing band means your shots are
-settling, a widening one that they are drifting apart. It is colored by the
-same verdict as the numbers above it, applied to those five shots: green while
-they are very consistent, yellow when fairly consistent, and orange when they
-vary a lot. A shot that a [fast or slow shot guard](fast-and-slow-shots.md)
-stopped is drawn in grey with a dashed outline, red when the guard let a fast
-shot run longer and blue when it ended a slow one early. It still counts: how
-long it took is part of how much your shots vary.
+settling, a widening one that they are drifting apart. Each half of the band
+takes the color of its own farthest shot among those five, on the same scale
+as the columns: the half above the line follows the slowest shot, the half
+below the quickest. The band changes where the shot that changed it starts.
+A shot that a [fast or slow shot guard](fast-and-slow-shots.md) stopped is
+drawn in grey with a dashed outline, red when the guard let a fast shot run
+longer and blue when it ended a slow one early. It still counts: how long it
+took is part of how much your shots vary.
 
 The limits scale with your recipe, because one second matters more on a
 20-second ristretto than on a 45-second lungo. When the shots shown come from a
@@ -88,10 +89,10 @@ single preset, the chart and its numbers read in seconds. When they come from
 several presets, each shot is compared with its own preset's average and the
 chart reads in percent, so different recipes can share it fairly.
 
-The numbers above the chart sum it up. The first is how much your time
-typically changes from one shot to the next, with a verdict: **Very
-consistent** up to 5 % of your average, **Fairly consistent** up to 10 %, and
-**Varies a lot** beyond that. A single odd shot does not change the verdict on
+The numbers above the chart sum it up. The first is how far a shot typically
+lands from your average, the same distance the columns show, with a verdict:
+**Very consistent** up to 5 % of your average, **Fairly consistent** up to
+10 %, and **Varies a lot** beyond that. A single odd shot does not change the verdict on
 its own. **Spread** is the gap between your fastest and slowest shot, and
 **Shots** is how many are shown. With fewer than 5 shots the verdict reads
 **Not enough shots yet**. Drag the cursor's dot across the chart, or focus it
@@ -106,12 +107,13 @@ asks for. A stop can only be judged against its own preset's target, so with
 **All** chosen above it shows the active preset, named beside its title, and
 follows it when you switch presets. Each column is one shot, newest on the
 right, starting at the target, the dashed line, and rising for a cup that
-settled heavier or falling for one that settled lighter. Columns within
-**0.2 g** of the target are green, heavier ones red and lighter ones blue. A
+settled heavier or falling for one that settled lighter. As on the Shot
+consistency chart, a column's color says how far it missed, whichever way:
+green within **0.2 g** of the target, yellow up to 0.5 g, and red beyond. A
 ring on the line is a **bullseye**: a cup that settled exactly on the target,
 the same moment the Bullseye melody plays for. The shaded band behind follows
-your last five stops, green where it stays within 0.2 g and red or blue where
-it reaches beyond.
+your last five stops the same way, each half in the color of its own farthest
+stop.
 
 A shot that a fast or slow shot guard stopped on purpose, heavier or lighter
 than the target by design, is drawn in grey with a dashed outline and left out

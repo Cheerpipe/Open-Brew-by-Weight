@@ -824,7 +824,6 @@ function renderStatsDurChart() {
           ? R.sub(__WEBUI_TEXT__("runtime.stats_legend_slow"), [L(b, "s")])
           : __WEBUI_TEXT__("runtime.stats_legend_slow_window"),
       ],
-      [null, __WEBUI_TEXT__("runtime.stats_legend_curve")],
     ]);
   fillChartTicks(
     host.querySelector(".ruleChartTicks"),
@@ -836,8 +835,8 @@ function renderStatsDurChart() {
 // Consistency of the window's timed shots, oldest first: each shot's time to
 // target as a share of its own preset's average, so recipes of any length
 // compare fairly.
-// The level is the median change between neighbouring shots, so one odd shot
-// cannot decide it; the band uses the same 5 %.
+// The level is the median distance from that average, so one odd shot cannot
+// decide it; the bars and the band are coloured by the same 5 % and 10 %.
 const CONSISTENT = 0.05,
   VARIED = 0.1;
 function consistencyModel(rows) {
@@ -846,11 +845,8 @@ function consistencyModel(rows) {
   for (const r of rows) (avg[r.presetId] ??= []).push(r.arrivalS);
   for (const k in avg) avg[k] = avg[k].reduce((a, v) => a + v, 0) / avg[k].length;
   const rel = rows.map((r) => r.arrivalS / avg[r.presetId] - 1),
-    j = rel
-      .slice(1)
-      .map((v, i) => Math.abs(v - rel[i]))
-      .sort((a, b) => a - b),
-    typical = n < 5 ? null : (j[(j.length - 1) >> 1] + j[j.length >> 1]) / 2,
+    d = rel.map(Math.abs).sort((a, b) => a - b),
+    typical = n < 5 ? null : (d[(n - 1) >> 1] + d[n >> 1]) / 2,
     // One preset reads in seconds (sec is its average), several in percent.
     sec = Object.keys(avg).length === 1 ? avg[rows[0].presetId] : 0,
     // Never narrower than twice the band, never so wide one outlier flattens
@@ -887,15 +883,31 @@ function statsLegend(items) {
     "</div>"
   );
 }
+// Consistency and Cut accuracy share one legend: the three sizes, the band and
+// each guard, the limits written in the chart's own units.
+function statsSizeLegend(near, mid, far) {
+  return [
+    ["near", R.sub(__WEBUI_TEXT__("runtime.stats_legend_within"), [near])],
+    ["mid", R.sub(__WEBUI_TEXT__("runtime.stats_legend_off_range"), mid)],
+    ["far", R.sub(__WEBUI_TEXT__("runtime.stats_legend_off_more"), [far])],
+    ["spread", R.sub(__WEBUI_TEXT__("runtime.stats_legend_spread"), [SPREAD_SHOTS])],
+    ["guard g1", __WEBUI_TEXT__("runtime.stats_legend_guard_fast")],
+    ["guard g2", __WEBUI_TEXT__("runtime.stats_legend_guard_slow")],
+  ];
+}
 // Consistency and Cut accuracy share one frame: a column per shot (at least
 // ten, latest on the right) on a 0–100 × 0–50 plot whose centre line is the
 // reference; the spread of the last five counted shots behind the bars;
 // tinted bars with a solid tip, guard-stopped ones neutral under a dashed
 // border; the scale in a right gutter; and the shot cursor with its pill.
 // `c` gives the title, figures, values and scale, each bar's class, colour
-// and pill, and the band's colours: per stretch by `level`, or per zone
-// around ±`tol` when given.
-const SPREAD_SHOTS = 5;
+// and pill, and the `near` and `far` limits that size the band's colours.
+// Colour says how far a shot landed, never which way: the side of the line
+// already says that. Within `near` is green, up to `far` amber, beyond red.
+const SPREAD_SHOTS = 5,
+  SIZE_COLORS = { near: "var(--ok)", mid: "var(--lw)", far: "var(--gFast)" },
+  sizeOf = (v, near, far) =>
+    Math.abs(v) <= near + 1e-9 ? "near" : Math.abs(v) <= far + 1e-9 ? "mid" : "far";
 function missChart(root, c) {
   const { vals, M } = c,
     n = vals.length,
@@ -910,11 +922,10 @@ function missChart(root, c) {
     if (c.counts(i)) win = [...win, vals[i]].slice(-SPREAD_SHOTS);
     spread.push(win.length ? win : null);
   }
-  const pts = spread.map((w, i) => w && [f(X(i)), f(Y(Math.max(...w))), f(Y(Math.min(...w)))]);
   // The band fades from its outer edges to the centre line, up and down.
   let svg =
     "<defs>" +
-    c.bands
+    Object.entries(SIZE_COLORS)
       .map(
         ([k, color]) =>
           '<linearGradient id="' +
@@ -938,64 +949,42 @@ function missChart(root, c) {
       )
       .join("") +
     "</defs>";
-  if (c.tol == null) {
-    for (let i = 1; i < n; i++)
-      if (pts[i - 1] && pts[i])
-        svg +=
-          '<path class="consSpread ' +
-          c.level(spread[i]) +
+  // A shot's spread starts at its bar's left edge and holds across the bar,
+  // then slopes to the next shot's in the gap, keeping its colours, so the
+  // band changes where the shot that changed it starts. Each half takes the
+  // size of its own farthest shot: the highest above the line, the lowest
+  // below it.
+  const up = (y) => Math.min(y, 25),
+    down = (y) => Math.max(y, 25),
+    part = (k, x0, a0, b0, x1, a1, b1) =>
+      Math.max(b0 - a0, b1 - a1) > 0.01
+        ? '<path class="consSpread ' +
+          k +
           '" d="M' +
-          [
-            pts[i - 1][0],
-            pts[i - 1][1],
-            pts[i][0],
-            pts[i][1],
-            pts[i][0],
-            pts[i][2],
-            pts[i - 1][0],
-            pts[i - 1][2],
-          ]
-            .map((v, k) => (k % 2 ? " " : k ? "L" : "") + v)
+          [x0, a0, x1, a1, x1, b1, x0, b0]
+            .map((v, i) => (i % 2 ? " " : i ? "L" : "") + f(v))
             .join("") +
-          'Z"/>';
-  } else {
-    const line = pts.filter(Boolean),
-      top = Y(c.tol),
-      bottom = Y(-c.tol);
-    if (line.length > 1) {
-      const d =
-        "M" +
-        line.map((q) => q[0] + " " + q[1]).join("L") +
-        "L" +
-        line
-          .reverse()
-          .map((q) => q[0] + " " + q[2])
-          .join("L") +
-        "Z";
-      for (const [k, y0, y1] of [
-        ["over", -5, top],
-        ["in", top, bottom],
-        ["under", bottom, 55],
-      ])
-        svg +=
-          '<clipPath id="' +
-          c.id +
-          "Zone" +
-          k +
-          '"><rect x="0" width="100" y="' +
-          f(y0) +
-          '" height="' +
-          f(y1 - y0) +
-          '"/></clipPath><path class="consSpread ' +
-          k +
-          '" clip-path="url(#' +
-          c.id +
-          "Zone" +
-          k +
-          ')" d="' +
-          d +
-          '"/>';
-    }
+          'Z"/>'
+        : "";
+  for (let i = 0, prev = null; i < n; i++) {
+    const w = spread[i];
+    if (!w) continue;
+    const s = {
+        x: X(i),
+        hi: Y(Math.max(...w)),
+        lo: Y(Math.min(...w)),
+        up: sizeOf(Math.max(0, ...w), c.near, c.far),
+        down: sizeOf(Math.min(0, ...w), c.near, c.far),
+      },
+      L = s.x - half;
+    if (prev)
+      svg +=
+        part(prev.up, prev.x + half, up(prev.hi), up(prev.lo), L, up(s.hi), up(s.lo)) +
+        part(prev.down, prev.x + half, down(prev.hi), down(prev.lo), L, down(s.hi), down(s.lo));
+    svg +=
+      part(s.up, L, up(s.hi), up(s.lo), s.x + half, up(s.hi), up(s.lo)) +
+      part(s.down, L, down(s.hi), down(s.lo), s.x + half, down(s.hi), down(s.lo));
+    prev = s;
   }
   let rings = "";
   for (let i = 0; i < n; i++) {
@@ -1109,16 +1098,8 @@ function renderStatsConsistency(shots) {
       sec ? R.axisLabel(v * sec, __WEBUI_TEXT__("runtime.s")) : +(v * 100).toFixed(1) + "%",
     signed = (v, k = Math.round(v * (sec || 100) * 10)) =>
       (k > 0 ? "+" : k < 0 ? "−" : "") + L(Math.abs(v)),
-    out = (i) => Math.abs(rel[i]) > CONSISTENT,
-    // Each stretch of the band takes the level the figures use, over its window.
-    level = (w) => {
-      const j = w
-          .slice(1)
-          .map((v, i) => Math.abs(v - w[i]))
-          .sort((a, b) => a - b),
-        typical = j.length ? (j[(j.length - 1) >> 1] + j[j.length >> 1]) / 2 : 0;
-      return typical <= CONSISTENT ? "good" : typical <= VARIED ? "fair" : "poor";
-    };
+    size = (i) => sizeOf(rel[i], CONSISTENT, VARIED),
+    pct = (v) => Math.round(v * 100);
   root.dataset.level = m.level;
   missChart(root, {
     id: "cons",
@@ -1146,15 +1127,11 @@ function renderStatsConsistency(shots) {
     M,
     // Guard-stopped shots still count: their timing is the variation shown.
     counts: () => true,
-    cls: (i) => (rows[i].guard ? "guard g" + rows[i].guard : out(i) ? "out" : "close"),
+    cls: (i) => (rows[i].guard ? "guard g" + rows[i].guard : size(i)),
     guard: (i) => rows[i].guard,
-    color: (i) => (rows[i].guard ? guardColor(rows[i].guard) : out(i) ? "var(--zl)" : "var(--zs)"),
-    level,
-    bands: [
-      ["good", "var(--ok)"],
-      ["fair", "var(--lw)"],
-      ["poor", "var(--ac)"],
-    ],
+    color: (i) => (rows[i].guard ? guardColor(rows[i].guard) : SIZE_COLORS[size(i)]),
+    near: CONSISTENT,
+    far: VARIED,
     edges: ["+" + L(M), sec ? L(1) : __WEBUI_TEXT__("runtime.consistency_avg"), "−" + L(M)],
     pill: (i) =>
       R.sub(__WEBUI_TEXT__("runtime.consistency_pill"), [
@@ -1164,22 +1141,20 @@ function renderStatsConsistency(shots) {
         signed(rel[i]),
       ]),
     aria: __WEBUI_TEXT__("runtime.consistency_cursor"),
-    legend: [
-      ["close", __WEBUI_TEXT__("runtime.consistency_legend_close")],
-      ["out", __WEBUI_TEXT__("runtime.consistency_legend_off")],
-      [null, __WEBUI_TEXT__("runtime.consistency_legend_band")],
-      ["good", __WEBUI_TEXT__("runtime.consistency_good")],
-      ["fair", __WEBUI_TEXT__("runtime.consistency_fair")],
-      ["poor", __WEBUI_TEXT__("runtime.consistency_poor")],
-      ["guard", __WEBUI_TEXT__("runtime.stats_legend_guard")],
-    ],
+    legend: statsSizeLegend(
+      pct(CONSISTENT) + "%",
+      [pct(CONSISTENT), pct(VARIED) + "%"],
+      pct(VARIED) + "%",
+    ),
   });
 }
 // Cut accuracy: how far each automatic stop of the chosen preset settled
 // from its target, from the header's "cut" series (oldest first). A bullseye
 // settles exactly on the target, as the Bullseye melody counts it; shots a
-// guard stopped on purpose are drawn but not scored.
-const CUT_CLOSE_G = 0.2;
+// guard stopped on purpose are drawn but not scored. Past CUT_CLOSE_G a miss
+// is amber, past CUT_FAR_G red.
+const CUT_CLOSE_G = 0.2,
+  CUT_FAR_G = 0.5;
 function cutModel(cut) {
   const rows = cut.e.map((e, i) => ({
       targetG: (Array.isArray(cut.t) ? cut.t[i] : cut.t) / 10,
@@ -1191,11 +1166,7 @@ function cutModel(cut) {
         ? "guard g" + r.guard
         : !Math.round(r.missG * 100)
           ? "bull"
-          : Math.abs(r.missG) <= CUT_CLOSE_G + 1e-9
-            ? "in"
-            : r.missG > 0
-              ? "over"
-              : "under",
+          : sizeOf(r.missG, CUT_CLOSE_G, CUT_FAR_G),
     scored = rows.filter((r) => !r.guard),
     mean = (f) => scored.reduce((s, r) => s + f(r), 0) / (scored.length || 1),
     max = Math.max(0, ...scored.map((r) => Math.abs(r.missG)));
@@ -1235,19 +1206,14 @@ function renderStatsCutAccuracy(st, preset, active) {
   const m = cutModel(st.cut),
     { rows, kind, M } = m,
     g = __WEBUI_TEXT__("runtime.g"),
-    grams = (v) => {
+    num = (v) => {
       const t = (Math.round(v * 100) / 100).toFixed(2);
-      return (t.endsWith("0") ? t.slice(0, -1) : t) + " " + g;
+      return t.endsWith("0") ? t.slice(0, -1) : t;
     },
+    grams = (v) => num(v) + " " + g,
     // The sign follows the hundredths shown, so a rounded zero reads ±0.
     signed = (v, k = Math.round(v * 100)) => (k > 0 ? "+" : k < 0 ? "−" : "±") + grams(Math.abs(v)),
     pct = (k) => (m.scored ? Math.round((100 * k) / m.scored) + "%" : "—"),
-    colors = {
-      bull: "var(--ok)",
-      in: "var(--cutIn)",
-      over: "var(--gFast)",
-      under: "var(--gSlow)",
-    },
     within = R.sub(__WEBUI_TEXT__("runtime.cut_within"), [grams(CUT_CLOSE_G)]);
   missChart(root, {
     id: "cut",
@@ -1280,13 +1246,12 @@ function renderStatsCutAccuracy(st, preset, active) {
     cls: (i) => kind(rows[i]),
     ring: (i) => kind(rows[i]) === "bull",
     guard: (i) => rows[i].guard,
-    color: (i) => (rows[i].guard ? guardColor(rows[i].guard) : colors[kind(rows[i])]),
-    tol: CUT_CLOSE_G,
-    bands: [
-      ["over", "var(--gFast)"],
-      ["in", "var(--ok)"],
-      ["under", "var(--gSlow)"],
-    ],
+    color: (i) =>
+      rows[i].guard
+        ? guardColor(rows[i].guard)
+        : SIZE_COLORS[sizeOf(rows[i].missG, CUT_CLOSE_G, CUT_FAR_G)],
+    near: CUT_CLOSE_G,
+    far: CUT_FAR_G,
     edges: [
       "+" + grams(M),
       m.oneTarget ? grams(rows[0].targetG) : __WEBUI_TEXT__("runtime.cut_target"),
@@ -1301,10 +1266,11 @@ function renderStatsCutAccuracy(st, preset, active) {
     aria: __WEBUI_TEXT__("runtime.cut_cursor"),
     legend: [
       ["bull", __WEBUI_TEXT__("runtime.cut_bullseye")],
-      ["in", within],
-      ["over", __WEBUI_TEXT__("runtime.cut_over")],
-      ["under", __WEBUI_TEXT__("runtime.cut_under")],
-      ["guard", __WEBUI_TEXT__("runtime.stats_legend_guard")],
+      ...statsSizeLegend(
+        grams(CUT_CLOSE_G),
+        [num(CUT_CLOSE_G), grams(CUT_FAR_G)],
+        grams(CUT_FAR_G),
+      ),
     ],
   });
 }
@@ -1327,20 +1293,11 @@ function renderShotStats() {
   q("Daily", s.shotsPerDay == null ? z : s.shotsPerDay.toFixed(1));
   q("Err", f(s.avgErrorPct, 1, "%"), s.avgErrorPct);
   q("Flow", f(s.avgFlowGps, 2, __WEBUI_TEXT__("runtime.g_s")));
-  const hint = $("statsWindowHint"),
-    note = $("statsHeaderNote"),
-    c = s.shotCount || 0;
+  const note = $("statsHeaderNote");
   note.hidden = !!statsMerged || !(R.archiveView || archiveStatsReady());
   note.textContent = R.archiveView
     ? __WEBUI_TEXT__("stats.header_unavailable")
     : __WEBUI_TEXT__("stats.header_controller_only");
-  if (hint) {
-    hint.hidden = !c;
-    hint.textContent =
-      c === 1
-        ? __WEBUI_TEXT__("runtime.stats_window_one")
-        : R.sub(__WEBUI_TEXT__("runtime.stats_window_hint"), [c]);
-  }
   statsWindowChoices();
   renderStatsDurChart();
 }

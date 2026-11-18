@@ -1,6 +1,7 @@
-// Stats consistency model: thresholds as a share of each preset's average, units
-// per data (seconds for one preset, percent for several), and a vertical scale
-// with a floor, an outlier cap and tidy label steps.
+// Stats consistency model: the verdict is the median distance from each
+// preset's average, as the bars show it, with thresholds as a share of that
+// average; units per data (seconds for one preset, percent for several), and a
+// vertical scale with a floor, an outlier cap and tidy label steps.
 {
   const assert = require('assert');
   const model = new Function(`${blockAt(viewJs.stats, 'const CONSISTENT = ')};return consistencyModel;`)();
@@ -18,12 +19,16 @@
   near(flat.M * flat.sec, 3, 'flat scale in seconds');
   near(flat.spread, 0, 'flat spread');
 
-  // Neighbour changes of 4 %, 8 % and 13.3 % of a 30 s average.
-  assert.equal(model(shots(alternate(29.4, 30.6))).level, 'good');
-  const fair = model(shots(alternate(28.8, 31.2)));
+  // Shots 4 %, 8 % and 13.3 % away from a 30 s average.
+  assert.equal(model(shots(alternate(28.8, 31.2))).level, 'good');
+  const fair = model(shots(alternate(27.6, 32.4)));
   assert.equal(fair.level, 'fair');
   near(fair.typical * fair.sec, 2.4, 'fair typical in seconds');
-  assert.equal(model(shots(alternate(28, 32))).level, 'poor');
+  assert.equal(model(shots(alternate(26, 34))).level, 'poor');
+  // A steady drift keeps each shot close to the one before it, yet far from
+  // the average: the verdict follows the distance the bars show.
+  const drift = model(shots(Array.from({length: 10}, (_, i) => 26 + (i * 8) / 9)));
+  assert.equal(drift.level, 'fair');
 
   // Fewer than five shots never get a verdict.
   const few = model(shots([30, 31, 29]));
@@ -54,6 +59,17 @@
   const short = model(shots(Array(10).fill(18)));
   near(short.M * short.sec, 2, 'short shot scale in seconds');
 }
+// Consistency and Cut accuracy colour bars and band by how far a shot
+// landed, never by its side: within the near limit, up to the far one (both
+// limits included), and beyond. Bullseyes and guards keep their own marks.
+{
+  const assert = require('assert');
+  const cutModel = new Function(`${blockAt(viewJs.stats, 'const SPREAD_SHOTS = ')}
+      ${blockAt(viewJs.stats, 'const CUT_CLOSE_G = ')};return cutModel;`)();
+  const m = cutModel({t: 360, e: [0, 20, -20, 21, -50, 51, -51, 300], g: [0, 0, 0, 0, 0, 0, 0, 1]});
+  assert.deepEqual(m.rows.map(m.kind), ['bull', 'near', 'near', 'mid', 'mid', 'far', 'far', 'guard g1']);
+  assert.equal(m.within, 3, 'a guard-stopped shot is drawn but never scored');
+}
 // Preset names are user text: the consistency pill escapes them before the
 // pill writes its label as markup.
 {
@@ -80,7 +96,7 @@
         (key) => 'translated ' + key, () => {}, () => header, () => {}, statsMerged, () => ready);
   render(null, false);
   assert.deepEqual(filled, ['statsAvgDur', 'statsAvgWeight', 'statsAvgDaily', 'statsAvgErr',
-    'statsAvgFlow', 'statsWindowHint', 'statsHeaderNote']);
+    'statsAvgFlow', 'statsHeaderNote']);
   // D12: opened directly no note; through the companion without its header the
   // controller's figures are labelled; the archive view says none are there.
   assert.equal(nodes.statsHeaderNote.hidden, true, 'opened directly, Stats need no note');
