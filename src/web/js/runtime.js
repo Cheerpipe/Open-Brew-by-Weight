@@ -2861,7 +2861,8 @@ function dismissOnController(card, key) {
 }
 // A closed card leaves an Undo strip in its place for 6 s (the strip's
 // countdown in bars.css); each card keeps its own. Its commit waits for its
-// strip to end or the page to hide, so an undone close sends nothing.
+// strip to end or the page to hide, so an undone close sends nothing. The
+// strip takes the card's accent for its edge and countdown line.
 const closing = new Map();
 function endClose(card, keep) {
   const c = closing.get(card);
@@ -2882,6 +2883,7 @@ function closeCard(card, text, commit) {
     undo = document.createElement("button");
   strip.className = "cardUndo";
   strip.setAttribute("role", "status");
+  strip.style.setProperty("--cardAc", getComputedStyle(card).borderLeftColor);
   undo.type = "button";
   undo.textContent = __WEBUI_TEXT__("runtime.undo");
   undo.onclick = () => endClose(card, false);
