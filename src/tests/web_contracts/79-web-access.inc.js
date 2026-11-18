@@ -30,11 +30,21 @@
                        '{"/api/v1/auth/login", HTTP_POST, authLoginHandler, false, true}',
                        '{"/api/v1/auth/logout", HTTP_POST, authLogoutHandler, false, true}',
                        '{"/api/v1/auth/access", HTTP_POST, authAccessHandler}',
-                       '{"/api/v1/auth/notice", HTTP_POST, authNoticeHandler}',
                        '{"/api/v1/auth/pairing", HTTP_POST, authPairingHandler}']) {
     assert.ok(network.includes(route), `Missing access route ${route}`);
   }
   assert.ok(network.includes('if (matched->open) return matched->handler(request);'));
+  // The open-access note is one more Home dismissal. Restore brings back every
+  // note and ignored advice, alone in its body; acknowledged images stay.
+  const dismiss = body(access, 'esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(');
+  const restore = dismiss.slice(dismiss.indexOf('if (restore) {'), dismiss.indexOf('} else if', dismiss.indexOf('if (restore) {')));
+  assert.ok(!network.includes('/api/v1/auth/notice') &&
+      dismiss.includes('jsonBoolean(root, "restore", restore) && restore && cJSON_GetArraySize(root) == 1') &&
+      restore.includes('g_cardDismissals.notes = 0;') &&
+      restore.includes('memset(g_cardDismissals.grind, 0, sizeof(g_cardDismissals.grind));') &&
+      restore.includes('g_webAccess.stored.noticeDismissed = 0;') && !restore.includes('image') &&
+      dismiss.includes('} else if (strcmp(card, "access") == 0) {') &&
+      network.includes('",\\"access\\":%s}"'), 'Home dismissals cover the access note and restore');
   // NET-02: every registered handler passes the DNS-rebinding Host gate
   // first; captive-probe hosts pass only while the SoftAP is up.
   const timed = body(network, 'esp_err_t timedHandler(');
@@ -214,17 +224,20 @@
   // Home cards show independently, each whenever its own condition holds, and
   // none waits for another or for the grind hint. The controller keeps every
   // dismissal; one left in the browser under a legacy card key is handed over.
+  // A close (×) leaves an Undo strip and commits only when it ends.
   const order = ['laMarzoccoPolicyHint', 'laMarzoccoAccountHint', 'companionHint', 'companionPairHint', 'accessHint', 'laMarzoccoCloudHint',
     'recipeHint', 'scaleOnlyHint'];
   const nodes = {grindHintCard: {hidden: true}};
   for (const id of order) nodes[id] = {hidden: true};
-  const $ = (id) => nodes[id] ||= {textContent: '', hidden: false,
+  const $ = (id) => nodes[id] ||= {textContent: '', hidden: false, dataset: {},
     classList: {toggle() {}, add() {}, remove() {}, contains: () => false}};
   const cards = new Map(), here = {companionHere: null}, posted = [];
-  let recorded = false, pairable = false;
+  let recorded = false, pairable = false, cycle = '1/7';
+  const closes = [];
   const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, presetState: {items: []},
     cardDismissed: (k) => cards.get(k) || '', dismissCard: (k, v = '1') => cards.set(k, v),
     dismissOnController: (card) => posted.push(card), shotRecorded: () => recorded,
+    shotCycle: () => cycle, closeCard: (card, text, commit) => closes.push({card, text, commit}),
     controlsMutable: true, uiState: here, companionHere: () => Promise.resolve(here.companionHere),
     companionPairable: () => pairable, sub: (t, a) => t + ':' + a.join(',')},
     document: {}, __LA_MARZOCCO__: false, __WEBUI_TEXT__: (key) => key};
@@ -235,6 +248,8 @@
   const shown = (s) => (home.applyStatus(s), order.filter((id) => !nodes[id].hidden));
   assert.deepEqual(shown(fresh), ['accessHint', 'laMarzoccoCloudHint', 'recipeHint', 'scaleOnlyHint']);
   assert.deepEqual(shown({...fresh, access: {notice: false}}), ['laMarzoccoCloudHint', 'recipeHint', 'scaleOnlyHint']);
+  assert.deepEqual(shown({...fresh, dismissed: {access: true}}), ['laMarzoccoCloudHint', 'recipeHint', 'scaleOnlyHint'],
+      'The access note follows its controller dismissal');
   const noCloud = {...fresh, access: {notice: false}, laMarzocco: {accountConfigured: true}};
   assert.deepEqual(shown(noCloud), ['recipeHint', 'scaleOnlyHint']);
   recorded = true;
@@ -274,8 +289,12 @@
   assert.deepEqual(shown({...fresh, dismissed: gone}), ['accessHint']);
   assert.deepEqual(posted.splice(0), ['laMarzoccoCloud']);
   cards.delete('obbwCard:laMarzoccoCloud');
-  assert.ok(codeIncludes(viewJs.home, '}else R.dismissOnController(cardName(id));'),
-      'Dismissing a note is sent to the controller');
+  assert.ok(codeIncludes(viewJs.home, 'R.closeCard($(id),"You won’t see this again.",()=>{R.dismissOnController(cardName(id));renderHints(R.homeStatusCache());});') &&
+      !viewJs.home.includes('/api/v1/auth/notice'), 'Closing a note is sent to the controller once its Undo ends');
+  for (const id of order.slice(3))
+    assert.ok(codeIncludes(partialHtml.home, `<button id="${id}Dismiss" class="cardClose" type="button" aria-label="Dismiss">×</button>`), id);
+  for (const id of order.slice(0, 3))
+    assert.ok(!partialHtml.home.includes(id + 'Dismiss'), id + ' has no close');
   fresh.dismissed = gone;
   // A page that came through an unpaired companion offers to pair it; the
   // request it sends then replaces that offer, with the code typed in Admin.
@@ -325,6 +344,19 @@
   assert.ok(nodes.scaleRecDelete.disabled && !nodes.scaleRecDownload.disabled,
       'Delete waits for the save; Download stays available');
   // A handled recording stays hidden until the next one; no recording clears it.
+  // Its close hides it until the next shot or a change of state.
+  cards.set('obbwCard:scaleRec', nodes.scaleRecCard.dataset.snooze);
+  assert.equal(nodes.scaleRecCard.dataset.snooze, '4h1/7');
+  shown(held);
+  assert.equal(nodes.scaleRecCard.hidden, true);
+  shown({...held, scaleRecording: 'busy'});
+  assert.equal(nodes.scaleRecCard.hidden, true, 'A save in progress is the same held state');
+  cycle = '1/8';
+  shown(held);
+  assert.equal(nodes.scaleRecCard.hidden, false, 'The next shot brings it back');
+  cards.set('obbwCard:scaleRec', nodes.scaleRecCard.dataset.snooze);
+  shown(recording);
+  assert.equal(nodes.scaleRecCard.hidden, false, 'A change of state brings it back');
   cards.set('obbwCard:scaleRec', '4');
   shown(held);
   assert.equal(nodes.scaleRecCard.hidden, true);
@@ -333,7 +365,8 @@
   shown({...held, scaleRecording: '', scaleRecordingId: 0});
   assert.ok(nodes.scaleRecCard.hidden && cards.get('obbwCard:scaleRec') === '');
   assert.ok(codeIncludes(rawPartialHtml.home, '<section id="scaleRecCard" class="homeCard warnHint" hidden>') &&
-      !partialHtml.home.includes('scaleRecDismiss') &&
+      codeIncludes(partialHtml.home, '<button id="scaleRecDismiss" class="cardClose" type="button" aria-label="Hide for now">×</button>') &&
+      codeIncludes(viewJs.home, 'R.closeCard($("scaleRecCard"),"Hidden until your next shot.",()=>{R.dismissCard(cardKey("scaleRec"),key);') &&
       codeIncludes(viewJs.home, 'R.command("/api/v1/diagnostic/scale-profile",{action:"stop"})') &&
       codeIncludes(viewJs.home, '"Delete this scale recording? It cannot be recovered.")&&handled(await R.command("/api/v1/diagnostic/scale-profile",{action:"delete"}))') &&
       codeIncludes(viewJs.home, '$("scaleRecDownload").onclick=async()=>handled(await R.downloadScaleProfile());') &&
@@ -342,4 +375,38 @@
   assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&
       codeIncludes(rawPartialHtml.settings, 'id="recipeSettings"') &&
       !codeIncludes(rawPartialHtml.home, 'type="checkbox"'));
+  // A close hides its card behind an Undo strip. Undo brings it back and
+  // commits nothing; the strip's end, another close or a hidden page commits.
+  const closeSrc = rawRuntimeJs.slice(rawRuntimeJs.indexOf('let closing = null;'),
+      rawRuntimeJs.indexOf('function firmwareResult('));
+  const timers = [], hideListeners = [], el = () => ({remove() { this.removed = true; },
+    setAttribute() {}, append(...c) { this.kids = c; }, focus() {}});
+  const card = () => {
+    const c = new Set();
+    return {classList: {add: (x) => c.add(x), remove: (x) => c.delete(x), has: (x) => c.has(x)},
+      after(strip) { this.strip = strip; }, querySelector: () => ({focus() {}})};
+  };
+  const close = {__WEBUI_TEXT__: (k) => k, clearTimeout() {}, setTimeout: (f, ms, a) => timers.push(() => f(a)),
+    document: {createElement: el, addEventListener: (t, f) => hideListeners.push(f), hidden: false}};
+  vm.runInNewContext(closeSrc + ';this.closeCard = closeCard;', close);
+  const commits = [], a = card(), b = card();
+  close.closeCard(a, 'gone', () => commits.push('a'));
+  assert.ok(a.classList.has('closing') && a.strip.kids[0] === 'gone' && commits.length === 0);
+  a.strip.kids[1].onclick();
+  assert.ok(!a.classList.has('closing') && a.strip.removed && commits.length === 0, 'Undo commits nothing');
+  close.closeCard(a, 'gone', () => commits.push('a'));
+  close.closeCard(b, 'gone', () => commits.push('b'));
+  assert.deepEqual(commits, ['a'], 'Another close commits the open strip');
+  timers.at(-1)();
+  assert.deepEqual(commits, ['a', 'b'], 'The strip commits when it ends');
+  close.closeCard(a, 'gone', () => commits.push('a2'));
+  close.document.hidden = true;
+  hideListeners.forEach((f) => f());
+  assert.deepEqual(commits, ['a', 'b', 'a2'], 'A hidden page commits the open strip');
+  // Admin brings every hidden note back, on the controller and in this browser.
+  assert.ok(codeIncludes(partialHtml.admin, '<button id="restoreNotesButton" class="btnGlyph mutable" type="button">') &&
+      codeIncludes(viewJs.admin, 'if(k.startsWith("obbwCard:"))localStorage.removeItem(k);') &&
+      codeIncludes(viewJs.admin, 'R.command("/api/v1/home/dismiss",{restore:true},false,"","Could not bring back the hidden notes."') &&
+      codeIncludes(viewJs.admin, 'Object.values(d).filter((v)=>v===true).length+(d.grind?.length||0)'),
+      'Admin restores hidden notes');
 }

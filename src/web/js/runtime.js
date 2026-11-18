@@ -2663,6 +2663,40 @@ function dismissOnController(card, key) {
   }).catch(() => {});
   renderHomeCards();
 }
+// A closed card leaves an Undo strip in its place for 6 s (the strip's
+// countdown in bars.css). Its commit waits for the strip to end, another
+// close, or the page to hide, so an undone close sends nothing.
+let closing = null;
+function endClose(keep) {
+  const c = closing;
+  if (!c) return;
+  closing = null;
+  clearTimeout(c.timer);
+  c.strip.remove();
+  // Hidden first, so a renderer that animates (reveal) has nothing to fold.
+  if (keep) {
+    c.card.hidden = true;
+    c.commit();
+  }
+  c.card.classList.remove("closing");
+  if (!keep) c.card.querySelector(".cardClose")?.focus();
+}
+function closeCard(card, text, commit) {
+  endClose(true);
+  const strip = document.createElement("div"),
+    undo = document.createElement("button");
+  strip.className = "cardUndo";
+  strip.setAttribute("role", "status");
+  undo.type = "button";
+  undo.textContent = __WEBUI_TEXT__("runtime.undo");
+  undo.onclick = () => endClose(false);
+  strip.append(text, undo);
+  card.classList.add("closing");
+  card.after(strip);
+  closing = { card, strip, commit, timer: setTimeout(endClose, 6e3, true) };
+  undo.focus({ preventScroll: true });
+}
+document.addEventListener("visibilitychange", () => document.hidden && endClose(true));
 function firmwareResult(s) {
   let flash = null;
   try {
@@ -2757,10 +2791,11 @@ function renderResultCards(s) {
       history.pushState(null, "", open.pathname);
       renderRoute(open.pathname);
     };
-    $(id + "Dismiss").onclick = () => {
-      view.dismiss();
-      renderResultCards(s);
-    };
+    $(id + "Dismiss").onclick = () =>
+      closeCard(card, __WEBUI_TEXT__("runtime.card_closed"), () => {
+        view.dismiss();
+        renderResultCards(s);
+      });
   }
 }
 function beginNetworkReconnectWait() {
@@ -5197,6 +5232,10 @@ async function loadHomeStatus() {
 function shotRecorded() {
   return shotFrame ? !!shotFrame.card.valid : null;
 }
+// The last cycle the controller started, new with every shot.
+function shotCycle() {
+  return shotFrame ? shotFrame.boot + "/" + shotFrame.cycle : "";
+}
 function homeStatusCache() {
   return homeStale ? null : homeFrame?.status || null;
 }
@@ -7458,6 +7497,7 @@ function liveShotDash(d, model, m) {
 }
 // Home cards dismissed in this browser only: the scale recording card, and
 // notes dismissed before the controller kept them (see dismissOnController).
+// Admin's restore forgets them.
 function cardDismissed(key) {
   try {
     return localStorage.getItem(key) || "";
@@ -8230,8 +8270,10 @@ export {
   cycleTheme,
   populateTimezoneOptions,
   cardDismissed,
+  closeCard,
   dismissCard,
   dismissOnController,
+  shotCycle,
   startNewCoffee,
   invalidateSettingsHydration,
   clearBrewDirty,

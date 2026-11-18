@@ -400,7 +400,8 @@ progress** card with **Stop** and **Download**. Once it has stopped, the card
 reads **Scale recording ready** and offers **Delete** and **Download**
 instead; Delete asks you to confirm first and becomes available once the
 recording is saved. Downloading or deleting hides the card in that browser
-until the next recording. Download works for whoever is using the controller,
+until the next recording. Its **×** only puts it aside in that browser: it
+comes back after your next shot, or when the recording stops. Download works for whoever is using the controller,
 while Stop and Delete need the same access as the Diagnostic page's buttons.
 
 On a 16 MB controller, **Diagnostic → Misc → Coredump** shows how many complete

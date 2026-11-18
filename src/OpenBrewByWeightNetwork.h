@@ -1079,7 +1079,6 @@ class OpenBrewByWeightNetwork {
   static esp_err_t authLoginHandler(httpd_req_t *request);
   static esp_err_t authLogoutHandler(httpd_req_t *request);
   static esp_err_t authAccessHandler(httpd_req_t *request);
-  static esp_err_t authNoticeHandler(httpd_req_t *request);
   static esp_err_t cardDismissHandler(httpd_req_t *request);
   static esp_err_t authPairingHandler(httpd_req_t *request);
   bool integrationAccessRoute(httpd_req_t *request, esp_err_t &result);

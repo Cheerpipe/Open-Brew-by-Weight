@@ -139,11 +139,6 @@
   max-width: none;
 }
 
-.ghCard .ghost {
-  border-color: var(--ln);
-  color: var(--mu);
-}
-
 /* Live closes the header signals as one more borderless control; on a phone
    it gives up its spacing so the header still fits one row at 360 px. */
 .headerSignals .liveBtn {

@@ -81,16 +81,30 @@
     ><span id="ghBand" class="band"></span><span id="ghLevel" class="lvl"></span>
   </div>
   <div id="ghAxis" class="ghAxis" aria-hidden="true"></div>
+  <button
+    id="grindHintDismiss"
+    class="cardClose"
+    type="button"
+    aria-label="{{webui:home.hide_for_now}}"
+  >
+    ×
+  </button>
   <div class="btnBar">
     <button id="grindHintNewBeans" class="btnGlyph" type="button">
-      <span class="t">{{webui:home.relearn_action}}</span></button
-    ><button id="grindHintLater" class="btnGlyph ghost" type="button">
-      <span class="t">{{webui:home.ignore}}</span>
+      <span class="t">{{webui:home.relearn_action}}</span>
     </button>
   </div>
 </section>
 <section id="scaleRecCard" class="homeCard warnHint" hidden>
   <p><strong id="scaleRecTitle"></strong> <span id="scaleRecText"></span></p>
+  <button
+    id="scaleRecDismiss"
+    class="cardClose"
+    type="button"
+    aria-label="{{webui:home.hide_for_now}}"
+  >
+    ×
+  </button>
   <div class="btnBar">
     <button id="scaleRecStop" class="btnGlyph scaleProfileCtl" type="button">
       <span class="t">{{webui:home.scale_rec_stop}}</span></button
@@ -133,51 +147,81 @@
   <p>
     <strong>{{webui:home.companion_pair_title}}</strong> <span id="companionPairHintText"></span>
   </p>
+  <button
+    id="companionPairHintDismiss"
+    class="cardClose"
+    type="button"
+    aria-label="{{webui:home.dismiss}}"
+  >
+    ×
+  </button>
   <div class="btnBar">
     <button id="companionPairHintPair" class="btnGlyph btnInvert" type="button">
-      <span class="t">{{webui:home.companion_pair}}</span></button
-    ><button id="companionPairHintDismiss" class="btnGlyph ghost" type="button">
-      <span class="t">{{webui:home.dismiss}}</span>
+      <span class="t">{{webui:home.companion_pair}}</span>
     </button>
   </div>
 </section>
 <section id="accessHint" class="homeCard infoHint" hidden>
   <p><strong>{{webui:home.access_hint_title}}</strong> {{webui:home.access_hint_text}}</p>
+  <button
+    id="accessHintDismiss"
+    class="cardClose"
+    type="button"
+    aria-label="{{webui:home.dismiss}}"
+  >
+    ×
+  </button>
   <div class="btnBar">
     <a id="accessHintOpen" class="btnGlyph btnInvert" href="/admin#accessPanel"
       ><span class="t">{{webui:home.access_hint_open}}</span></a
-    ><button id="accessHintDismiss" class="btnGlyph ghost" type="button">
-      <span class="t">{{webui:home.dismiss}}</span>
-    </button>
+    >
   </div>
 </section>
 <section id="laMarzoccoCloudHint" class="homeCard infoHint" hidden>
   <p><strong>{{webui:home.la_marzocco_hint_title}}</strong> {{webui:home.la_marzocco_hint_text}}</p>
+  <button
+    id="laMarzoccoCloudHintDismiss"
+    class="cardClose"
+    type="button"
+    aria-label="{{webui:home.dismiss}}"
+  >
+    ×
+  </button>
   <div class="btnBar">
     <a id="laMarzoccoCloudHintOpen" class="btnGlyph btnInvert" href="/settings#laMarzoccoSettings"
       ><span class="t">{{webui:home.la_marzocco_hint_open}}</span></a
-    ><button id="laMarzoccoCloudHintDismiss" class="btnGlyph ghost" type="button">
-      <span class="t">{{webui:home.dismiss}}</span>
-    </button>
+    >
   </div>
 </section>
 <section id="recipeHint" class="homeCard infoHint" hidden>
   <p><strong>{{webui:home.recipe_hint_title}}</strong> {{webui:home.recipe_hint_text}}</p>
+  <button
+    id="recipeHintDismiss"
+    class="cardClose"
+    type="button"
+    aria-label="{{webui:home.dismiss}}"
+  >
+    ×
+  </button>
   <div class="btnBar">
     <a id="recipeHintOpen" class="btnGlyph btnInvert" href="/settings#recipeSettings"
       ><span class="t">{{webui:home.recipe_hint_open}}</span></a
-    ><button id="recipeHintDismiss" class="btnGlyph ghost" type="button">
-      <span class="t">{{webui:home.dismiss}}</span>
-    </button>
+    >
   </div>
 </section>
 <section id="scaleOnlyHint" class="homeCard infoHint" hidden>
   <p><strong>{{webui:home.scale_hint_title}}</strong> {{webui:home.scale_hint_text}}</p>
+  <button
+    id="scaleOnlyHintDismiss"
+    class="cardClose"
+    type="button"
+    aria-label="{{webui:home.dismiss}}"
+  >
+    ×
+  </button>
   <div class="btnBar">
     <button id="scaleOnlyHintUse" class="btnGlyph btnInvert" type="button">
-      <span class="t">{{webui:home.scale_hint_use}}</span></button
-    ><button id="scaleOnlyHintDismiss" class="btnGlyph ghost" type="button">
-      <span class="t">{{webui:home.dismiss}}</span>
+      <span class="t">{{webui:home.scale_hint_use}}</span>
     </button>
   </div>
 </section>

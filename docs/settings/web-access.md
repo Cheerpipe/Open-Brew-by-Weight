@@ -9,8 +9,8 @@ is your decision and it stays yours.
 
 Controllers set up before this protection existed keep working as they were:
 anyone on your Wi-Fi can open their Web UI, and Home shows a short note about
-it, with a **Set up** button that takes you to the panel below. **Dismiss**
-hides the note on every phone.
+it, with a **Set up** button that takes you to the panel below. Its **×**
+hides the note on every phone; **Admin → Hidden notes** brings it back.
 
 ## Turn the password on
 

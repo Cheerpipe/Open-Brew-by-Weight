@@ -4,8 +4,7 @@ const $ = R.$;
 let ready = false;
 let quickWeight = null;
 let quickWeightWanted = false;
-let accessHintClosed = false,
-  recipeTag = 0;
+let recipeTag = 0;
 // Controller states in which water is flowing.
 const BREWING_STATES = ["BREW", "RINSE", "MANUAL_NO_SCALE"];
 
@@ -93,8 +92,8 @@ export function applyStatus(s) {
   renderLaMarzoccoBoilers();
 }
 // A card shows whenever its condition holds, independently of the others.
-// Dismissals stay in this browser, except the access one,
-// which the controller keeps for every phone. A companion's pairing request
+// The controller keeps each note's dismissal for every phone; one dismissed
+// here before it did is handed over. A companion's pairing request
 // has no dismissal: it lasts ten minutes at most, Admin's Ignore is the
 // lasting answer, and a key could not tell a new request from an old one.
 // A page that came through an unpaired companion offers to pair it; a request
@@ -147,7 +146,7 @@ function renderHints(s) {
   for (const [id, want] of [
     ["companionHint", !!request],
     ["companionPairHint", !request && R.companionPairable()],
-    ["accessHint", !accessHintClosed && s.access?.notice],
+    ["accessHint", s.access?.notice],
     [
       "laMarzoccoCloudHint",
       s.machineIntegration === "la_marzocco_cloud" && s.laMarzocco?.accountConfigured === false,
@@ -168,15 +167,17 @@ function renderHints(s) {
   }
   if ($("scaleOnlyHintUse")) $("scaleOnlyHintUse").disabled = !R.controlsMutable;
   // One card per recording: Stop while it runs, Delete once it is held.
-  // Download or Delete hides it until the next recording; Stop and Delete
-  // follow the Diagnostic page's gate, Download only this window's ownership.
+  // Download or Delete hides it until the next recording, its close until the
+  // next shot or a change of state; Stop and Delete follow the Diagnostic
+  // page's gate, Download only this window's ownership.
   const rec = $("scaleRecCard");
   if (!rec) return;
   const id = String(s.scaleRecordingId || ""),
     running = s.scaleRecording === "recording",
     locked = !R.webUiOwner || !(R.adminUnlockedFor(s) || s.development || R.diagnosticVisible);
   if (!id && R.cardDismissed(cardKey("scaleRec"))) R.dismissCard(cardKey("scaleRec"), "");
-  rec.hidden = !id || R.cardDismissed(cardKey("scaleRec")) === id;
+  rec.dataset.snooze = id + (running ? "r" : "h") + R.shotCycle();
+  rec.hidden = !id || [id, rec.dataset.snooze].includes(R.cardDismissed(cardKey("scaleRec")));
   $("scaleRecTitle").textContent = running
     ? __WEBUI_TEXT__("home.scale_rec_title")
     : __WEBUI_TEXT__("home.scale_rec_held_title");
@@ -412,9 +413,13 @@ export function init() {
       R.renameScale();
     };
   if ($("grindHintNewBeans")) $("grindHintNewBeans").onclick = () => R.startNewCoffee();
-  if ($("grindHintLater"))
-    $("grindHintLater").onclick = () =>
-      R.dismissOnController("grind", $("grindHintCard").dataset.key);
+  if ($("grindHintDismiss"))
+    $("grindHintDismiss").onclick = () => {
+      const key = $("grindHintCard").dataset.key;
+      R.closeCard($("grindHintCard"), __WEBUI_TEXT__("home.closed_until_advice"), () =>
+        R.dismissOnController("grind", key),
+      );
+    };
   for (const id of [
     "companionHint",
     "companionPairHint",
@@ -432,14 +437,12 @@ export function init() {
         R.renderRoute(open.pathname);
       };
     if (!dismiss) continue;
-    dismiss.onclick = () => {
-      // Dismissals are kept on the controller, so other phones skip them too.
-      if (id === "accessHint") {
-        accessHintClosed = true;
-        R.api("/api/v1/auth/notice", { method: "POST", body: "{}" }).catch(() => {});
-      } else R.dismissOnController(cardName(id));
-      renderHints(R.homeStatusCache());
-    };
+    // Dismissals are kept on the controller, so other phones skip them too.
+    dismiss.onclick = () =>
+      R.closeCard($(id), __WEBUI_TEXT__("runtime.card_closed"), () => {
+        R.dismissOnController(cardName(id));
+        renderHints(R.homeStatusCache());
+      });
   }
   if ($("laMarzoccoPolicyHintAccept"))
     $("laMarzoccoPolicyHintAccept").onclick = () => R.laMarzoccoAction("acceptPolicy");
@@ -452,6 +455,13 @@ export function init() {
       confirm(__WEBUI_TEXT__("diagnostic.delete_profile_confirm")) &&
       handled(await R.command("/api/v1/diagnostic/scale-profile", { action: "delete" }));
     $("scaleRecDownload").onclick = async () => handled(await R.downloadScaleProfile());
+    $("scaleRecDismiss").onclick = () => {
+      const key = $("scaleRecCard").dataset.snooze;
+      R.closeCard($("scaleRecCard"), __WEBUI_TEXT__("home.closed_until_shot"), () => {
+        R.dismissCard(cardKey("scaleRec"), key);
+        renderHints(R.homeStatusCache());
+      });
+    };
   }
   if ($("scaleOnlyHintUse"))
     $("scaleOnlyHintUse").onclick = () =>

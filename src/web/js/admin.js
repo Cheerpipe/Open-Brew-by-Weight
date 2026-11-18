@@ -1798,8 +1798,21 @@ const WEBHOOK_IDS = [
   "webhookFirstDrop",
   "webhookEnd",
 ];
+// Notes and advice closed for good on the controller; restoring them also
+// forgets what this browser hid.
+let notesRestored = false;
+const hiddenNotes = (d = R.homeStatusCache()?.dismissed || {}) =>
+  Object.values(d).filter((v) => v === true).length + (d.grind?.length || 0);
 export function applyStatus(s) {
   applyAdminStatus(s);
+  const notes = hiddenNotes(s.dismissed);
+  notesRestored &&= !notes;
+  $("restoreNotesButton").disabled = !notes;
+  $("hiddenNotesState").textContent = notes
+    ? R.sub(__WEBUI_TEXT__("admin.hidden_notes_count"), [notes])
+    : notesRestored
+      ? __WEBUI_TEXT__("admin.hidden_notes_restored")
+      : __WEBUI_TEXT__("admin.hidden_notes_none");
   const compat = !!s.compatibilityMode;
   ["blePanel", "dateTimePanel", "webhookPanel", "companionPanel", "machineControlPanel"].forEach(
     (id) => {
@@ -2137,6 +2150,10 @@ const ADMIN_SUMMARIES = {
       ? __WEBUI_TEXT__("admin.sum_password_required")
       : __WEBUI_TEXT__("admin.sum_no_password"),
   update: () => document.documentElement.dataset.fw,
+  notes: () => {
+    const n = hiddenNotes();
+    return n ? R.sub(__WEBUI_TEXT__("admin.sum_hidden_notes"), [n]) : "";
+  },
   companion: () => {
     const c = companionState;
     if (!c?.paired)
@@ -2309,6 +2326,22 @@ export function init() {
     $(id).addEventListener("change", passwordChanged);
   });
   $("syncTimeButton").onclick = () => R.command("/api/v1/time/sync");
+  $("restoreNotesButton").onclick = () => {
+    notesRestored = true;
+    try {
+      for (const k of Object.keys(localStorage))
+        if (k.startsWith("obbwCard:")) localStorage.removeItem(k);
+    } catch {
+      // Storage blocked: this browser kept nothing to forget.
+    }
+    R.command(
+      "/api/v1/home/dismiss",
+      { restore: true },
+      false,
+      "",
+      __WEBUI_TEXT__("admin.restore_notes_failed"),
+    );
+  };
   const webhookChanged = () => {
     webhookDirty = true;
     setSaveDirty("saveWebhookButton", "webhookDirtyHint", true);

@@ -47,8 +47,8 @@ that can't start is replaced by the previous version on its own, which takes a
 little longer. If a shot is pouring, the screen says so and the restart waits
 until it ends.
 
-The result card stays until you dismiss it, and the next update starts over.
-The controller remembers the dismissal, so dismissing it on one phone or
+The result card stays until you close it with its **×**, and the next update
+starts over. The controller remembers that, so closing it on one phone or
 browser clears it everywhere:
 
 - **Firmware updated** names the version now running and when it was built. It appears the same way
@@ -276,7 +276,9 @@ or a USB installation rewrites otadata (writing only the application with
 `--image` leaves it); `dismissed.rollback` is the one acknowledged. Dismissing
 a card sends `POST /api/v1/home/dismiss` with `{"card":"image"}` or
 `{"card":"rollback"}` and that prefix as `key`; the controller keeps it in NVS
-key `cardDismissals`. The Web UI's wait after a flash ends only on a `200` status
+key `cardDismissals`. `{"restore":true}` (Admin's **Show hidden notes again**)
+clears the Home notes and ignored grind advice but keeps these two prefixes,
+so an old update never comes back as news. The Web UI's wait after a flash ends only on a `200` status
 whose `bootId` changed, or on `AUTH_REQUIRED`: the old boot keeps answering until
 it restarts, and a companion answers for a controller that is down. That status
 needs the Web UI claim, which a restart clears, so a `UI_TAKEN_OVER` answer makes

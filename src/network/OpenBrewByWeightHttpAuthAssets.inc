@@ -473,7 +473,6 @@ esp_err_t OpenBrewByWeightNetwork::ownedApiHandler(httpd_req_t *request) {
       {"/api/v1/auth/login", HTTP_POST, authLoginHandler, false, true},
       {"/api/v1/auth/logout", HTTP_POST, authLogoutHandler, false, true},
       {"/api/v1/auth/access", HTTP_POST, authAccessHandler},
-      {"/api/v1/auth/notice", HTTP_POST, authNoticeHandler},
       {"/api/v1/home/dismiss", HTTP_POST, cardDismissHandler},
       {"/api/v1/auth/pairing", HTTP_POST, authPairingHandler},
       // The companion pairs without a claim or a login; Admin approves.

@@ -427,43 +427,40 @@ esp_err_t OpenBrewByWeightNetwork::authAccessHandler(httpd_req_t *request) {
                    nullptr, "UNKNOWN_ACCESS_ACTION");
 }
 
-esp_err_t OpenBrewByWeightNetwork::authNoticeHandler(httpd_req_t *request) {
-  OpenBrewByWeightNetwork &self = *instance_;
-  WebAccessBody body;
-  esp_err_t sent = ESP_OK;
-  if (!self.readWebAccessBody(request, body, sent)) return sent;
-  {
-    TaskLockGuard lock(self.dataMux_);
-    if (g_webAccess.stored.noticeDismissed == 0) {
-      g_webAccess.stored.noticeDismissed = 1;
-      g_webAccess.dirty = true;
-    }
-  }
-  return sendJson(request, STATUS_OK, "{\"ok\":true}");
-}
-
 // One Home card dismissed for every browser: {"card":"image"|"rollback"|
 // "grind","key":...} names the image prefix or advice key the page showed,
 // so a stale page can only dismiss what it showed; {"card":"wifi"} ends the
-// Wi-Fi change report; a CARD_NOTES name dismisses that Home note.
+// Wi-Fi change report; "access" or a CARD_NOTES name dismisses that Home
+// note. {"restore":true} brings back every note and ignored advice; the
+// acknowledged images stay, since they report past events.
 esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   esp_err_t sent = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (sent != ESP_OK) return sent;
   char card[16] = {}, key[CARD_GRIND_KEY_BYTES] = {};
+  bool restore = false;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  static const char *const fields[] = {"card", "key"};
-  const bool parsed = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 2) &&
-                      jsonString(root, "card", card, sizeof(card), false) &&
-                      (!jsonFieldPresent(root, "key") ||
-                       jsonString(root, "key", key, sizeof(key), false));
+  static const char *const fields[] = {"card", "key", "restore"};
+  const bool parsed =
+      root != nullptr && jsonHasOnlyUniqueFields(root, fields, 3) &&
+      (jsonFieldPresent(root, "restore")
+           ? jsonBoolean(root, "restore", restore) && restore && cJSON_GetArraySize(root) == 1
+           : jsonString(root, "card", card, sizeof(card), false) &&
+                 (!jsonFieldPresent(root, "key") ||
+                  jsonString(root, "key", key, sizeof(key), false)));
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   const bool image = strcmp(card, "image") == 0, rollback = strcmp(card, "rollback") == 0;
   bool known = parsed;
   if (known) {
     TaskLockGuard lock(self.dataMux_);
-    if ((image || rollback) && key[0] != '\0' && cardImageValid(key)) {
+    if (restore) {
+      g_cardDismissalsDirty |= g_cardDismissals.notes != 0 || g_cardDismissals.grind[0][0] != '\0';
+      g_cardDismissals.notes = 0;
+      memset(g_cardDismissals.grind, 0, sizeof(g_cardDismissals.grind));
+      g_webAccess.dirty |= g_webAccess.stored.noticeDismissed != 0;
+      g_webAccess.stored.noticeDismissed = 0;
+    } else if ((image || rollback) && key[0] != '\0' && cardImageValid(key)) {
       g_cardDismissalsDirty |= cardDismissImage(
           image ? g_cardDismissals.image : g_cardDismissals.rollback, key);
     } else if (strcmp(card, "grind") == 0 && cardGrindPreset(key) != 0) {
@@ -471,6 +468,9 @@ esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
     } else if (const uint8_t note = cardNoteBit(card)) {
       g_cardDismissalsDirty |= (g_cardDismissals.notes & note) == 0;
       g_cardDismissals.notes |= note;
+    } else if (strcmp(card, "access") == 0) {
+      g_webAccess.dirty |= g_webAccess.stored.noticeDismissed == 0;
+      g_webAccess.stored.noticeDismissed = 1;
     } else if (strcmp(card, "wifi") == 0) {
       self.status_.staChangeResult = "";
     } else {

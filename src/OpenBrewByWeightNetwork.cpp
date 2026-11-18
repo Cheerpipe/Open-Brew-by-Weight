@@ -240,8 +240,9 @@ static OPEN_BREW_BY_WEIGHT_PSRAM_BSS WebAccessState g_webAccess;
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CardDismissals g_cardDismissals;
 static bool g_cardDismissalsDirty = false;
 
-// The dismissals as the status "dismissed" object, under dataMux_. Image
-// prefixes and advice keys are JSON safe once validated.
+// The dismissals as the status "dismissed" object, under dataMux_, with the
+// open-access note kept by g_webAccess. Image prefixes and advice keys are
+// JSON safe once validated.
 static void formatCardDismissals(char *out, size_t cap) {
   int used = snprintf(out, cap, "{\"image\":\"%s\",\"rollback\":\"%s\",\"grind\":[",
                       g_cardDismissals.image, g_cardDismissals.rollback);
@@ -256,7 +257,9 @@ static void formatCardDismissals(char *out, size_t cap) {
     used += snprintf(out + used, cap - used, "%s\"%s\":%s", i == 0 ? "]," : ",", CARD_NOTES[i],
                      (g_cardDismissals.notes >> i) & 1U ? "true" : "false");
   }
-  if (fits()) snprintf(out + used, cap - used, "}");
+  if (fits())
+    snprintf(out + used, cap - used, ",\"access\":%s}",
+             g_webAccess.stored.noticeDismissed ? "true" : "false");
 }
 // Companion pairing, link and relay; dataMux_ guards it (network/OpenBrewByWeightCompanion.inc).
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionState g_companion;
