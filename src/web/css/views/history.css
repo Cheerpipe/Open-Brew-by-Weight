@@ -321,7 +321,7 @@
 #shotTable tr {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate" "spark spark spark spark spark spark";
+  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale rate rate rate rate" "spark spark spark spark spark spark";
   gap: 0.6rem 0.5rem;
   align-items: start;
   position: relative;
@@ -674,7 +674,7 @@
 }
 
 #shotTable tr.noSpark {
-  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale scale rate rate rate";
+  grid-template-areas: "dur dur dur actual actual actual" "time time time time time time" "goal goal avgflow avgflow maxflow maxflow" "temp temp dose dose ratio ratio" "err err atcut atcut drip drip" "dripdelay dripdelay drop drop tare tare" "ended ended shot shot preset preset" "scale scale rate rate rate rate";
 }
 
 /* A shot without a machine-reported target skips its cell: Dose and Ratio
