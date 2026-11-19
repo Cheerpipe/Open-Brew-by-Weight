@@ -431,6 +431,7 @@ struct ShotLogRecord {
 // Appended fields read as zero in records widened from an earlier image, so
 // zero must mean "missing" for them, or the widening must set their default.
 static_assert(sizeof(ShotLogRecord) == 132, "Shot-log schema 2 record size");
+static_assert(MAX_RAMP_MS / 100 <= UINT8_MAX, "cutRampDs holds the longest ramp");
 static_assert(offsetof(ShotLogRecord, verdict) == 27, "schema 1 verdict byte");
 static_assert(offsetof(ShotLogRecord, slowAfterDs) == 108, "schema 1 snapshot tail");
 static_assert(offsetof(ShotLogRecord, dripDelayCode) == 117, "schema 1 drip delay byte");

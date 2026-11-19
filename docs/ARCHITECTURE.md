@@ -220,7 +220,7 @@ or writes flash. The trend fit remains only for accidental-touch sensing. The
 `replay` host test fixed the timed law, D = 5 s and the channeling floor from a
 synthetic uncensored corpus, and a D = 0 oracle reproduces the captured legacy
 Fast/Slow decisions. Each preset sets its Fast and Slow ramps on their own:
-length D (0–10 s, 5 s by default) and a curve from `RAMP_CURVES`, the
+length D (0–25.5 s, 5 s by default) and a curve from `RAMP_CURVES`, the
 regularized incomplete beta I(u; a, b) with integer a, b ≥ 2 (monotone and
 flat at both ends, as the crossing bisection requires). The kernel evaluates
 it exactly as floor(margin · Bernstein sum / d^(a+b−1)) in a 128-bit

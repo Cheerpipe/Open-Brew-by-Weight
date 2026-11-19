@@ -401,8 +401,8 @@
     qwEls.qwZone.setAttribute = (k, v) => { qwZoneAttrs[k] = String(v); };
     qwCtl.open();
     qwAssert.equal(qwEls.qwNum.textContent, '36.0', 'The sheet opens at the in-range goal');
-    qwAssert.equal(qwZoneAttrs['aria-valuemin'], '32.0',
-      'The slider floor keeps the extra yield within a quarter of the target');
+    qwAssert.equal(qwZoneAttrs['aria-valuemin'], '16.0',
+      'The slider floor keeps the extra yield within half of the target');
     qwAssert.equal(qwZoneAttrs['aria-valuemax'], '192.0',
       'The slider ceiling keeps target plus extra yield within 200 g');
     qwAssert.equal(qwEls.qwLimitMin.hidden, true, 'The floor pill starts hidden');
@@ -411,7 +411,7 @@
     const qwLabel = (v) => qwStrip.find((n) => n._text === String(v));
     qwAssert.ok(qwLabel('40') && !qwLabel('40').classes.has('out'),
       'In-range gram labels stay at full strength');
-    qwAssert.ok(qwLabel('30').classes.has('out') && qwLabel('195').classes.has('out'),
+    qwAssert.ok(qwLabel('10').classes.has('out') && qwLabel('195').classes.has('out'),
       'Labels outside the range dim without guard colors');
     qwAssert.ok(!qwLabel('5') && !qwLabel('205'),
       'Filler ticks past the firmware bounds stay unlabeled');
@@ -419,7 +419,7 @@
         qwStrip.some((n) => !n._text && !n.classes.has('out')),
       'Minor ticks dim outside the range only');
     qwDragZone([[600, 5], [600, 5], [600, 5], [600, 5]]);
-    qwAssert.equal(qwEls.qwNum.textContent, '32.0',
+    qwAssert.equal(qwEls.qwNum.textContent, '16.0',
       'The drag clamps at the lowest target the margins allow');
     qwAssert.equal(qwEls.qwLimitMin.hidden, false,
       'The floor pill appears at the bottom of the target range');

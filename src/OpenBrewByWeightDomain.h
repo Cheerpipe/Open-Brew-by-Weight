@@ -1164,7 +1164,7 @@ inline ConfigValidationError validateRuntimeConfig(
   if (config.fastSideEnabled &&
       (config.fastMarginDg < MIN_SIDE_MARGIN_DG ||
        config.fastMarginDg > MAX_SIDE_MARGIN_DG ||
-       config.fastMarginDg > config.goalWeightDg / 4 ||
+       config.fastMarginDg > config.goalWeightDg / 2 ||
        config.goalWeightDg + config.fastMarginDg > MAX_GOAL_WEIGHT_DG)) {
     return ConfigValidationError::FAST_MARGIN;
   }

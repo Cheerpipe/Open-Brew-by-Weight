@@ -611,12 +611,12 @@ function initQuickWeight() {
     const preset = R.presetState.items.find((x) => x.id === R.presetState.activeId);
     if (!preset || !preset.goalWeightG) return;
     // Margins are relative and follow the target: an enabled slow margin
-    // keeps 5 g in the cup, an enabled fast margin stays within a quarter
+    // keeps 5 g in the cup, an enabled fast margin stays within half
     // of the target and the extra yield within the 200 g maximum.
     const slow = !!preset.slowExtractionGuardEnabled && Number.isFinite(+preset.slowMarginG),
       fast = !!preset.fastExtractionGuardEnabled && Number.isFinite(+preset.fastMarginG);
     lo = Math.ceil(
-      Math.max(MIN, slow ? +preset.slowMarginG + 5 : 0, fast ? 4 * preset.fastMarginG : 0) * 10 -
+      Math.max(MIN, slow ? +preset.slowMarginG + 5 : 0, fast ? 2 * preset.fastMarginG : 0) * 10 -
         1e-6,
     );
     hi = Math.floor((MAX - (fast ? +preset.fastMarginG : 0)) * 10 + 1e-6);

@@ -954,8 +954,8 @@ function validateBrewClient() {
   add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));
   if (fastOn) add(brewRange("fastMarginG", 0.5, 10, { step: 0.1 }));
   if (slowOn) add(brewRange("slowMarginG", 0.5, 10, { step: 0.1 }));
-  if (fastOn) add(brewRange("fastRampS", 0, 10, { step: 0.5 }));
-  if (slowOn) add(brewRange("slowRampS", 0, 10, { step: 0.5 }));
+  if (fastOn) add(brewRange("fastRampS", 0, 25.5, { step: 0.5 }));
+  if (slowOn) add(brewRange("slowRampS", 0, 25.5, { step: 0.5 }));
   if (fastOn) add(brewRange("fastCurveHardness", 0, 100, { step: 0.5 }));
   if (slowOn) add(brewRange("slowCurveHardness", 0, 100, { step: 0.5 }));
   if (brewFieldValue("scaleLossFixedS") !== "")
@@ -1012,17 +1012,17 @@ function validateBrewClient() {
         +(R.number("fastBeforeS") + 1).toFixed(1),
       ]),
     });
-  // Margins are relative to the target: extra yield at most a quarter of it,
+  // Margins are relative to the target: extra yield at most half of it,
   // and an early stop that still leaves 5 g in the cup.
   const goal = brewFieldValue("goalWeightG") === "" ? NaN : R.number("goalWeightG"),
     recipe = BREW_SECTION_TEXT.recipe;
-  if (fastOn && brewFieldValue("fastMarginG") !== "" && R.number("fastMarginG") > goal / 4)
+  if (fastOn && brewFieldValue("fastMarginG") !== "" && R.number("fastMarginG") > goal / 2)
     errors.push({
       id: "fastMarginG",
       msg: R.sub(BREW_CROSS_TEXT.le, [
         brewFieldLabel("fastMarginG"),
-        (goal / 4).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
-        __WEBUI_TEXT__("runtime.quarter_of_target"),
+        (goal / 2).toFixed(1) + __WEBUI_TEXT__("runtime.g_2"),
+        __WEBUI_TEXT__("runtime.half_of_target"),
         recipe,
       ]),
     });

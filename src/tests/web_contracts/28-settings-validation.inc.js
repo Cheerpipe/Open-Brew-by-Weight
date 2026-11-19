@@ -145,11 +145,12 @@
   'Window end (s) must not exceed 44.0 s (Max shot time − 1 s, Time limits).');
 
   // (e) Margins are relative to the target and checked only while their side
-  // is on: extra yield up to a quarter of it, less yield leaving 5 g.
+  // is on: extra yield up to half of it, less yield leaving 5 g.
   svOne(svValidate((f) => {
-    f.fastMarginG.value = '10';
+    f.goalWeightG.value = '12';
+    f.fastMarginG.value = '7';
   }), 'fastMarginG',
-  'Extend by up to (g) must not exceed 9.0 g (25 % of Target yield, Recipe).');
+  'Extend by up to (g) must not exceed 6.0 g (50 % of Target yield, Recipe).');
   svAssert.deepEqual(svValidate((f) => {
     f.fastExtractionGuardEnabled.checked = false;
     f.fastMarginG.value = '50';
@@ -280,15 +281,16 @@
   // guard gating; the engine harness proves signature-skip rendering and the
   // conflict chip.
   {
-    // (w1) Shrinking Target below four times the extra yield shows the same
+    // (w1) Shrinking Target below twice the extra yield shows the same
     // single verdict the save would produce, on the margin it invalidated;
     // the empty-field result is suppressed.
     const w1 = svValidate((f) => {
       f.goalWeightG.value = '10';
+      f.fastMarginG.value = '6';
     });
     svAssert.equal(w1.warnings.length, 1, JSON.stringify(w1.warnings));
     svAssert.equal(w1.warnings[0].msg,
-      'Extend by up to (g) must not exceed 2.5 g (25 % of Target yield, Recipe).');
+      'Extend by up to (g) must not exceed 5.0 g (50 % of Target yield, Recipe).');
     const w1Empty = svValidate((f) => {
       f.goalWeightG.value = '';
     });
@@ -299,7 +301,7 @@
     // (w2) Resolving the other side clears the whole set without saving.
     const w2 = svValidate((f) => {
       f.goalWeightG.value = '10';
-      f.fastMarginG.value = '2.5';
+      f.fastMarginG.value = '5';
     });
     svAssert.deepEqual(w2.warnings, [], JSON.stringify(w2.warnings));
 

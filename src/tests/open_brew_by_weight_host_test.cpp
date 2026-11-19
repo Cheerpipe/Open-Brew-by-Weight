@@ -2949,7 +2949,8 @@ void w02_each_runtime_field_is_validated() {
   config = RuntimeConfig{};
   config.fastMarginDg = 4;
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::FAST_MARGIN);
-  config.fastMarginDg = 91;  // Over 25 % of a 36 g target.
+  config.goalWeightDg = 100;
+  config.fastMarginDg = 51;  // Over 50 % of a 10 g target.
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::FAST_MARGIN);
   config.fastSideEnabled = false;  // An off side keeps an unchecked margin.
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);

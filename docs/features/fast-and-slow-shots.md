@@ -135,10 +135,10 @@ While you edit, the field result shows the resulting weight and ratio, such as
 | --- | --- | --- | --- |
 | **Shot time window (s)** (Recipe) | 27 to 36 s (doubles), 23 to 32 s (singles) | **Window start** at least 2 s after Earliest weight stop; **Window end** at least 1 s after Window start and at least 1 s before Max shot time; 0.5 s steps | Reaching the target inside the window is On recipe; earlier is Fast, later is Slow. |
 | **Extend fast shots** | ON | ON / OFF | Lets fast shots go past the target. |
-| **Extend by up to (g)** | 6 g | 0.5–10 g in 0.1 g steps, and no more than a quarter of the target | The most a very fast shot gains over the target. |
+| **Extend by up to (g)** | 6 g | 0.5–10 g in 0.1 g steps, and no more than half of the target | The most a very fast shot gains over the target. |
 | **Shorten slow shots** | ON | ON / OFF | Lets slow shots stop before the target. |
 | **Shorten by up to (g)** | 3 g | 0.5–10 g in 0.1 g steps, leaving at least 5 g in the cup | The most a very slow shot stops short of the target. |
-| **Transition (s)** (Fast shots, Slow shots) | 6 s | 0–10 s in 0.5 s steps | How long the cut line takes to move between the target and the extra or reduced yield. |
+| **Transition (s)** (Fast shots, Slow shots) | 6 s | 0–25.5 s in 0.5 s steps | How long the cut line takes to move between the target and the extra or reduced yield. |
 | **Transition curve** (Fast shots, Slow shots) | Steep early (Fast shots), Steep late (Slow shots) | Steep early, Even, Steep late | Where that change happens fastest. |
 | **Curve hardness** (Fast shots, Slow shots) | Gentle | Gentle to Firm, 0.5 % steps | How marked the transition curve is. |
 

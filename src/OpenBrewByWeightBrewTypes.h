@@ -66,7 +66,7 @@ constexpr uint16_t DEFAULT_SLOW_MARGIN_DG = 30;
 constexpr uint16_t DEFAULT_DOSE_DG = 180;
 constexpr uint16_t MIN_SIDE_MARGIN_DG = 5;
 constexpr uint16_t MAX_SIDE_MARGIN_DG = 100;
-// The slow side never stops below 5 g; the fast side extends at most 25 %.
+// The slow side never stops below 5 g; the fast side extends at most 50 %.
 constexpr uint16_t MIN_SLOW_FLOOR_DG = 50;
 constexpr uint16_t MIN_DOSE_DG = 50;
 constexpr uint16_t MAX_DOSE_DG = 300;
@@ -81,7 +81,7 @@ constexpr uint32_t MIN_WINDOW_BEFORE_WALL_MS = 1000;
 // (Slow), flat beside the window so near-recipe shots stay on target.
 constexpr uint32_t DEFAULT_RAMP_MS = 5000;
 constexpr uint32_t FACTORY_RAMP_MS = 6000;
-constexpr uint32_t MAX_RAMP_MS = 10000;
+constexpr uint32_t MAX_RAMP_MS = 25500;  // Fast ramp is logged in one byte of ds.
 constexpr uint32_t RAMP_STEP_MS = 500;
 constexpr uint8_t RAMP_CURVE_EVEN = 0;
 constexpr uint8_t RAMP_CURVE_EARLY = 1;
