@@ -65,7 +65,7 @@ constexpr uint16_t DEFAULT_FAST_MARGIN_DG = 60;
 constexpr uint16_t DEFAULT_SLOW_MARGIN_DG = 30;
 constexpr uint16_t DEFAULT_DOSE_DG = 180;
 constexpr uint16_t MIN_SIDE_MARGIN_DG = 5;
-constexpr uint16_t MAX_SIDE_MARGIN_DG = 100;
+constexpr uint16_t MAX_SIDE_MARGIN_DG = 255;  // Margins are logged in one byte of dg.
 // The slow side never stops below 5 g; the fast side extends at most 50 %.
 constexpr uint16_t MIN_SLOW_FLOOR_DG = 50;
 constexpr uint16_t MIN_DOSE_DG = 50;

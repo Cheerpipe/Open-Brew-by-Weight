@@ -629,7 +629,7 @@ if (!codeIncludes(ui, 'function rangeCheck(') ||
     !codeIncludes(ui, 'id="goalWeightG" type="number" min="10" max="200" step="0.1"') ||
     !codeIncludes(ui, 'validateNetworkClient') ||
     !codeIncludes(ui, 'validateDevicePasswordClient') ||
-    !/0\.5 to 10 g/.test(errorCatalog['err.config_fast_margin_rules']) ||
+    !/0\.5 to 25\.5 g/.test(errorCatalog['err.config_fast_margin_rules']) ||
     !validationHeader.includes('validationFailure("CONFIG_FAST_MARGIN_RULES")') ||
     !/at least 2 s/.test(errorCatalog['err.config_fast_before_rules']) ||
     !validationHeader.includes('validationFailure("CONFIG_FAST_BEFORE_RULES")') ||

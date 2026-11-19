@@ -952,8 +952,8 @@ function validateBrewClient() {
   add(brewRange("doseG", 5, 30, { step: 0.1 }));
   add(brewRange("fastBeforeS", 2.5, 58, { step: 0.5 }));
   add(brewRange("slowAfterS", 3.5, 59, { step: 0.5 }));
-  if (fastOn) add(brewRange("fastMarginG", 0.5, 10, { step: 0.1 }));
-  if (slowOn) add(brewRange("slowMarginG", 0.5, 10, { step: 0.1 }));
+  if (fastOn) add(brewRange("fastMarginG", 0.5, 25.5, { step: 0.1 }));
+  if (slowOn) add(brewRange("slowMarginG", 0.5, 25.5, { step: 0.1 }));
   if (fastOn) add(brewRange("fastRampS", 0, 25.5, { step: 0.5 }));
   if (slowOn) add(brewRange("slowRampS", 0, 25.5, { step: 0.5 }));
   if (fastOn) add(brewRange("fastCurveHardness", 0, 100, { step: 0.5 }));

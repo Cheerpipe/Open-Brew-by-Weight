@@ -2955,6 +2955,15 @@ void w02_each_runtime_field_is_validated() {
   config.fastSideEnabled = false;  // An off side keeps an unchecked margin.
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);
   config = RuntimeConfig{};
+  config.goalWeightDg = 600;
+  config.fastMarginDg = config.slowMarginDg = MAX_SIDE_MARGIN_DG;  // 25.5 g each.
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);
+  config.fastMarginDg = MAX_SIDE_MARGIN_DG + 1;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::FAST_MARGIN);
+  config.fastMarginDg = MAX_SIDE_MARGIN_DG;
+  config.slowMarginDg = MAX_SIDE_MARGIN_DG + 1;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::SLOW_MARGIN);
+  config = RuntimeConfig{};
   config.goalWeightDg = 1980;
   config.fastMarginDg = 30;  // Target plus extra over 200 g.
   CHECK(validateRuntimeConfig(config) == ConfigValidationError::FAST_MARGIN);

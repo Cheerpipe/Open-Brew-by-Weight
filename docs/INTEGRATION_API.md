@@ -209,7 +209,7 @@ params substituted in order (see the example above).
 | ``CONFIG_BOOKOO_VOLUME_RANGE`` | Bookoo scale volume must be disabled (0) or 1 to 5. |
 | ``CONFIG_COMBINED_TARE_REQUIRES_AUTOTARE`` | The Bookoo combined command requires automatic tare. |
 | ``CONFIG_FAST_BEFORE_RULES`` | The shot time window must start at least 2 s after the earliest weight stop, end at least 1 s later, and use 0.5 s steps. |
-| ``CONFIG_FAST_MARGIN_RULES`` | Extra yield for fast shots must be 0.5 to 10 g, at most half of the target, and keep the target plus extra within 200 g. |
+| ``CONFIG_FAST_MARGIN_RULES`` | Extra yield for fast shots must be 0.5 to 25.5 g, at most half of the target, and keep the target plus extra within 200 g. |
 | ``CONFIG_FAST_RAMP_STEPS`` | Fast transition must be from 0 to 25.5 s in 0.5 s steps. |
 | ``CONFIG_FIELDS_INVALID`` | Config must be a JSON object with known fields and correct types. |
 | ``CONFIG_INVALID`` | Invalid configuration. |
@@ -222,7 +222,7 @@ params substituted in order (see the example above).
 | ``CONFIG_SCALE_LOSS_WINDOW`` | The scale-loss stop time must be empty or between the earliest weight stop and the max shot time. |
 | ``CONFIG_SHOT_REACT_TIMEOUT_RANGE`` | Shot reaction timeout must be 0 (compiled default) or from 3 to 30 s. |
 | ``CONFIG_SLOW_AFTER_RULES`` | The shot time window must end at least 1 s before the max shot time, in 0.5 s steps. |
-| ``CONFIG_SLOW_MARGIN_RULES`` | Less yield for slow shots must be 0.5 to 10 g and leave at least 5 g. |
+| ``CONFIG_SLOW_MARGIN_RULES`` | Less yield for slow shots must be 0.5 to 25.5 g and leave at least 5 g. |
 | ``CONFIG_SLOW_RAMP_STEPS`` | Slow transition must be from 0 to 25.5 s in 0.5 s steps. |
 | ``CONFIG_TIMING_RELATION`` | Required: rinse gesture < max shot time; rinse duration, retare window, and earliest weight stop each ≤ max shot time. |
 | ``CONFIG_WEIGHT_OFFSET_INTERNAL`` | Internal offset is invalid; it cannot be edited from the Web UI. |
