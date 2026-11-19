@@ -1475,8 +1475,7 @@
 }
 
 /* Confirm text keeps its paragraph breaks. With a third answer the answers
-   stack, the default on top, and Cancel steps back to plain text so the
-   lighter alternative still outweighs it. */
+   stack as equal pills, the default on top. */
 #confirmText {
   white-space: pre-line;
 }
@@ -1489,15 +1488,6 @@
 
 #confirmDialog:has(#confirmAlt:not([hidden])) .btnGlyph {
   min-height: 3rem;
-}
-
-/* Without its pill, Cancel's text would float a half box below the others:
-   the negative margin keeps the visible gaps even and the full tap target. */
-#confirmDialog:has(#confirmAlt:not([hidden])) [value="cancel"] {
-  min-height: var(--tap);
-  margin-top: -0.75rem;
-  border-color: transparent;
-  background: transparent;
 }
 
 /* The confirm and pairing dialogs' centred box on wider screens; on phones
