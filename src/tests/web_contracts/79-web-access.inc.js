@@ -381,19 +381,22 @@
   const closeSrc = rawRuntimeJs.slice(rawRuntimeJs.indexOf('const closing = new Map();'),
       rawRuntimeJs.indexOf('function firmwareResult('));
   const timers = [], hideListeners = [], el = () => ({remove() { this.removed = true; },
-    setAttribute() {}, append(...c) { this.kids = c; }, focus() {}});
+    setAttribute() {}, append(...c) { this.kids = c; }, focus() {},
+    style: {setProperty(k, v) { this[k] = v; }}});
   const card = () => {
     const c = new Set();
     return {classList: {add: (x) => c.add(x), remove: (x) => c.delete(x), has: (x) => c.has(x)},
       after(strip) { this.strip = strip; }, querySelector: () => ({focus() {}})};
   };
   const close = {__WEBUI_TEXT__: (k) => k, clearTimeout() {}, Map,
+    getComputedStyle: () => ({borderLeftColor: 'rgb(1, 2, 3)'}),
     setTimeout: (f, ms, ...a) => timers.push(() => f(...a)),
     document: {createElement: el, addEventListener: (t, f) => hideListeners.push(f), hidden: false}};
   vm.runInNewContext(closeSrc + ';this.closeCard = closeCard;', close);
   const commits = [], a = card(), b = card();
   close.closeCard(a, 'gone', () => commits.push('a'));
   assert.ok(a.classList.has('closing') && a.strip.kids[0] === 'gone' && commits.length === 0);
+  assert.equal(a.strip.style['--cardAc'], 'rgb(1, 2, 3)', 'The strip takes its card\'s accent');
   a.strip.kids[1].onclick();
   assert.ok(!a.classList.has('closing') && a.strip.removed && commits.length === 0, 'Undo commits nothing');
   close.closeCard(a, 'gone', () => commits.push('a'));
