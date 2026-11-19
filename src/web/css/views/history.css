@@ -1259,6 +1259,10 @@
   gap: 0.05rem;
 }
 
+.menuText b {
+  font-weight: 600;
+}
+
 .menuText small {
   color: var(--mu);
   font-size: 0.72rem;
