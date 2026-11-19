@@ -218,13 +218,15 @@
     return e;
   }}, sheetDialog: (d) => d, formatShotTime: () => 'today', setEmptyState: (id, text) => Object.assign(dom[id],
     {textContent: text || '', hidden: !text})});
+  vm.runInContext(blockAt(rawRuntimeJs, 'function openModal('), context);
   const interrupted = {...trace, flags: {...trace.flags, interrupted: true, decisionsTruncated: true},
     counters: {...trace.counters, decisionsDropped: 4}};
   context.showShotTrace(base, interrupted, vocab);
   const rowText = (li) => li.children.map((c) => c.textContent).join(' ');
   const rows = dom.shotTraceEvents.children;
   // Opening the view focuses the dialog, never a control with a focus ring.
-  assert.ok(dom.shotTraceDialog.open && dom.shotTraceDialog.focused && rows.length === 11);
+  assert.ok(dom.shotTraceDialog.open && dom.shotTraceDialog.focused &&
+      dom.shotTraceDialog.tabIndex === -1 && rows.length === 11);
   assert.deepEqual(rows.map((li) => li.children[0].textContent).slice(0, 2), ['6.00 s', '7.00 s']);
   assert.equal(rowText(rows.find((li) => li.dataset.type === 'debug')),
       '8.00 s Machine circuit closed 100000 · 7');

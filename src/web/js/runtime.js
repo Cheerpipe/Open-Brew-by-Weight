@@ -1784,6 +1784,14 @@ function sheetDialog(d, keep = false) {
   });
   return d;
 }
+// Opens a modal focused on itself: showModal would focus its first control,
+// and the browser draws the keyboard focus ring on it the moment it opens.
+// Tab still reaches every control, with its ring.
+function openModal(d) {
+  d.tabIndex = -1;
+  d.showModal();
+  d.focus();
+}
 // Arms a bar-top sentinel so the sticky toolbar after it carries the popup
 // shadow only while detached from its in-flow slot. Re-armed when the
 // --hdr breakpoint flips so the trigger keeps matching the sticky offset.
@@ -3716,7 +3724,7 @@ function applyPairingPrompt(access) {
   clearInterval(pairTimer);
   pairTimer = setInterval(paintPairExpiry, 1000);
   // A tap outside never dismisses the request: once hidden it cannot come back.
-  if (!dialog.open) sheetDialog(dialog, true).showModal();
+  if (!dialog.open) openModal(sheetDialog(dialog, true));
 }
 async function decidePairing(allow) {
   const id = pairShownId;
@@ -4582,7 +4590,7 @@ function startRenamePreset(p, titleEl) {
       d.close();
       commitRenamePreset(p, input.value);
     };
-    sheetDialog(d).showModal();
+    openModal(sheetDialog(d));
     return;
   }
   if (!titleEl) {
@@ -7860,7 +7868,7 @@ function askConfirm(text, ok, danger = false, alt = "") {
   b.classList.toggle("btnInvert", !danger);
   b.classList.toggle("btnDanger", danger);
   d.returnValue = "";
-  d.showModal();
+  openModal(d);
   return new Promise((done) =>
     d.addEventListener(
       "close",
@@ -8502,6 +8510,7 @@ export {
   presetState,
   selectedPreset,
   askConfirm,
+  openModal,
   sub,
   brewRatio,
   bootId,

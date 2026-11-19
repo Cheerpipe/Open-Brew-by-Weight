@@ -2800,10 +2800,7 @@ function showShotTrace(r, t, vocab) {
   $("shotTraceSearch").value = "";
   $("shotTraceType").onchange = $("shotTraceSearch").oninput = filter;
   $("shotTraceClose").onclick = () => d.close();
-  R.sheetDialog(d).showModal();
-  // Focus the dialog itself, or the browser focuses the close button and
-  // shows its focus ring the moment the view opens.
-  d.focus();
+  R.openModal(R.sheetDialog(d));
   filter();
 }
 const ICON = {

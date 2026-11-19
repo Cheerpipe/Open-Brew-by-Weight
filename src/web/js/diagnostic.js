@@ -2140,7 +2140,7 @@ function openLogDialog(d) {
     z.textContent = R.sub(__WEBUI_TEXT__("diagnostic.log_zone"), [zone]);
   d.returnValue = "";
   checkLogDialog(d);
-  d.showModal();
+  R.openModal(d);
 }
 // The dialogs check as they are filled in: a jump cannot be in the future,
 // and a custom export range cannot end before it starts.

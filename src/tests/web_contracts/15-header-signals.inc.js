@@ -265,7 +265,12 @@
     assert(new RegExp(`<dialog id="${id}" class="sheetDialog"[^>]*>\\s*<div class="sheetGrab">`).test(shellHtml), id);
   assert(/<dialog id="shotTraceDialog" class="sheetDialog"/.test(partialHtml.stats) &&
       /<dialog\s+id="presetRenameDialog"\s+class="sheetDialog"/.test(rawPartialHtml.settings));
-  assert(codeIncludes(rawRuntimeJs, 'if (!dialog.open) sheetDialog(dialog, true).showModal();') &&
+  // Every sheet opens focused on itself, so no control shows a focus ring
+  // the moment it opens.
+  assert(codeIncludes(rawRuntimeJs, 'function openModal(d){d.tabIndex=-1;d.showModal();d.focus();}') &&
+      !/\.showModal\(\)/.test(rawRuntimeJs.replace('d.showModal();', '')) &&
+      !/\.showModal\(\)/.test(viewJs.stats + viewJs.diagnostic) &&
+      codeIncludes(rawRuntimeJs, 'if (!dialog.open) openModal(sheetDialog(dialog, true));') &&
       codeIncludes(rawRuntimeJs, 'const d = sheetDialog($("confirmDialog")),') &&
       !rawRuntimeJs.includes('confirmOption') && !shellHtml.includes('confirmOption'),
       'Confirm drops the unused checkbox; pairing must be answered');
