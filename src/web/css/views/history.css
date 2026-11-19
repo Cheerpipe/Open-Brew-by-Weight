@@ -1474,6 +1474,23 @@
   margin: 0;
 }
 
+/* Confirm text keeps its paragraph breaks. With a third answer the answers
+   stack, the default on top, and Cancel steps back to plain text so the
+   lighter alternative still outweighs it. */
+#confirmText {
+  white-space: pre-line;
+}
+
+#confirmDialog:has(#confirmAlt:not([hidden])) .btnBar {
+  flex-direction: column-reverse;
+  align-items: stretch;
+}
+
+#confirmDialog:has(#confirmAlt:not([hidden])) [value="cancel"] {
+  border-color: transparent;
+  background: transparent;
+}
+
 /* The confirm and pairing dialogs' centred box on wider screens; on phones
    they rise as sheets (components/sheet.css) with full-width answers, and the
    preset rename sheet takes over from the card's in-place edit. */

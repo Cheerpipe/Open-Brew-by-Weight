@@ -48,6 +48,19 @@ void armBbwQuickStart(const ShotPreset &preset, bool userSet) {
   stageBbwQuickStart();
 }
 
+// A recipe change keeps the statistics epoch: arrival statistics count only
+// shots judged against the current window and target (plan §4.8), and the
+// first drop depends on neither. It restarts the drip evidence unless only
+// the starting drip, learning speed, dose or grind hints moved.
+void invalidateBbwEvidenceOnRecipeChange(ShotPreset previous, const ShotPreset &next) {
+  previous.weightOffsetBaselineG = next.weightOffsetBaselineG;
+  previous.bbwAlphaBaseline = next.bbwAlphaBaseline;
+  previous.doseDg = next.doseDg;
+  previous.grindHintsEnabled = next.grindHintsEnabled;
+  if (memcmp(&previous, &next, sizeof(previous)) != 0)
+    bbwLearningBank.invalidate(next.id, presetBank);
+}
+
 // The Web UI log names every drip change the owner makes and how it came,
 // within one log line (127 bytes with the longest preset name).
 void logDripChange(const char *change, const ShotPreset &preset, bool quickStart,
@@ -527,16 +540,7 @@ void processWebCommand(const WebCommand &command) {
                                         runtimeConfig.retareWindowMs,
                                         runtimeConfig.autoRetare);
           if (ok) {
-            // The epoch stays: arrival statistics count only shots judged
-            // against the current window and target (plan §4.8), and the
-            // first drop does not depend on either.
-            ShotPreset previous = *preset;
-            previous.weightOffsetBaselineG = candidateRecipe.weightOffsetBaselineG;
-            previous.bbwAlphaBaseline = candidateRecipe.bbwAlphaBaseline;
-            previous.doseDg = candidateRecipe.doseDg;
-            previous.grindHintsEnabled = candidateRecipe.grindHintsEnabled;
-            if (memcmp(&previous, &candidateRecipe, sizeof(previous)) != 0)
-              bbwLearningBank.invalidate(preset->id, presetBank);
+            invalidateBbwEvidenceOnRecipeChange(*preset, candidateRecipe);
             *preset = candidateRecipe;
             presetBank.activeId = preset->id;
           }
@@ -579,6 +583,16 @@ void processWebCommand(const WebCommand &command) {
                           *mutableShotPreset(presetBank, command.presetId), true, command);
           }
           break;
+        case PresetAction::RESTORE_FACTORY_RECIPE: {
+          const ShotPreset *before = findShotPreset(quickBefore.presets, command.presetId);
+          ok = restoreFactoryShotPresetValues(presetBank, command.presetId, true);
+          if (ok) {
+            const ShotPreset &restored = *mutableShotPreset(presetBank, command.presetId);
+            invalidateBbwEvidenceOnRecipeChange(*before, restored);
+            logDripChange("Factory recipe restored", restored, false, command);
+          }
+          break;
+        }
         case PresetAction::NEW_COFFEE: {
           ShotPreset *preset = mutableShotPreset(presetBank, command.presetId);
           ok = preset != nullptr;

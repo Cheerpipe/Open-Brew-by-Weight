@@ -973,8 +973,11 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
                            false)) {
       parseError = validationFailure("FIELD_REQUIRED", "name");
     }
-  } else if (strcmp(action, "restore_factory_values") == 0) {
-    presetAction = PresetAction::RESTORE_FACTORY_VALUES;
+  } else if (strcmp(action, "restore_factory_values") == 0 ||
+             strcmp(action, "restore_factory_recipe") == 0) {
+    presetAction = strcmp(action, "restore_factory_recipe") == 0
+                       ? PresetAction::RESTORE_FACTORY_RECIPE
+                       : PresetAction::RESTORE_FACTORY_VALUES;
     if (!jsonUint8(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }

@@ -2293,16 +2293,20 @@ export function init() {
     $("presetResetBtn").onclick = async () => {
       const p = R.selectedPreset();
       if (!p || !p.isFactory) return;
-      if (
-        !(await R.askConfirm(
-          R.sub(__WEBUI_TEXT__("settings.restore_confirm"), [p.name]),
-          __WEBUI_TEXT__("settings.restore"),
-        ))
-      )
-        return;
+      // Recipe only is the default answer; the learning reset is the lighter one.
+      const answer = await R.askConfirm(
+        R.sub(__WEBUI_TEXT__("settings.restore_confirm"), [p.name]),
+        __WEBUI_TEXT__("settings.restore_recipe"),
+        false,
+        __WEBUI_TEXT__("settings.restore_learning"),
+      );
+      if (!answer) return;
       if (R.uiState.brewDirty) R.clearBrewDirty();
       R.invalidateSettingsHydration();
-      R.command("/api/v1/presets", { action: "restore_factory_values", id: p.id });
+      R.command("/api/v1/presets", {
+        action: answer === "alt" ? "restore_factory_values" : "restore_factory_recipe",
+        id: p.id,
+      });
     };
   if ($("presetNewCoffeeBtn"))
     $("presetNewCoffeeBtn").onclick = () => R.startNewCoffee(R.selectedPreset().id);

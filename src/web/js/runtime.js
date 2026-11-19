@@ -2634,6 +2634,10 @@ function commandMessages(path, v) {
       ],
       rename: [__WEBUI_TEXT__("runtime.preset_renamed"), __WEBUI_TEXT__("runtime.rename_preset")],
       delete: [__WEBUI_TEXT__("runtime.preset_deleted"), __WEBUI_TEXT__("runtime.delete_preset")],
+      restore_factory_recipe: [
+        __WEBUI_TEXT__("runtime.factory_recipe_restored"),
+        __WEBUI_TEXT__("runtime.restore_factory_recipe"),
+      ],
       restore_factory_values: [
         __WEBUI_TEXT__("runtime.factory_values_restored"),
         __WEBUI_TEXT__("runtime.restore_factory_values"),
@@ -7844,19 +7848,25 @@ async function startNewCoffee(id = presetState.activeId) {
   if (p && (await askConfirm(text, __WEBUI_TEXT__("settings.new_coffee"))))
     command("/api/v1/presets", { action: "new_coffee", id });
 }
-// [Cancel][<ok>] confirmation in the shell dialog; resolves true on <ok>,
-// or "option" when the optional, unchecked box was ticked.
-function askConfirm(text, ok, danger = false) {
+// [Cancel][<alt>][<ok>] confirmation in the shell dialog; resolves true on
+// <ok>, "alt" on the optional, lighter <alt> answer, false otherwise.
+function askConfirm(text, ok, danger = false, alt = "") {
   const d = sheetDialog($("confirmDialog")),
     b = $("confirmOk");
   $("confirmText").textContent = text;
   b.firstChild.textContent = ok;
+  $("confirmAlt").hidden = !alt;
+  $("confirmAlt").firstElementChild.textContent = alt;
   b.classList.toggle("btnInvert", !danger);
   b.classList.toggle("btnDanger", danger);
   d.returnValue = "";
   d.showModal();
   return new Promise((done) =>
-    d.addEventListener("close", () => done(d.returnValue === "ok"), { once: true }),
+    d.addEventListener(
+      "close",
+      () => done(d.returnValue === "ok" || (d.returnValue === "alt" && "alt")),
+      { once: true },
+    ),
   );
 }
 // "Last 10 shots: 28–33 s, median 30.4 s": arrival times since the preset's

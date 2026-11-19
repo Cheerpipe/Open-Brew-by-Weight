@@ -21651,6 +21651,28 @@ void fw05_set_drip_quick_starts_and_three_shots_decide() {
   CHECK(debugLogTextCount("Quick start: three shots agree; drip correction 0.30 g") == 1);
   CHECK(state() == static_cast<uint8_t>(QuickStartState::APPLIED));
   CHECK(!debugEventExists(DebugCode::DRIP_LEARN_SKIPPED, static_cast<int32_t>(DripLearnNote::OUTLIER)) && debugLogTextCount("Drip step") == 0);
+  // Restore recipe brings back the factory settings, the starting drip and
+  // learning speed included, and keeps what the shots taught.
+  const ShotPreset learned = preset;
+  ShotPreset factory;
+  fillFactoryShotPreset(factory, preset.id);
+  preset.goalWeightDg = factory.goalWeightDg + 20;
+  WebCommand recipe;
+  recipe.type = WebCommandType::PRESET_OP;
+  recipe.presetAction = static_cast<uint8_t>(PresetAction::RESTORE_FACTORY_RECIPE);
+  recipe.presetId = preset.id;
+  debugLog.clear();
+  processWebCommand(recipe);
+  CHECK(preset.goalWeightDg == factory.goalWeightDg &&
+        preset.weightOffsetBaselineG == factory.weightOffsetBaselineG &&
+        preset.bbwAlphaBaseline == factory.bbwAlphaBaseline && factory.bbwAlphaBaseline != 50);
+  CHECK(preset.bbwEwmaOffsetG == learned.bbwEwmaOffsetG &&
+        preset.bbwEwmaAlpha == learned.bbwEwmaAlpha &&
+        preset.learningEpoch == learned.learningEpoch && !strcmp(preset.name, learned.name));
+  CHECK(state() == static_cast<uint8_t>(QuickStartState::APPLIED));
+  CHECK(debugLogTextCount("Factory recipe restored for \"") == 1 &&
+        debugLogTextCount("quick start armed") == 0);
+  pendingPresetPersistence = {};
   // Restore quick starts again and marks where the factory drip came back,
   // so the chart fades the shots pulled before it.
   WebCommand restore;

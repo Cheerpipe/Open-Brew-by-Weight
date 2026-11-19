@@ -80,8 +80,29 @@ preset and whether editing is allowed.
 | **Relearn** | Use after a new bag or a change to your dose, basket or grinder. Grind hints, the scale-loss backup and the usual first-drop time on the preset graph learn from your next shots; the shots so far are set aside. Your settings do not change. Ordinary grind tweaks don't need it: grind hints notice them on their own. |
 | **New** | Creates an Untitled preset from the Double · Adaptive values. |
 | **Duplicate** | Copies the selected preset into a new one. |
-| **Restore** | Factory presets only: returns the preset to its factory values and starts its shot statistics over. Shared settings do not change. |
+| **Restore** | Factory presets only: returns the preset to its factory values. You choose whether to keep what it has learned from your shots. Shared settings do not change. See [Restore a factory preset](#restore-a-factory-preset). |
 | **Delete** | Your own presets only: removes the preset. This cannot be undone. |
+
+## Restore a factory preset
+
+A factory preset holds two kinds of things: the recipe you can edit, and what
+it has learned from your shots. **Restore** asks which ones to put back:
+
+- **Restore recipe** returns the recipe to its factory values: target, shot
+  time window, fast and slow shot settings, the starting drip correction and
+  learning speed, and the machine settings. What the preset has learned stays:
+  the drip correction in use and its shot statistics, which feed grind hints,
+  the scale-loss backup and the usual first-drop time. This is the button to
+  use when you only want to undo your edits.
+- **Restore recipe and learning** also starts the learning over, as on a new
+  preset: the drip correction goes back to its factory value with a learning
+  speed of 0.30, a quick start begins, and the shot statistics start from your next
+  shot. Use it when the preset should forget your earlier shots, for example
+  after a big change to your setup.
+- **Cancel** changes nothing.
+
+Either way the preset keeps its name, and settings shared by all presets do
+not change.
 
 ## Lock the preset list on Home
 
@@ -246,10 +267,9 @@ change when you don't know the new value yet. **Set** on the learning-speed fiel
 **Set** and **undo** keys appear inside the field while your value differs from
 the one in use: undo puts the value in use back without applying, and typing
 that value back makes both leave. Pressing Enter applies.
-**Restore** on a factory preset returns the whole recipe, its drip correction and a
-learning speed of 0.30, and starts a quick start; it is available only for
-factory presets. A device factory reset additionally erases other settings and
-history. See
+**Restore** on a factory preset returns its factory values; see
+[Restore a factory preset](#restore-a-factory-preset). A device factory reset
+additionally erases other settings and history. See
 [BBW learning](brew-by-weight.md#cutoff-behavior-and-learning)
 for prediction, gain selection and reset behavior.
 

@@ -956,7 +956,8 @@ enum class PresetAction : uint8_t {
   DUPLICATE = 4,
   RENAME = 5,
   RESTORE_FACTORY_VALUES = 6,
-  NEW_COFFEE = 7  // Restarts the preset's shot statistics.
+  NEW_COFFEE = 7,  // Restarts the preset's shot statistics.
+  RESTORE_FACTORY_RECIPE = 8  // Factory values; the learned data stays.
 };
 
 // Recipe fields a preset save carries; a save writes only the present ones.

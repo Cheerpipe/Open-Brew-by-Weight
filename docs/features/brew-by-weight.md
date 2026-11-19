@@ -275,8 +275,8 @@ configuration with no recipe change still being saved.
   runs, a shot that **Extend fast shots** or **Shorten slow shots** stopped still
   trains the correction a little, as usual, but is not one of the three.
   The chart colors the shots the quick start counts and marks
-  where it began and where it decided. New presets, restored factory presets and a fresh install start the
-  same way; presets kept from an earlier firmware keep their correction untouched.
+  where it began and where it decided. New presets, factory presets restored with their learning and a fresh
+  install start the same way; presets kept from an earlier firmware keep their correction untouched.
 - **Quick start**, in the row under the chart, starts a quick start without
   changing anything else: the correction in use and the learning speed stay as they
   are, and the shots before it stop counting — for the quick start, for the

@@ -310,7 +310,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     !codeIncludes(ui, "action:'new'") ||
     !codeIncludes(ui, "action:'duplicate'") ||
     !codeIncludes(ui, "action:'rename'") ||
-    !codeIncludes(ui, "action:'restore_factory_values'") ||
+    !codeIncludes(ui, 'answer === "alt" ? "restore_factory_values" : "restore_factory_recipe"') ||
     !codeIncludes(ui, 'function startRenamePreset(') ||
     !codeIncludes(ui, 'function updatePresetActionButtons(') ||
     !codeIncludes(ui, 'function presetSummary(p)') ||
@@ -322,6 +322,7 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     !network.includes('/api/v1/presets') ||
     !network.includes('presetsHandler') ||
     !network.includes('restore_factory_values') ||
+    !network.includes('restore_factory_recipe') ||
     !network.includes('delta.hashedField("presets"') ||
     network.includes('"/presets"') ||
     !css.includes('.presetCard') ||

@@ -560,16 +560,23 @@ inline bool deleteShotPreset(ShotPresetBank &bank, uint8_t id) {
   return true;
 }
 
-inline bool restoreFactoryShotPresetValues(ShotPresetBank &bank, uint8_t id) {
+// Factory values under the owner's name; keepLearning also keeps what the
+// shots taught (drip in use, adapted speed, statistics epoch).
+inline bool restoreFactoryShotPresetValues(ShotPresetBank &bank, uint8_t id,
+                                           bool keepLearning = false) {
   ShotPreset *preset = mutableShotPreset(bank, id);
   if (preset == nullptr || !preset->isFactory || !factoryShotPresetId(id)) {
     return false;
   }
-  char name[SHOT_PRESET_NAME_CAPACITY];
-  memcpy(name, preset->name, sizeof(name));
+  const ShotPreset kept = *preset;
   fillFactoryShotPreset(*preset, id);
-  // Keep user-facing name.
-  memcpy(preset->name, name, sizeof(preset->name));
+  memcpy(preset->name, kept.name, sizeof(preset->name));
+  if (keepLearning) {
+    preset->learningEpoch = kept.learningEpoch;
+    preset->bbwEwmaOffsetG = kept.bbwEwmaOffsetG;
+    preset->bbwEwmaAlpha = kept.bbwEwmaAlpha;
+    preset->bbwAlphaLearned = kept.bbwAlphaLearned;
+  }
   return true;
 }
 

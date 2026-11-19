@@ -182,8 +182,8 @@ the stop (observation = offset used + final − f(t_cut)); channeling, manual,
 time/safety-limit, A→M and cup-removal outcomes, and cuts without a valid flow
 estimate (no q·τ lead), cannot adjust it or its candidate evidence. The
 channeling surge baseline must lie a full estimator window after the first
-drop. A quick start (armed by Set drip, Quick start alone, a new or restored
-preset, or a fresh install; persisted in NVS key `bbwQs`, absent = off) records
+drop. A quick start (armed by Set drip, Quick start alone, a new preset, a full
+factory restore, or a fresh install, never a recipe-only restore; persisted in NVS key `bbwQs`, absent = off) records
 the raw observations of the next three learning shots stopped at the target
 (SCALE_THRESHOLD); raised or lowered cuts take the EWMA step but are not
 counted. When max − min ≤ 0.40 g the third sets the offset to their median

@@ -247,8 +247,9 @@ only), shot time window (`fastBeforeMs`/`slowAfterMs`), fast and slow side
 switches with margins relative to the target (decigrams), weight-cut delay, max
 shot time, the optional fixed scale-loss stop time, drip compensation, grind
 hints and its statistics epoch (`learningEpoch`, a shot-log record id, moved
-only by Relearn (the `new_coffee` command), create, duplicate, restore and the
-reset-guard-samples command). Arrival statistics also require each shot's stored window and a
+only by Relearn (the `new_coffee` command), create, duplicate, the full restore (`restore_factory_values`; the recipe-only
+`restore_factory_recipe` keeps the epoch, the drip in use and the adapted
+learning speed) and the reset-guard-samples command). Arrival statistics also require each shot's stored window and a
 target within 1 g of the preset's; the first-drop median ignores both and
 falls back to the other presets' shots while the preset has none. The grind
 hint stores nothing: each status snapshot replays the preset's shot-log rows
