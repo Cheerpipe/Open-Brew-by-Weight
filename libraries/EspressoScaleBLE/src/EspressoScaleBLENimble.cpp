@@ -676,6 +676,10 @@ class NimbleScaleClient {
                               protocol_->parseBattery(frame.data, frame.length,
                                                       hasWeight, &batteryPct);
       if (!hasWeight && !hasTimer && !hasBattery) {
+        if (protocol_->ignorableFrame != nullptr &&
+            protocol_->ignorableFrame(frame.data, frame.length)) {
+          continue; // Documented, unconsumed frame: valid traffic.
+        }
         notifyDroppedFrame(frame, ScaleFrameDropReason::Undecodable);
         rejectPacket();
         continue;

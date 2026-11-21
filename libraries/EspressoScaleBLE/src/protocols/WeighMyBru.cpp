@@ -65,5 +65,6 @@ const ScaleProtocol kScaleProtocolWeighMyBru = {
     nullptr,
     0,
     false,
-    {nullptr, nullptr}
+    {nullptr, nullptr},
+    nullptr
 };

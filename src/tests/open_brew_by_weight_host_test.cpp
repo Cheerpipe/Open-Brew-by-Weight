@@ -6127,11 +6127,39 @@ bool scaleWarningContains(const char *fragment) {
   return false;
 }
 
-void d13d_known_mini_rejects_shutdown_before_terminal_barrier() {
+// The Mini supports shutdown with the same 0x15 opcode as the Ultra
+// (Mini release V1.4.3+), so an identified Mini takes the terminal barrier
+// and drops pending beeps and debug commands like any supported scale.
+void d13d_known_mini_accepts_shutdown_like_the_ultra() {
   resetHarness(false, false);
   copyCString(scale.connectedLocalName, sizeof(scale.connectedLocalName),
               "BOOKOO_SC 715097");
   scale.connectedFeatures.flags |= ScaleFeaturePowerOff;
+  setScaleConnected(true);
+  const ScaleLinkSnapshot link = getScaleLinkSnapshot();
+  CHECK(link.model == ScaleModel::BookooMini);
+  CHECK(link.features.has(ScaleFeaturePowerOff));
+  requestScaleBrewBeep(1);
+  CHECK(scaleBeepPending);
+  CHECK(enqueueScaleDebugCommand(BookooDebugAction::VOLUME, 3));
+  CHECK(scaleDebugPending);
+  requestScalePowerOff();
+  CHECK(scalePowerOffBlocksGeneration(link.connectionGeneration));
+  CHECK(!scaleBeepPending);
+  CHECK(!scaleDebugPending);
+  CHECK(scale.commandLog.empty());
+  CHECK(takeScalePowerOff());
+  executeScalePowerOffCommand();
+  CHECK(scale.commandLog.size() == 1);
+  CHECK(scale.commandLog[0] == "powerOff");
+  setScaleConnected(false);
+  CHECK(getScaleLinkSnapshot().model == ScaleModel::Unknown);
+}
+
+void d13d2_scale_without_power_off_support_keeps_pending_commands() {
+  resetHarness(false, false);
+  copyCString(scale.connectedLocalName, sizeof(scale.connectedLocalName),
+              "BOOKOO_SC 715097");
   setScaleConnected(true);
   const ScaleLinkSnapshot link = getScaleLinkSnapshot();
   CHECK(link.model == ScaleModel::BookooMini);
@@ -6146,9 +6174,7 @@ void d13d_known_mini_rejects_shutdown_before_terminal_barrier() {
   CHECK(scaleBeepPending);
   CHECK(scaleDebugPending);
   CHECK(scale.commandLog.empty());
-  CHECK(scaleWarningContains("Power off not sent: Bookoo Themis Mini"));
-  setScaleConnected(false);
-  CHECK(getScaleLinkSnapshot().model == ScaleModel::Unknown);
+  CHECK(scaleWarningContains("Power off not sent: connected scale"));
 }
 
 void d13e_ultra_volume_rejection_preserves_saved_level() {
@@ -27162,7 +27188,8 @@ const TestCase testCases[] = {
     {"D01", d01_idle_scan_stays_enabled_between_ticks},
     {"D13", d13_idle_delays_relax_without_scale},
     {"D13B", d13b_scale_power_off_is_terminal_for_connection_generation},
-    {"D13D", d13d_known_mini_rejects_shutdown_before_terminal_barrier},
+    {"D13D", d13d_known_mini_accepts_shutdown_like_the_ultra},
+    {"D13D2", d13d2_scale_without_power_off_support_keeps_pending_commands},
     {"D13E", d13e_ultra_volume_rejection_preserves_saved_level},
     {"D13C", d13c_disconnect_silence_clears_connecting_snapshot},
     {"D15", d15_control_housekeeping_has_wrap_safe_10ms_cadence},

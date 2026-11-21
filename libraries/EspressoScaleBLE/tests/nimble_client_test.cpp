@@ -1265,12 +1265,13 @@ static void run() {
     strcpy(c.name_, "BOOKOO_SC 715097"); c.identityPresent_=true;
     c.writeProperties_=BLE_GATT_CHR_PROP_WRITE_NO_RSP;
     CHECK(c.model()==ScaleModel::BookooMini);
-    CHECK(!c.features().has(ScaleFeaturePowerOff));
+    CHECK(c.features().has(ScaleFeaturePowerOff));
     CHECK(c.features().volumeMax==5);
-    CHECK(c.writeOp(ScaleOp::PowerOff)==ScaleCommandResult::Unsupported);
-    CHECK(testWrites==0 && c.closedCommandGeneration_!=c.generation_);
-    CHECK(c.writeOp(ScaleOp::Tare)==ScaleCommandResult::Ok);
-    CHECK(testWrites==1);
+    CHECK(c.writeOp(ScaleOp::Heartbeat)==ScaleCommandResult::Ok);
+    CHECK(c.writeOp(ScaleOp::PowerOff)==ScaleCommandResult::Ok);
+    CHECK(testWrites==2 && c.closedCommandGeneration_==c.generation_);
+    CHECK(c.writeOp(ScaleOp::Tare)==ScaleCommandResult::NotConnected);
+    CHECK(testWrites==2);
     c.enterState(NimbleScaleClient::State::Scanning);
     CHECK(c.model()==ScaleModel::Unknown);
     ready(c);
@@ -1307,13 +1308,13 @@ static void run() {
     CHECK(c.model()==ScaleModel::Unknown);
   }
   {
-    const uint8_t miniCodes[]={1,2,4,5,6,7};
+    const uint8_t miniCodes[]={1,2,4,5,6,7,0x15};
     ScaleCommandInfo command={};
-    for(size_t i=0;i<6;++i){
+    for(size_t i=0;i<7;++i){
       CHECK(scaleBookooCommandAt(ScaleModel::BookooMini,i,&command));
       CHECK(command.code==miniCodes[i]);
     }
-    CHECK(!scaleBookooCommandAt(ScaleModel::BookooMini,6,&command));
+    CHECK(!scaleBookooCommandAt(ScaleModel::BookooMini,7,&command));
     CHECK(scaleBookooCommandAt(ScaleModel::BookooUltra,6,&command));
     CHECK(command.code==0x15);
     CHECK(!scaleBookooCommandAt(ScaleModel::Unknown,0,&command));
@@ -1333,6 +1334,25 @@ static void run() {
     }
     CHECK(!scaleBookooCommandAt(ultra,7,&command));
     CHECK(strcmp(scaleDefaultFriendlyName("LUNAR"),"LUNAR")==0);
+  }
+  {
+    // The keep-alive resets the scale's auto-off countdown (Mini V1.4.3+,
+    // Ultra V4.0.1+): same 6-byte command shape as every other Bookoo op.
+    uint8_t out[SCALE_MAX_COMMAND_LENGTH]={}; int length=0;
+    CHECK(scaleBookooOpcode(ScaleOp::Heartbeat)==0x25);
+    CHECK(kScaleProtocolGenericFf11.encodeCommand(ScaleOp::Heartbeat,0,out,&length));
+    const uint8_t keepAlive[]={0x03,0x0a,0x25,0x00,0x00,0x2c};
+    CHECK(length==6);
+    for(size_t i=0;i<sizeof(keepAlive);++i) CHECK(out[i]==keepAlive[i]);
+    // Ultra automatic-mode event (0x0d) and powder weight (0x0f) frames are
+    // documented, unconsumed traffic: recognized, but never corrupt packets.
+    uint8_t event[20]={0x03,0x0d,0x01}; event[19]=0x03^0x0d^0x01;
+    uint8_t powder[20]={0x03,0x0f}; powder[19]=0x03^0x0f;
+    CHECK(kScaleProtocolGenericFf11.ignorableFrame(event,20));
+    CHECK(kScaleProtocolGenericFf11.ignorableFrame(powder,20));
+    --event[19];
+    CHECK(!kScaleProtocolGenericFf11.ignorableFrame(event,20));
+    CHECK(!kScaleProtocolGenericFf11.ignorableFrame(powder,19));
   }
   for (const auto preset : {std::make_pair(BLE_SCAN_RELAXED_INTERVAL,BLE_SCAN_RELAXED_WINDOW),
                             std::make_pair(BLE_SCAN_AGGRESSIVE_INTERVAL,BLE_SCAN_AGGRESSIVE_WINDOW)}) {

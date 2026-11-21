@@ -16,8 +16,8 @@
   assert.equal(rows.values.length, 7); assert(!elements.scaleCommandTable.hidden);
   assert.equal(rows.values[6][1].textContent, '0x15');
   assert(elements.scaleCommandHint.textContent.includes('charging'));
-  apply({model: 'bookoo_mini', supportedCommandsKnown: true, supportedCommands: commands.slice(0, 6)});
-  assert.equal(rows.values.length, 6); assert.equal(elements.scaleCommandHint.textContent, '');
+  apply({model: 'bookoo_mini', supportedCommandsKnown: true, supportedCommands: commands});
+  assert.equal(rows.values.length, 7); assert.equal(elements.scaleCommandHint.textContent, '');
   apply({model: 'unknown', supportedCommandsKnown: false, supportedCommands: []});
   assert(elements.scaleCommandTable.hidden); assert.equal(rows.values.length, 0);
   assert(elements.scaleCommandHint.textContent.includes('unknown'));

@@ -178,7 +178,8 @@ const ScaleProtocol kScaleProtocolAcaiaLegacy = {
     kAcaiaInitWrites,
     sizeof(kAcaiaInitWrites) / sizeof(kAcaiaInitWrites[0]),
     false,
-    {nullptr, nullptr}
+    {nullptr, nullptr},
+    nullptr
 };
 
 const ScaleProtocol kScaleProtocolAcaia = {
@@ -198,5 +199,6 @@ const ScaleProtocol kScaleProtocolAcaia = {
     kAcaiaInitWrites,
     sizeof(kAcaiaInitWrites) / sizeof(kAcaiaInitWrites[0]),
     false,
-    {nullptr, nullptr}
+    {nullptr, nullptr},
+    nullptr
 };

@@ -56,6 +56,12 @@ struct ScaleProtocol {
     size_t initWriteCount;
     bool requireAdvertisedName;
     ScaleStockTones stockTones;
+    // A documented notification frame type this protocol recognizes but does
+    // not consume (for example Bookoo automatic-mode events). Such frames are
+    // valid traffic: dropped silently, never counted as corrupt packets.
+    // Positioned last so every protocol's positional initializer list only
+    // grows at the end.
+    bool (*ignorableFrame)(const uint8_t *data, int length);
 };
 
 // Advertisement identity is a hint for display; command filtering also
@@ -102,6 +108,9 @@ inline uint8_t scaleBookooOpcode(ScaleOp op) {
         case ScaleOp::ResetTimer: return 0x06;
         case ScaleOp::CombinedTareStart: return 0x07;
         case ScaleOp::PowerOff: return 0x15;
+        // Keep-alive: resets the auto-off countdown (Mini V1.4.3+, Ultra
+        // V4.0.1+); both specs recommend sending it periodically.
+        case ScaleOp::Heartbeat: return 0x25;
         default: return 0;
     }
 }
@@ -120,8 +129,9 @@ inline bool scaleBookooCommandAt(ScaleModel model, size_t index,
     static const char *const names[] = {"Tare", "Volume", "Start timer",
                                          "Stop timer", "Reset timer",
                                          "Tare and start timer", "Power off"};
-    const size_t count = model == ScaleModel::BookooUltra ? 7 :
-                         model == ScaleModel::BookooMini ? 6 : 0;
+    // The Mini and the Ultra share the same command set since the Mini
+    // protocol gained power-off (release V1.4.3, unified opcode 0x15).
+    const size_t count = model == ScaleModel::Unknown ? 0 : 7;
     if (out == nullptr || index >= count) return false;
     *out = {names[index], scaleBookooOpcode(ops[index])};
     return true;
@@ -161,12 +171,12 @@ inline ScaleFeatureSet scaleFeaturesForModel(const ScaleProtocol *protocol,
                                              ScaleModel model) {
     ScaleFeatureSet result = protocol == nullptr ? scaleFeatureSetNone()
                                                 : protocol->features;
-    if (protocol == &kScaleProtocolGenericFf11) {
-        if (model == ScaleModel::BookooMini) {
-            result.flags &= ~static_cast<uint32_t>(ScaleFeaturePowerOff);
-        } else if (model == ScaleModel::BookooUltra) {
-            result.volumeMax = 3;
-        }
+    // The Mini gained power-off with the same 0x15 opcode as the Ultra
+    // (Mini release V1.4.3+); only the volume range still differs by model
+    // (Ultra V4.0.0+: 0-3; the Mini clamps above 5 itself).
+    if (protocol == &kScaleProtocolGenericFf11 &&
+        model == ScaleModel::BookooUltra) {
+        result.volumeMax = 3;
     }
     return result;
 }

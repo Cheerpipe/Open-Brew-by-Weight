@@ -122,5 +122,6 @@ const ScaleProtocol kScaleProtocolFelicita = {
     kFelicitaInitWrites,
     sizeof(kFelicitaInitWrites) / sizeof(kFelicitaInitWrites[0]),
     false,
-    {nullptr, nullptr}
+    {nullptr, nullptr},
+    nullptr
 };

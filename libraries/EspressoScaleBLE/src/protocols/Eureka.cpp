@@ -81,5 +81,6 @@ const ScaleProtocol kScaleProtocolEureka = {
     nullptr,
     0,
     true,
-    {nullptr, nullptr}
+    {nullptr, nullptr},
+    nullptr
 };

@@ -1639,9 +1639,7 @@ void requestScalePowerOff() {
   }
   if (!link.features.has(ScaleFeaturePowerOff)) {
     serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
-                         "Power off not sent: %s does not support it",
-                         link.model == ScaleModel::BookooMini
-                             ? "Bookoo Themis Mini" : "connected scale");
+                         "Power off not sent: connected scale does not support it");
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_DEBUG_UNSUPPORTED);
     return;
   }
@@ -2876,7 +2874,8 @@ void scaleWorkerTask(void *) {
             SCALE_LINK_SNAPSHOT_INTERVAL_MS;
 
     // Packet timeout / remote-drop detection must not wait behind beeps or
-    // queued commands. Bookoo has no heartbeat; silence is the only watchdog.
+    // queued commands. Bookoo's keep-alive only resets its own auto-off
+    // countdown; packet silence remains the disconnect watchdog.
     if (linked) {
       discovery.connectAttemptSeriesActive = false;
       serviceScaleWorkerLink();

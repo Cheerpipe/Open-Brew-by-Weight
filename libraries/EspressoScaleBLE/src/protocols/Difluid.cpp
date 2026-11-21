@@ -98,5 +98,6 @@ const ScaleProtocol kScaleProtocolDifluid = {
     kDifluidInitWrites,
     sizeof(kDifluidInitWrites) / sizeof(kDifluidInitWrites[0]),
     false,
-    {nullptr, nullptr}
+    {nullptr, nullptr},
+    nullptr
 };

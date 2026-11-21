@@ -11,11 +11,13 @@ static const ScaleFeatureSet kGenericFeatures = {
     SCALE_CORE_FEATURES | ScaleFeatureCombinedTareStart |
         ScaleFeatureIndependentBeep | ScaleFeatureVolume |
         ScaleFeatureCommandAudibleFeedback | ScaleFeaturePowerOff |
-        ScaleFeatureFlowRate | ScaleFeatureTimerInWeightFrame |
-        ScaleFeatureBatteryLevel,
+        ScaleFeatureHeartbeat | ScaleFeatureFlowRate |
+        ScaleFeatureTimerInWeightFrame | ScaleFeatureBatteryLevel,
     0,
     5,
-    0,
+    // Keep-alive (0x25) resets the scale's auto-off countdown; the countdown
+    // is 5-30 minutes, so one write a minute keeps it comfortably awake.
+    60000,
     8000,
     100,
     // Themis Mini on a Linea Micra: the post-cut knee sat at 0.55 +/- 0.01 s
@@ -92,6 +94,16 @@ bool encodeGenericCommand(ScaleOp op, uint8_t arg, uint8_t *out, int *length) {
     return scaleCopyPayload(command, sizeof(command), out, length);
 }
 
+// Documented frame types this firmware does not consume: automatic-mode
+// events (0x0d, Ultra beta V3.2.4+/V4.0.0+) and powder weight (0x0f, same
+// releases). Both arrive on the weight characteristic as 20-byte frames;
+// valid traffic, never corrupt packets.
+bool genericIgnorableFrame(const uint8_t *data, int length) {
+    return length == 20 && data[0] == 0x03 &&
+           (data[1] == 0x0d || data[1] == 0x0f) &&
+           scaleXorBytes(data, 19) == data[19];
+}
+
 } // namespace
 
 const ScaleProtocol kScaleProtocolGenericFf11 = {
@@ -112,5 +124,6 @@ const ScaleProtocol kScaleProtocolGenericFf11 = {
     0,
     false,
     {"bookoo:d=16,o=6,b=100:16c6,16g6,16f6,16c7",
-     "bookoo-off:d=16,o=6,b=100:16c7,16c6"}
+     "bookoo-off:d=16,o=6,b=100:16c7,16c6"},
+    &genericIgnorableFrame
 };
