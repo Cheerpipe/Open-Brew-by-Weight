@@ -268,6 +268,8 @@ void processWebCommand(const WebCommand &command) {
       candidate.alertOutputChannel = command.config.alertOutputChannel;
       candidate.bookooMuteOnBuzzerOnly = command.config.bookooMuteOnBuzzerOnly;
       candidate.bookooConnectBeepLevel = command.config.bookooConnectBeepLevel;
+      candidate.bookooKeepAwakeWhileMachineOn =
+          command.config.bookooKeepAwakeWhileMachineOn;
       candidate.autoRetare = command.config.autoRetare;
       candidate.retareWindowMs = command.config.retareWindowMs;
       candidate.minimumCupWeightG = command.config.minimumCupWeightG;

@@ -578,6 +578,14 @@ class EspressoScaleBLE {
     }
     return runCommand(heartbeatSucceeds);
   }
+  ScaleCommandResult resetAutoOff() {
+    commandLog.push_back("resetAutoOff");
+    if (!features().has(ScaleFeatureAutoOffReset)) {
+      return ScaleCommandResult::Unsupported;
+    }
+    if (connected && !resetAutoOffSucceeds) return ScaleCommandResult::WriteFailed;
+    return runCommand(true);
+  }
   bool supportsPowerOff() const {
     return connected && features().has(ScaleFeaturePowerOff);
   }
@@ -760,6 +768,7 @@ class EspressoScaleBLE {
   bool heartbeatSucceeds = true;
   bool heartbeatFailureKeepsLink = false;
   bool powerOffSucceeds = true;
+  bool resetAutoOffSucceeds = true;
   bool heartbeatRequiredValue = false;
   uint32_t silenceStartedAtMs = 0;
   bool silenceArmed = false;

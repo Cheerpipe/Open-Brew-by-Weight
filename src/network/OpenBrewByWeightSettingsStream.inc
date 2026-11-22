@@ -49,6 +49,9 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   const bool companionBeanconqueror =
       companion.paired && companion.archiveSwitch && companion.bcSwitch;
   gate = gateOver(gate, &companionBeanconqueror, sizeof(companionBeanconqueror));
+  // Whether any machine integration can report a confirmed power state.
+  const bool machinePowerKnown = machineIntegrationReportsPower();
+  gate = gateOver(gate, &machinePowerKnown, sizeof(machinePowerKnown));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   char serial[LA_MARZOCCO_SERIAL_CAPACITY] = {};
   uint8_t options, scaleOptions;
@@ -145,6 +148,9 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("config.touchStopFallbackEnabled", bool(config.touchStopFallbackEnabled));
   fields.field("config.cupRemovedWeightG", static_cast<float>(config.cupRemovedWeightG));
   fields.field("config.bookooMuteOnBuzzerOnly", bool(config.bookooMuteOnBuzzerOnly));
+  fields.field("config.bookooKeepAwakeWhileMachineOn",
+               bool(config.bookooKeepAwakeWhileMachineOn));
+  fields.field("machinePowerKnown", machinePowerKnown);
   fields.field("config.bookooConnectBeepLevel",
                static_cast<unsigned long>(config.bookooConnectBeepLevel));
   fields.field("config.noScaleAllowRinseWhileArmed",

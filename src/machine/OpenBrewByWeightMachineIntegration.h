@@ -43,6 +43,10 @@ inline void serviceMachineIntegrationScaleLink(uint32_t, bool, uint32_t,
 inline void serviceMachineIntegrationMachinePower(bool, bool, bool) {}
 inline MachinePower hostMachinePowerState = MachinePower::UNKNOWN;
 inline MachinePower machineIntegrationPowerState() { return hostMachinePowerState; }
+inline bool hostMachineConfirmedOn = false;
+inline bool machineIntegrationConfirmedOn() { return hostMachineConfirmedOn; }
+inline bool hostMachineReportsPower = false;
+inline bool machineIntegrationReportsPower() { return hostMachineReportsPower; }
 inline uint32_t hostMachineTemperatureRequestCount = 0;
 inline uint8_t hostMachineTemperaturePresetId = 0;
 inline uint32_t hostMachineTemperatureGeneration = 0;
@@ -113,6 +117,12 @@ void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
 // optimistic overlay) for the control task's power policy; UNKNOWN when the
 // integration cannot tell. Reads the cached status poll, never blocks.
 MachinePower machineIntegrationPowerState();
+// True only for a current ON observation: never stale, optimistic or
+// assumed. Control task only, like machineIntegrationPowerState().
+bool machineIntegrationConfirmedOn();
+// Whether the integration is set up to observe the machine's power at all
+// (and so can ever confirm ON). Any task.
+bool machineIntegrationReportsPower();
 void requestMachineIntegrationPresetSettings(PresetMachineSettings preset,
                                              uint32_t configGeneration);
 // The integration's current coffee target in deci-Celsius for the shot

@@ -60,6 +60,10 @@ constexpr uint32_t SCALE_WEIGHT_POLL_INTERVAL_MS = 10;
 // Frames drained per wake; the client RX ring holds this many.
 constexpr unsigned SCALE_WEIGHT_DRAIN_MAX = 16;
 constexpr uint32_t SCALE_POWER_OFF_DISCONNECT_TIMEOUT_MS = 3000;
+// Bookoo auto-off is at least 5 minutes, so a reset every 2 minutes keeps a
+// requested scale awake; the first waits 10 s after Ready, past setup writes.
+constexpr uint32_t SCALE_AUTO_OFF_RESET_PERIOD_MS = 120000;
+constexpr uint32_t SCALE_AUTO_OFF_RESET_FIRST_DELAY_MS = 10000;
 constexpr uint32_t SCALE_WORKER_BACKGROUND_MS = 25;
 constexpr uint32_t SCALE_LINK_SNAPSHOT_INTERVAL_MS = 50;
 constexpr uint32_t SCALE_LINK_RSSI_SAMPLE_MS = 1000;
@@ -167,6 +171,10 @@ void cancelOperationalScaleBeeps();
 // Machine-link request: power the connected scale off. Dropped unless the
 // link stays on the same connection generation and the protocol supports it.
 void requestScalePowerOff();
+// Control task, every loop: whether the connected scale should be kept awake
+// now (option on, machine confirmed ON, no cycle). The worker owns the
+// schedule and the command; publishing never blocks.
+void publishScaleKeepAwake(bool requested);
 
 // Orchestrator-owned scale BLE client.
 extern EspressoScaleBLE scale;

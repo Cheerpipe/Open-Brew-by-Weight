@@ -20,6 +20,8 @@ void serviceMachineIntegrationMachinePower([[maybe_unused]] bool scaleLinkUp,
                                            [[maybe_unused]] bool scaleSupportsPowerOff,
                                            [[maybe_unused]] bool machineBusy) {}
 MachinePower machineIntegrationPowerState() { return MachinePower::UNKNOWN; }
+bool machineIntegrationConfirmedOn() { return false; }
+bool machineIntegrationReportsPower() { return false; }
 void requestMachineIntegrationPresetSettings([[maybe_unused]] PresetMachineSettings preset,
                                              [[maybe_unused]] uint32_t configGeneration) {}
 uint16_t machineIntegrationShotTargetDeciC() { return 0; }

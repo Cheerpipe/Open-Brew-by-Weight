@@ -190,7 +190,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "ntpServerPreset",
       "ntpServerCustom", "scheduledRestartEnabled", "scheduledRestartMinuteOfDay",
       "scaleMacCacheMode", "preferredScaleMac", "bookooMuteOnBuzzerOnly",
-      "bookooConnectBeepLevel", "noScaleBbwMode",
+      "bookooConnectBeepLevel", "bookooKeepAwakeWhileMachineOn", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
       "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode", "beanconquerorEndpoint",
@@ -490,6 +490,9 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "bookooMuteOnBuzzerOnly") &&
              !jsonBoolean(root, "bookooMuteOnBuzzerOnly", candidate.bookooMuteOnBuzzerOnly)) {
     parseError = validationFailure("FIELD_BOOLEAN", "bookooMuteOnBuzzerOnly");
+  } else if (!jsonOptionalBoolean(root, "bookooKeepAwakeWhileMachineOn",
+                                  candidate.bookooKeepAwakeWhileMachineOn)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "bookooKeepAwakeWhileMachineOn");
   } else if (jsonFieldPresent(root, "bookooConnectBeepLevel") &&
              (!jsonUint8(root, "bookooConnectBeepLevel",
                          candidate.bookooConnectBeepLevel) ||

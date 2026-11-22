@@ -133,6 +133,17 @@ MachinePower machineIntegrationPowerState() {
   return MachinePower::UNKNOWN;
 }
 
+bool machineIntegrationConfirmedOn() {
+  return service.statusPoll().assumedPower == LaMarzoccoAssumedPower::ON &&
+         !service.statusPollStale();
+}
+
+bool machineIntegrationReportsPower() {
+  return laMarzoccoAccountConfigured.load(std::memory_order_relaxed) &&
+         (laMarzoccoOptions.load(std::memory_order_relaxed) &
+          LA_MARZOCCO_OBSERVE_STATE) != 0;
+}
+
 void serviceMachineIntegrationMachinePower(bool scaleLinkUp,
                                            bool scaleSupportsPowerOff,
                                            bool machineBusy) {

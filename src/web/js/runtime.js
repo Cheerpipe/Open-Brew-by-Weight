@@ -8039,6 +8039,7 @@ function loadSettingsConfig({ config: c, quickRevert }) {
     "soundAlertsEnabled",
     "canTareStartTimer",
     "bookooMuteOnBuzzerOnly",
+    "bookooKeepAwakeWhileMachineOn",
     "firstDropBeep",
     "scaleConnectedLed",
     "buzzerScaleLostBeep",

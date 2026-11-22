@@ -940,6 +940,10 @@ void loop() {
   serviceMachineIntegrationMachinePower(
       loopScaleConnected, loopScaleLink.features.has(ScaleFeaturePowerOff),
       loopMachineBusy);
+  publishScaleKeepAwake(runtimeConfig.bookooKeepAwakeWhileMachineOn &&
+                        !loopMachineBusy && !session.active &&
+                        machineRunState() == MachineRunState::IDLE &&
+                        machineIntegrationConfirmedOn());
   finishLoopPhase(LoopPhase::MACHINE_INTEGRATION);
   stateMachineTask();
   finishLoopPhase(LoopPhase::CONTROL_STATE_MACHINE);

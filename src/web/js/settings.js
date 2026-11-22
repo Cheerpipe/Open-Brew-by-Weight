@@ -314,6 +314,7 @@ function machinePayload() {
     canTareStartTimer: $("canTareStartTimer").checked,
     bookooMuteOnBuzzerOnly: $("bookooMuteOnBuzzerOnly").checked,
     bookooConnectBeepLevel: Number($("bookooConnectBeepLevel").value),
+    bookooKeepAwakeWhileMachineOn: $("bookooKeepAwakeWhileMachineOn").checked,
     scaleTimerStopExtraDelayMs: R.number("scaleTimerStopExtraDelayMs"),
     dripDelayMs: R.sToMs("dripDelayS"),
     soundAlertsEnabled: $("soundAlertsEnabled").checked,
@@ -666,6 +667,11 @@ function applySettingsStatus(s) {
   R.loadSettingsConfig(s);
   loadBullseyeConfig(s.config);
   applyLaMarzoccoStatus(s);
+  // Keep-awake follows any machine integration that reports its power.
+  const powerKnown = !!s.machinePowerKnown;
+  $("bookooKeepAwakeWrap").classList.toggle("fieldOff", !powerKnown);
+  $("bookooKeepAwakeWhileMachineOn").disabled = !R.controlsMutable || !powerKnown;
+  $("bookooKeepAwakeUnavailable").hidden = powerKnown;
   R.updateBbwControls();
   const sl = s.scaleLoss,
     active = R.presetState.items.find((x) => x.id === R.presetState.activeId);

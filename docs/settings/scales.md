@@ -185,6 +185,26 @@ connection has fully closed. If a command times out during shutdown, the
 controller waits for the old connection to close before searching again; a
 delayed disconnect starts a fresh three-second pause.
 
+## Keep a Bookoo awake while the machine is on
+
+A Bookoo switches itself off after the idle time set on the scale. With
+**Keep the scale awake while the machine is on** turned on, the controller
+restarts that countdown about every two minutes while your machine is on and
+no shot or rinse is running, so the scale is ready whenever you come back.
+As soon as the machine is off, or its state is no longer certain, the
+controller stops and the scale's own auto-off works again. The scale's
+auto-off setting itself is never changed.
+
+The option needs a machine connection that reports whether the machine is on,
+with its power monitoring turned on; without one it is unavailable and does
+nothing. A machine that is only assumed to be on — for example right after a
+wake command, before the machine confirms it — does not count.
+
+Keeping the scale awake uses more of its battery. It works with Bookoo Themis
+Mini firmware 1.4.3 or later and Themis Ultra firmware 4.0.1 or later; BooKoo
+does not say how older firmware reacts. If the command cannot be sent, the log
+notes it once per connection and the controller tries again two minutes later.
+
 ## Manual tare for diagnosis
 
 With a Bookoo connected and the controller **Ready**, use **Diagnostic → Scale
@@ -238,6 +258,7 @@ drip correction; one lifted before, or a hold ended by the next shot, does not.
 | **Bookoo combined command** | ON | ON / OFF | Combined tare + start-timer. Requires automatic tare at shot start. Also listed under [Tare](tare.md). |
 | **Mute the Bookoo speaker** | ON | ON / OFF | Bookoo/generic: send silence (volume 0) after the first valid weight on the first connection of that scale in this Open Brew by Weight session. Reconnecting does not resend it. Applies only in **Buzzer only**. |
 | **Scale volume** | 3 | 1–5 or Disabled | Bookoo/generic: set after the first valid weight on the first connection of that scale in this Open Brew by Weight session. Mini accepts levels 1–5; Ultra accepts 1–3. **Off** sends volume 0. A previously saved 4 or 5 remains saved but is skipped with a warning on a recognized Ultra. Reconnecting does not resend it. Changes that alter the effective speaker volume also apply to a stable link; saving unrelated settings does not resend the command. Applies only in **Scale only** and **Scale first**. |
+| **Keep the scale awake while the machine is on** | OFF | ON / OFF | Bookoo only: while a machine connection reports the machine confirmed on and no shot or rinse runs, restarts the scale's own auto-off countdown so it stays on. See [Keep a Bookoo awake](#keep-a-bookoo-awake-while-the-machine-is-on). |
 | **AtomHeart Eclair** | informational | — | Uses normal tare/timer commands. No configurable volume, beep, mode, combined command, or documented command sound. In Buzzer only and Scale priority, alerts use the local buzzer; Scale only omits unsupported sounds. |
 
 If the scale disconnects or **notifications go silent** during an automatic

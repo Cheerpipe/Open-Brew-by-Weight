@@ -288,6 +288,9 @@ std::atomic<uint8_t> liveBleEnabledRaw{1};
 std::atomic<uint8_t> liveBleScanOverrideRaw{
     static_cast<uint8_t>(BleScanIntensity::BALANCED)};
 bool bookooConnectVolumePending = false;
+static std::atomic<bool> scaleKeepAwakeRequested{false};
+static uint32_t autoOffResetAtMs = 0;
+static bool autoOffResetFailureLogged = false;
 static std::atomic<bool> bleStackReady{false};
 static std::atomic<bool> scaleWorkerStartupFinished{false};
 
@@ -635,6 +638,10 @@ void setScaleLinkState(ScaleLinkState state) {
   } else if (previous != ScaleLinkState::CONNECTED &&
              state == ScaleLinkState::CONNECTED) {
     clearScalePowerOffLifecycle(connectedGeneration);
+    // The first auto-off reset of a connection waits past its setup writes.
+    autoOffResetAtMs = progressAtMs - SCALE_AUTO_OFF_RESET_PERIOD_MS +
+                       SCALE_AUTO_OFF_RESET_FIRST_DELAY_MS;
+    autoOffResetFailureLogged = false;
   }
   if (previous != state) {
     scaleProfileNoteEvent(
@@ -2655,6 +2662,32 @@ void serviceScaleWorkerDiscovery(ScaleDiscoveryState &discovery) {
   setScaleLinkState(ScaleLinkState::DISCONNECTED);
 }
 
+void publishScaleKeepAwake(bool requested) {
+  scaleKeepAwakeRequested.store(requested, std::memory_order_release);
+}
+
+// Restarts the scale's own auto-off countdown while the control task asks for
+// it. Never during connection setup, queued commands or a power-off; a
+// failure is logged once per connection and never touches link state.
+static void serviceScaleAutoOffReset() {
+  const uint32_t now = millis();
+  if (!scaleKeepAwakeRequested.load(std::memory_order_acquire) ||
+      bookooConnectVolumePending ||
+      !scale.features().has(ScaleFeatureAutoOffReset) ||
+      scalePowerOffBlocksGeneration(scaleConnectionGenerationNow()) ||
+      (scaleCommandQueue != nullptr &&
+       uxQueueMessagesWaiting(scaleCommandQueue) > 0) ||
+      now - autoOffResetAtMs < SCALE_AUTO_OFF_RESET_PERIOD_MS) {
+    return;
+  }
+  autoOffResetAtMs = now;
+  if (scaleCommandOk(scale.resetAutoOff()) || autoOffResetFailureLogged) return;
+  autoOffResetFailureLogged = true;
+  serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                       "Scale auto-off reset not sent; retrying in %lu s",
+                       static_cast<unsigned long>(SCALE_AUTO_OFF_RESET_PERIOD_MS / 1000));
+}
+
 void serviceScaleWorkerLink() {
   if (applyScalePreferenceReset()) {
     return;
@@ -2694,6 +2727,7 @@ void serviceScaleWorkerLink() {
     snapshotDirty = true;
   }
   serviceBookooConnectBeepPolicy(sawWeight);
+  serviceScaleAutoOffReset();
   if (!scale.isLinkUp()) {
     cancelBookooConnectBeepPolicy();
     updateWorkerLinkState();

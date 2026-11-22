@@ -232,6 +232,9 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
       MachinePhysicalStartDisposition::NORMAL;
   hostMachinePhysicalStartCount = 0;
   hostMachinePowerState = MachinePower::UNKNOWN;
+  hostMachineConfirmedOn = false;
+  hostMachineReportsPower = false;
+  publishScaleKeepAwake(false);
   hostMachineManualPower = false;
   hostBackflushObservations = {};
   hostBackflushReady = false;
@@ -6176,6 +6179,73 @@ void d13d2_scale_without_power_off_support_keeps_pending_commands() {
   CHECK(scaleDebugPending);
   CHECK(scale.commandLog.empty());
   CHECK(scaleWarningContains("Power off not sent: connected scale"));
+}
+
+size_t scaleAutoOffResets() {
+  return static_cast<size_t>(std::count(scale.commandLog.begin(),
+                                        scale.commandLog.end(),
+                                        std::string("resetAutoOff")));
+}
+
+// Keep-awake resets wait 10 s after Ready, repeat every 2 minutes, stop with
+// the request, wait for connection setup, and a failure is logged once
+// without touching the link.
+void k01_scale_auto_off_reset_follows_request_and_period() {
+  resetHarness(false, true);
+  scale.connectedFeatures.flags |= ScaleFeatureAutoOffReset;
+  publishScaleKeepAwake(true);
+  hostMillis += SCALE_AUTO_OFF_RESET_FIRST_DELAY_MS - 1;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 0);
+  hostMillis += 1;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 1);
+  hostMillis += SCALE_AUTO_OFF_RESET_PERIOD_MS - 1;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 1);
+  hostMillis += 1;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 2);
+  publishScaleKeepAwake(false);
+  hostMillis += SCALE_AUTO_OFF_RESET_PERIOD_MS;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 2);
+  publishScaleKeepAwake(true);
+  bookooConnectVolumePending = true;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 2);
+  bookooConnectVolumePending = false;
+  scale.resetAutoOffSucceeds = false;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 3);
+  CHECK(scale.connected && scale.disconnectCalls == 0);
+  CHECK(scaleWarningContains("Scale auto-off reset not sent"));
+  scale.connectedFeatures.flags &= ~static_cast<uint32_t>(ScaleFeatureAutoOffReset);
+  hostMillis += SCALE_AUTO_OFF_RESET_PERIOD_MS;
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 3);
+}
+
+// The control loop asks for keep-awake only with the option on and a
+// confirmed ON; an assumed or optimistic ON is not enough.
+void k02_keep_awake_needs_option_and_confirmed_on() {
+  resetHarness(false, true);
+  scale.connectedFeatures.flags |= ScaleFeatureAutoOffReset;
+  hostMillis += SCALE_AUTO_OFF_RESET_FIRST_DELAY_MS;
+  runtimeConfig.bookooKeepAwakeWhileMachineOn = true;
+  hostMachinePowerState = MachinePower::ON;
+  runLoopAfter(1);
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 0);
+  runtimeConfig.bookooKeepAwakeWhileMachineOn = false;
+  hostMachineConfirmedOn = true;
+  runLoopAfter(1);
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 0);
+  runtimeConfig.bookooKeepAwakeWhileMachineOn = true;
+  runLoopAfter(1);
+  serviceScaleWorkerLink();
+  CHECK(scaleAutoOffResets() == 1);
 }
 
 void d13e_ultra_volume_rejection_preserves_saved_level() {
@@ -27192,6 +27262,8 @@ const TestCase testCases[] = {
     {"D13D", d13d_known_mini_accepts_shutdown_like_the_ultra},
     {"D13D2", d13d2_scale_without_power_off_support_keeps_pending_commands},
     {"D13E", d13e_ultra_volume_rejection_preserves_saved_level},
+    {"K01", k01_scale_auto_off_reset_follows_request_and_period},
+    {"K02", k02_keep_awake_needs_option_and_confirmed_on},
     {"D13C", d13c_disconnect_silence_clears_connecting_snapshot},
     {"D15", d15_control_housekeeping_has_wrap_safe_10ms_cadence},
     {"BF01", bf01_confirmed_bounds_and_final_history},
