@@ -1463,7 +1463,7 @@
   text-transform: uppercase;
 }
 
-/* Mahlkönig untested warning: after the Settings note, beside the Admin switch. */
+/* Mahlkönig untested warning: after the Settings note, ending the Admin hint. */
 .gbsBadge {
   margin-left: 0.35rem;
   color: var(--dn);

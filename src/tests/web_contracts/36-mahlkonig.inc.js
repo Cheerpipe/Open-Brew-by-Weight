@@ -32,10 +32,13 @@
   assert.match(integrations, /id="integrationBeanconqueror" type="checkbox" role="switch" checked/);
   assert.match(integrations, /id="integrationMahlkonig" type="checkbox" role="switch"\s*\/?>/);
   const note = errorCatalog['admin.integration_gbs_note'];
-  for (const words of ['Not tested with a real grinder', 'E65W, E65T, E80W and E80T', 'every 2 seconds',
-    '15 to 25 seconds', '20 by default', 'works well without the companion', 'strongly recommended'])
+  for (const words of ['Not tested with a real grinder', 'at your own risk', 'works well without the companion',
+    'E65W, E65T, E80W and E80T', 'full capacity', 'powerful enough'])
     assert.ok(note.includes(words), 'the note says: ' + words);
   assert.ok(integrations.includes(note) && integrations.includes('gbsBadge'));
+  assert.match(integrations,
+      /your grinder setup is kept\.[^<]*<span class="presetCardBadge gbsBadge">Untested<\/span><\/small>/,
+      'the untested badge ends the hint text');
   assert.ok(!/\b(push|pull)\b/i.test(note + errorCatalog['admin.integration_gbs_hint']),
       'user copy describes behavior, not protocol roles');
   for (const id of ['companionGbs', 'companionApproveGbs'])

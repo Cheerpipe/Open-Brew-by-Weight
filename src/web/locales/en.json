@@ -183,7 +183,7 @@
     "admin.integration_bc_hint": "Shows Coffee apps in Settings and the Beanconqueror option on your shots. Off: hides them, and the controller stops answering Beanconqueror.",
     "admin.integration_gbs": "Mahlkönig grinder",
     "admin.integration_gbs_hint": "Shows the Mahlkönig section in Settings, so a Grind-by-Sync grinder can learn from your shots. Off: no grinder traffic at all; your grinder setup is kept.",
-    "admin.integration_gbs_note": "ⓘ Not tested with a real grinder yet. The E64 WS checks in with the controller by itself every 2 seconds and works well without the companion. The E65W, E65T, E80W and E80T have to be asked after each grind: Open Brew by Weight Companion asks every 2 seconds, while the controller on its own asks every 15 to 25 seconds (20 by default, adjustable in Settings → Mahlkönig), so a shot pulled soon after grinding may not sync. For these four models the companion is strongly recommended.",
+    "admin.integration_gbs_note": "ⓘ Not tested with a real grinder yet, so use it at your own risk. The E64 WS works well without the companion. The E65W, E65T, E80W and E80T need Open Brew by Weight Companion to work at full capacity: the controller alone isn’t powerful enough to keep up with these grinders, and a shot pulled soon after grinding may not sync.",
     "admin.integrations": "Integrations",
     "admin.integrations_hint": "Choose which integrations Settings shows. Turning one off also stops its traffic.",
     "admin.integrations_setting": "Integrations",

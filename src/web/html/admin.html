@@ -484,9 +484,11 @@
     >
     <label
       ><input id="integrationMahlkonig" type="checkbox" role="switch" />
-      {{webui:admin.integration_gbs}}
-      <span class="presetCardBadge gbsBadge">{{webui:settings.gbs_untested}}</span
-      ><small class="fieldHint">{{webui:admin.integration_gbs_hint}}</small></label
+      {{webui:admin.integration_gbs}}<small class="fieldHint"
+        >{{webui:admin.integration_gbs_hint}}<span class="presetCardBadge gbsBadge"
+          >{{webui:settings.gbs_untested}}</span
+        ></small
+      ></label
     >
     <p class="readyMsg" role="note">{{webui:admin.integration_gbs_note}}</p>
     <div class="btnBar">
