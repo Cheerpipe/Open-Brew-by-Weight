@@ -2893,9 +2893,20 @@ function closeCard(card, text, commit, revert) {
   strip.className = "cardUndo";
   strip.setAttribute("role", "status");
   strip.style.setProperty("--cardAc", getComputedStyle(card).borderLeftColor);
+  // One window for the wait and the strip's bar: bars.css runs the line out
+  // with the same 6 s.
+  const undoMs = 6e3;
+  let timer = 0;
   const end = () => {
     clearTimeout(timer);
     strip.remove();
+  };
+  // Hiding the view (display: none) and the page boot freeze cancel the bar's
+  // animation; each restart replays the bar from full, and the wait restarts
+  // with it, so the strip never dies while its bar still runs.
+  const rearm = () => {
+    clearTimeout(timer);
+    timer = setTimeout(end, undoMs);
   };
   undo.type = "button";
   undo.textContent = __WEBUI_TEXT__("runtime.undo");
@@ -2910,7 +2921,10 @@ function closeCard(card, text, commit, revert) {
   card.hidden = true;
   commit();
   card.after(strip);
-  const timer = setTimeout(end, 6e3);
+  rearm();
+  strip.addEventListener("animationstart", (e) => {
+    if (e.animationName === "undoTime") rearm();
+  });
   undo.focus({ preventScroll: true });
 }
 function firmwareResult(s) {

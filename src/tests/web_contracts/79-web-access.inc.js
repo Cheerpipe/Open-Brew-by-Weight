@@ -385,15 +385,20 @@
       rawRuntimeJs.indexOf('function firmwareResult('));
   const timers = [], el = () => ({remove() { this.removed = true; },
     setAttribute() {}, append(...c) { this.kids = c; }, focus() { this.focused = true; },
+    addEventListener(kind, f) { this[kind] = f; },
     style: {setProperty(k, v) { this[k] = v; }}});
   const card = () => {
     const c = {hidden: false, refocused: false, after(strip) { this.strip = strip; },
       querySelector: () => ({focus: () => { c.refocused = true; }})};
     return c;
   };
-  const close = {__WEBUI_TEXT__: (k) => k, clearTimeout() {},
+  const close = {__WEBUI_TEXT__: (k) => k, clearTimeout(t) { if (t) t.cleared = true; },
     getComputedStyle: () => ({borderLeftColor: 'rgb(1, 2, 3)'}),
-    setTimeout: (f, ms, ...a) => timers.push(() => f(...a)),
+    setTimeout: (f, ms, ...a) => {
+      const t = () => t.cleared || f(...a);
+      timers.push(t);
+      return t;
+    },
     document: {createElement: el}};
   vm.runInNewContext(closeSrc + ';this.closeCard = closeCard;', close);
   const commits = [], reverts = [], a = card(), b = card();
@@ -416,6 +421,18 @@
   assert.ok(a.strip.removed && b.strip.removed, 'Each strip ends with its own countdown');
   assert.deepEqual(commits, ['a', 'a2', 'b'], 'A strip\'s end commits and reverts nothing');
   assert.deepEqual(reverts, ['a', 'b'], 'Every Undo took its own dismissal back');
+  // Coming back to a view replays the strip: display: none canceled the bar's
+  // animation, so the bar restarts from full, and the wait restarts with it
+  // while the stale one stops being able to end the strip.
+  close.closeCard(a, 'gone', () => {}, () => {});
+  const stale = timers[timers.length - 1];
+  a.strip.animationstart({animationName: 'undoIn'});
+  assert.ok(timers[timers.length - 1] === stale, 'A replayed reveal alone re-arms nothing');
+  a.strip.animationstart({animationName: 'undoTime'});
+  assert.ok(timers[timers.length - 1] !== stale && stale.cleared,
+      'A replayed bar re-arms the wait and clears the stale one');
+  stale();
+  assert.ok(!a.strip.removed, 'The stale wait no longer ends the strip');
   // Admin brings every hidden note back, on the controller and in this browser.
   assert.ok(codeIncludes(partialHtml.admin, '<button id="restoreNotesButton" class="btnGlyph mutable" type="button">') &&
       codeIncludes(viewJs.admin, 'if(k.startsWith("obbwCard:"))localStorage.removeItem(k);') &&
