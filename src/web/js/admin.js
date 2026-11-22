@@ -713,8 +713,9 @@ function applyCompanionStatus(c) {
       $("companionApproveGbs").checked =
         true;
   }
-  // Beanconqueror is served from the archive: it needs the archive on.
-  $("companionApproveBc").disabled = !$("companionApproveArchive").checked;
+  // Beanconqueror and the Mahlkönig grinder work from the archive: they need it on.
+  $("companionApproveBc").disabled = $("companionApproveGbs").disabled =
+    !$("companionApproveArchive").checked;
   if (!c.paired) return;
   // From the controller's own address, the way to the companion's Web UI.
   $("companionOpenRow").hidden =

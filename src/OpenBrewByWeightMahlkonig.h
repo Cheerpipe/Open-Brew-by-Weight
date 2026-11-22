@@ -90,6 +90,10 @@ inline GbsShotFacts gbsShotFactsOf(const ShotLogRecord &record) {
   return facts;
 }
 
+// A cycle too short to be a shot (a group flush after grinding) settles no
+// grind: the shot that follows does (A4). The grinder learns nothing under 10 s.
+inline bool gbsIsShot(const GbsShotFacts &facts) { return facts.durationDs > MIN_SHOT_LOG_DURATION_MS / 100U; }
+
 struct GbsShotReport {
   bool success = false;
   uint32_t timeMs = 0;  // pump time: start to the relay cut, drip excluded
@@ -583,7 +587,8 @@ inline GbsRequest gbsPushNext(const GbsPush &push, const GbsIdentity &identity, 
     return GbsRequest::NONE;
   if (push.result.due && tickReached(now, push.result.retryAtMs))
     return push.result.retake ? GbsRequest::BREW_ACCEPT : GbsRequest::BREW_DONE;
-  if (push.hasJob && !push.jobTaken) return GbsRequest::BREW_ACCEPT;
+  // After a failure the job waits for the next poll (its back-off) to show it again.
+  if (push.hasJob && !push.jobTaken && push.failures == 0) return GbsRequest::BREW_ACCEPT;
   return push.pollAfterResult || tickReached(now, push.dueAtMs) ? GbsRequest::BREW_JOBS : GbsRequest::NONE;
 }
 
@@ -774,18 +779,27 @@ inline bool gbsPushReply(GbsPush &push, GbsIdentity &identity, GbsRequest reques
       push.lastPollAtMs = now;
       break;
     case GbsRequest::BREW_ACCEPT:
-      if (push.result.due && push.result.retake) push.result.retake = false;
-      else push.jobTaken = reply.status == GbsResponse::OK;
-      if (reply.status != GbsResponse::OK && !push.result.due) push.hasJob = false;
+      if (push.result.due && push.result.retake) {
+        push.result.retake = false;
+        // The grinder no longer has the job: its result cannot be delivered.
+        if (reply.status != GbsResponse::OK) push.result.due = false, push.pollAfterResult = true;
+      } else {
+        push.jobTaken = reply.status == GbsResponse::OK;
+        if (!push.jobTaken) push.hasJob = false;
+      }
       break;
-    case GbsRequest::BREW_DONE:
-      if (reply.status == GbsResponse::JOB_NOT_EXISTING) {
-        push.result.retake = true;  // take it again, then send again
+    case GbsRequest::BREW_DONE: {
+      const uint32_t limit = push.result.report.success ? GBS_RESULT_RETRY_MS : GBS_CANCEL_RETRY_MS;
+      if (reply.status == GbsResponse::JOB_NOT_EXISTING &&
+          ticksSince(now, push.result.sinceMs) < static_cast<int32_t>(limit)) {
+        push.result.retake = true;  // take it again, then send again, paced like a retry
+        push.result.retryAtMs = now + GBS_RETRY_MS;
       } else {
         push.result.due = false;
         push.pollAfterResult = true;
       }
       break;
+    }
     default: break;
   }
   return identityChanged;

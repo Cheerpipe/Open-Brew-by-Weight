@@ -150,5 +150,7 @@
   assert.ok(codeIncludes(admin, '$("integrationMahlkonig").addEventListener("change", companionBcNeedsArchive)'),
       'an unsaved Integrations toggle updates it live');
   assert.ok(codeIncludes(admin, 'revertSection("integrations", companionBcNeedsArchive)'));
+  assert.ok(codeIncludes(admin, '$("companionApproveBc").disabled = $("companionApproveGbs").disabled ='),
+      'the approval form ties it to the shot archive, as Beanconqueror');
   assert.ok(partialHtml.admin.includes(errorCatalog['admin.companion_gbs_off']));
 }

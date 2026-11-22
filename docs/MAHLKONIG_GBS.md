@@ -114,9 +114,11 @@ by the vectors: `pairingApplication`, `pairingStatus`, `brewJobs`,
   refusals are a grinder booting).
 - **Jobs**: a new job is taken at once (`brewAccept`), taken again when it is
   handed out again; a newer job supersedes; a taken job with no shot within
-  180 s is reported `Canceled`. `ClientErrorOngoingJobNotExisting` on
-  `brewDone` takes the job again and resends. Result retries: 120 s for a
-  result, 20 s for a cancellation, every 5 s.
+  180 s is reported `Canceled`. A take that fails waits for the next
+  `brewJobs` poll (its back-off) to show the job again.
+  `ClientErrorOngoingJobNotExisting` on `brewDone` takes the job again 5 s
+  later and resends; a retake the grinder refuses ends the result. Result
+  retries: 120 s for a result, 20 s for a cancellation, every 5 s.
 - **After a shot** (S3): the shot's record lands once its hold ended; a job in
   hand gets `brewDone` first (with `brewAccept` before it when needed), then
   one `brewJobs` poll goes at once, not at the next cadence tick, and the
@@ -142,7 +144,9 @@ yield source is `post_drip`. Everything else reports **Canceled**: a hand
 stop, scale loss, a cup removed, a cut-short drip, a fault or safety limit.
 The grinder applies its own windows (E64 WS 10–80 s; push ±15 s of the job);
 the controller does not pre-filter. Rinses leave no shot record and are never
-reported.
+reported. A cycle of 12 s or less (stored as a `short` shot, typically a group
+flush after grinding) settles no grind either: the grind waits for the next
+shot, so a flush between grinding and brewing does not cancel the sync.
 
 ## Wi-Fi and BLE safeguards
 

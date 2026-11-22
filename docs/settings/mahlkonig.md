@@ -84,7 +84,9 @@ Open **Shot sync** to see the last shot and whether the grinder received it.
   yield.
 - Shots you stop by hand, channeling shots and shots that lose the scale are
   sent as **cancelled**, so the grinder doesn't learn from them.
-- Rinses aren't shots and are never sent.
+- Rinses aren't shots and are never sent. A quick flush of the group after
+  grinding (12 seconds or less) is skipped too: the grinder waits for the
+  shot that follows.
 
 The grinder aims for its own **Brew Time**. Set it to the middle of your
 preset's shot time window (Settings shows the number), so the grinder and the

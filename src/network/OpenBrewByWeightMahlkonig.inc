@@ -216,8 +216,9 @@ void OpenBrewByWeightNetwork::mahlkonigShots(uint32_t now) {
   work.recordId = shot.id;
   work.recordKnown = true;
   // A shot from before the integration was on, or from another boot, is no grind's.
-  if (!known || shot.bootId != callbacks_.bootId()) return;
-  const GbsShotReport report = gbsReport(gbsShotFactsOf(shot));
+  const GbsShotFacts facts = gbsShotFactsOf(shot);
+  if (!known || shot.bootId != callbacks_.bootId() || !gbsIsShot(facts)) return;
+  const GbsShotReport report = gbsReport(facts);
   const uint32_t end = shot.endedAtMs, start = end - shot.durationDs * 100U;
   const uint32_t polls = g_gbsCounters.polls.load(std::memory_order_acquire);
   uint8_t random[16];
@@ -284,17 +285,6 @@ void OpenBrewByWeightNetwork::mahlkonigClientStep(uint32_t now, bool hold, bool 
   config.buffer_size = GBS_CLIENT_BUFFER;
   config.buffer_size_tx = GBS_CLIENT_BUFFER;
   config.is_async = true;
-  {
-    GbsQuietLog quiet;
-    work.client = esp_http_client_init(&config);
-  }
-  if (work.client == nullptr ||
-      esp_http_client_set_header(work.client, "Content-Type", "application/json") != ESP_OK ||
-      esp_http_client_set_header(work.client, "Connection", "close") != ESP_OK ||
-      esp_http_client_set_post_field(work.client, work.body, static_cast<int>(length)) != ESP_OK) {
-    gbsReleaseClient(work);
-    return;
-  }
   g_gbsPin = GbsTlsPin{};
   g_gbsPin.identity = work.identity;
   work.request = next;
@@ -303,6 +293,16 @@ void OpenBrewByWeightNetwork::mahlkonigClientStep(uint32_t now, bool hold, bool 
   work.used = 0;
   work.overflow = false;
   ++work.requests;
+  {
+    GbsQuietLog quiet;
+    work.client = esp_http_client_init(&config);
+  }
+  // A client that cannot start fails like a transport: logged, backed off.
+  if (work.client == nullptr ||
+      esp_http_client_set_header(work.client, "Content-Type", "application/json") != ESP_OK ||
+      esp_http_client_set_header(work.client, "Connection", "close") != ESP_OK ||
+      esp_http_client_set_post_field(work.client, work.body, static_cast<int>(length)) != ESP_OK)
+    mahlkonigFinishRequest(now, ESP_ERR_NO_MEM);
 }
 
 // Network task: a request ended (an answer, a transport failure or the
@@ -473,8 +473,11 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
     const CompanionStored &stored = g_companion.stored;
     companionWanted = stored.paired && stored.archiveSwitch && stored.gbsSwitch;
   }
-  char config[COMPANION_GBS_CONFIG_TEXT];
-  work.companionRoute = companion.own && companionWanted && mahlkonigCompanionConfig(config, sizeof(config)) != 0;
+  {
+    // Scoped: this frame stays live under the client's TLS handshake.
+    char config[COMPANION_GBS_CONFIG_TEXT];
+    work.companionRoute = companion.own && companionWanted && mahlkonigCompanionConfig(config, sizeof(config)) != 0;
+  }
   if (work.companionRoute != work.loggedRoute)
     lifecycleLog(work.companionRoute ? "Mahlkönig: the companion now talks to the grinder"
                                      : "Mahlkönig: the controller talks to the grinder itself");
@@ -491,6 +494,12 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
     g_gbsAction = GbsAction::NONE;
   }
   const uint32_t polls = g_gbsCounters.polls.load(std::memory_order_acquire);
+  // A pairing action outdates the request in flight: its answer must not
+  // pair, pin or save the identity the person just replaced.
+  if (action != GbsAction::NONE && action != GbsAction::RELEASE && work.request != GbsRequest::NONE) {
+    gbsReleaseClient(work);
+    work.request = GbsRequest::NONE;
+  }
   switch (action) {
     case GbsAction::PAIR:
       if (!gbsUuidValid(work.identity.brewDeviceId, sizeof(work.identity.brewDeviceId))) {
