@@ -402,13 +402,14 @@ void testPushJobs() {
   // The grinder dropped the job: take it again, then send again.
   deliver(push, id, GbsRequest::BREW_DONE, 200, "{\"status\":\"ClientErrorOngoingJobNotExisting\"}", now + 95500);
   CHECK(push.result.due && push.result.retake);
-  CHECK(gbsPushNext(push, id, false, true, now + 95500) == GbsRequest::BREW_ACCEPT);
+  CHECK(gbsPushNext(push, id, false, true, now + 95500 + GBS_RETRY_MS - 1) != GbsRequest::BREW_ACCEPT);
+  CHECK(gbsPushNext(push, id, false, true, now + 95500 + GBS_RETRY_MS) == GbsRequest::BREW_ACCEPT);
   CHECK(gbsRequestBody(body, sizeof(body), GbsRequest::BREW_ACCEPT, push, id) > 0);
   CHECK(std::strstr(body, "\"grindUuid\":\"job-1\"") != nullptr);
-  deliver(push, id, GbsRequest::BREW_ACCEPT, 200, kOk, now + 96000);
-  CHECK(gbsPushNext(push, id, false, true, now + 96000) == GbsRequest::BREW_DONE);
-  deliver(push, id, GbsRequest::BREW_DONE, 200, kOk, now + 96500);
-  CHECK(!push.result.due && gbsPushNext(push, id, false, true, now + 96500) == GbsRequest::BREW_JOBS);
+  deliver(push, id, GbsRequest::BREW_ACCEPT, 200, kOk, now + 101000);
+  CHECK(gbsPushNext(push, id, false, true, now + 101000) == GbsRequest::BREW_DONE);
+  deliver(push, id, GbsRequest::BREW_DONE, 200, kOk, now + 101500);
+  CHECK(!push.result.due && gbsPushNext(push, id, false, true, now + 101500) == GbsRequest::BREW_JOBS);
   // The job reappearing while its result waits is not a new job.
   now += 200000;
   deliver(push, id, GbsRequest::BREW_JOBS, 200, kJob2, now);
@@ -502,6 +503,54 @@ struct PostHold {
       unclaimed = false;
   }
 };
+
+// A grinder that keeps refusing or dropping a job never makes the client loop:
+// a failed take waits for the next poll, a job the grinder no longer has ends
+// its result, and OngoingJobNotExisting is retried at the result's pace and
+// within its limit.
+void testNoRetryLoop() {
+  GbsIdentity id;
+  id.paired = 1;
+  id.pairingId = 4821;
+  const char *gone = "{\"status\":\"ClientErrorOngoingJobNotExisting\"}";
+  GbsPush push;
+  deliver(push, id, GbsRequest::BREW_JOBS, 200, kJob, 1000);
+  CHECK(gbsPushNext(push, id, false, true, 1000) == GbsRequest::BREW_ACCEPT);
+  CHECK(!gbsPushReply(push, id, GbsRequest::BREW_ACCEPT, false, false, GbsResponse{}, 1100));
+  CHECK(push.hasJob && gbsPushNext(push, id, false, true, 1100) == GbsRequest::NONE);
+  CHECK(gbsPushNext(push, id, false, true, 1100 + kPoll) == GbsRequest::BREW_JOBS);
+  deliver(push, id, GbsRequest::BREW_JOBS, 200, kJob, 1100 + kPoll);
+  CHECK(gbsPushNext(push, id, false, true, 1100 + kPoll) == GbsRequest::BREW_ACCEPT);
+  // A take refused while another result waits drops the job.
+  push.result.due = true;
+  push.result.retryAtMs = 999999;
+  deliver(push, id, GbsRequest::BREW_ACCEPT, 200, gone, 30000);
+  CHECK(!push.hasJob && gbsPushNext(push, id, false, true, 30000) != GbsRequest::BREW_ACCEPT);
+  // A retake the grinder refuses ends the result; one poll follows.
+  GbsPush late;
+  deliver(late, id, GbsRequest::BREW_JOBS, 200, kJob, 0);
+  GbsShotReport good{true, 28400, 36210};
+  CHECK(gbsPushShot(late, good, 5000, 33400, kRandom, 40000) && late.result.retake);
+  CHECK(gbsPushNext(late, id, false, true, 40000) == GbsRequest::BREW_ACCEPT);
+  deliver(late, id, GbsRequest::BREW_ACCEPT, 200, gone, 40500);
+  CHECK(!late.result.due && gbsPushNext(late, id, false, true, 40500) == GbsRequest::BREW_JOBS);
+  // OngoingJobNotExisting after every take: paced, and over after 120 s.
+  GbsPush stuck;
+  deliver(stuck, id, GbsRequest::BREW_JOBS, 200, kJob, 0);
+  deliver(stuck, id, GbsRequest::BREW_ACCEPT, 200, kOk, 100);
+  CHECK(gbsPushShot(stuck, good, 5000, 33400, kRandom, 40000) && !stuck.result.retake);
+  uint32_t now = 40000, requests = 0;
+  while (stuck.result.due && requests < 1000) {
+    const GbsRequest next = gbsPushNext(stuck, id, false, true, now);
+    if (next == GbsRequest::BREW_DONE || next == GbsRequest::BREW_ACCEPT) {
+      ++requests;
+      deliver(stuck, id, next, 200, next == GbsRequest::BREW_DONE ? gone : kOk, now);
+    }
+    now += 500;
+  }
+  CHECK(!stuck.result.due && now - 40000 <= GBS_RESULT_RETRY_MS + GBS_RETRY_MS + 500);
+  CHECK(requests <= 2 * (GBS_RESULT_RETRY_MS / GBS_RETRY_MS + 1));
+}
 
 // D12: the direct cadence is 15, 20 (default) or 25 s; the first retry
 // waits one cadence, then 60 and 120 s; the post-shot poll ignores it.
@@ -696,6 +745,7 @@ int main() {
   testPushPairing();
   testPushJobs();
   testPostHold();
+  testNoRetryLoop();
   testCadence();
   testProperties();
   testFuzz();
