@@ -60,9 +60,6 @@ idf_component_register(
     log
     heap
     soc
-    # WiFiGeneric.h includes this even when CONFIG_ARDUINO_SELECTIVE_WiFiProv
-    # is unset (selective compilation). main used to get it via auto-REQUIRES.
-    espressif__network_provisioning
 )
 
 

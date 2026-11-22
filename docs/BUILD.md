@@ -3,7 +3,7 @@
 <a id="build-environment"></a>
 
 Supported firmware uses ESP-IDF **6.1.0** (release tag **v6.1**),
-Arduino-ESP32 **3.3.12** as an IDF component, and native NimBLE.
+Arduino-ESP32 **4.0.0** as an IDF component, and native NimBLE.
 The bundled EspressoScaleBLE library is not installed through Library Manager.
 
 Production defaults compile DFS (`CONFIG_PM_ENABLE`) and S3 controller modem

@@ -5,7 +5,11 @@ managed_components/
 sdkconfig
 sdkconfig.old
 # Vendored trees stay local, except components the build requires: the
-# esp-modbus stub is part of Component Manager resolution and must be
-# committed like sdkconfig.defaults* and dependencies.lock.
+# empty stubs that main/idf_component.yml overrides are part of Component
+# Manager resolution and must be committed like sdkconfig.defaults* and
+# dependencies.lock.
 third_party/*
 !third_party/esp-modbus/
+!third_party/esp_rainmaker/
+!third_party/esp_insights/
+!third_party/esp-sr/
