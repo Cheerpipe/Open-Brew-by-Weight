@@ -542,6 +542,21 @@ inline const char *beanconquerorEndpointId(uint8_t endpoint) {
                                                : "off";
 }
 
+// Mahlkönig grinder models (Settings → Mahlkönig, wire names gbsModelId;
+// docs/MAHLKONIG_GBS.md): none until one is chosen.
+constexpr uint8_t GBS_MODEL_NONE = 0, GBS_MODEL_E64WS = 1, GBS_MODEL_E65W = 2, GBS_MODEL_E65T = 3,
+                  GBS_MODEL_E80W = 4, GBS_MODEL_E80T = 5, GBS_MODEL_COUNT = 6;
+constexpr size_t GBS_HOST_CAPACITY = 48;  // an IP or a short name the grinder shows
+// How often the controller asks an E65/E80 for a new grind without the
+// companion (D12): 15, 20 (the default) or 25 s; anything else reads as 20.
+constexpr uint8_t GBS_CADENCE_DEFAULT_S = 20;
+inline bool gbsCadenceValid(uint8_t seconds) { return seconds == 15 || seconds == 20 || seconds == 25; }
+inline uint8_t gbsCadenceS(uint8_t seconds) { return gbsCadenceValid(seconds) ? seconds : GBS_CADENCE_DEFAULT_S; }
+inline const char *gbsModelId(uint8_t model) {
+  static const char *const ids[] = {"none", "e64ws", "e65w", "e65t", "e80w", "e80t"};
+  return model < GBS_MODEL_COUNT ? ids[model] : ids[0];
+}
+
 // Every member needs a row in OpenBrewByWeightSettingsCodec.h.
 struct RuntimeConfig {
   uint32_t revision = 1;
@@ -566,6 +581,10 @@ struct RuntimeConfig {
   // from any network client; scale automations keep their own options. Fills
   // padding.
   bool machinePowerControlEnabled = false;
+  // Settings → Mahlkönig: the grinder model (GBS_MODEL_*). An E65/E80's
+  // address belongs to its pairing (gbs_ident), not to these settings.
+  // Fills padding.
+  uint8_t mahlkonigModel = GBS_MODEL_NONE;
   // Optional pad after the scale timer catches up to circuit whole seconds.
   uint32_t scaleTimerStopExtraDelayMs = DEFAULT_SCALE_TIMER_STOP_EXTRA_DELAY_MS;
   // Optional beep when the first coffee drop is detected.
@@ -573,6 +592,8 @@ struct RuntimeConfig {
   // Remind the user to release the physical paddle after machine circuit has opened.
   bool paddleReturnReminderBeep = OPEN_BREW_BY_WEIGHT_DEFAULT_PADDLE_RETURN_REMINDER;
   bool soundAlertsMuted = false;
+  // Settings → Mahlkönig: gbsCadenceS seconds (D12). Fills padding.
+  uint8_t mahlkonigPushCadenceS = GBS_CADENCE_DEFAULT_S;
   uint32_t paddleReturnReminderIntervalMs =
       DEFAULT_PADDLE_RETURN_REMINDER_INTERVAL_MS;
   uint32_t paddleReturnReminderMaxDurationMs =
@@ -655,6 +676,11 @@ struct RuntimeConfig {
   // reports a confirmed ON and no cycle runs; off keeps the scale's own
   // auto-off. Placed here to use existing padding.
   bool bookooKeepAwakeWhileMachineOn = false;
+  // Admin → Integrations: whether Settings shows and the controller serves
+  // Beanconqueror (on) and the Mahlkönig grinder (off). Off keeps the stored
+  // setup. Fill padding.
+  bool integrationBeanconqueror = true;
+  bool integrationMahlkonig = false;
   uint32_t lastShotCooldownMs = DEFAULT_LAST_SHOT_COOLDOWN_MS;
   // Minimum level sent to the ESP-IDF serial backend. NONE is off; CLI
   // request/reply traffic remains independent.

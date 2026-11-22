@@ -3256,13 +3256,18 @@ export function init() {
             wait,
           ],
         ]),
-    __WEBUI_TEXT__("stats.open_in"),
-    [
-      ICON.bean,
-      "Beanconqueror",
-      __WEBUI_TEXT__("stats.beanconqueror_hint"),
-      () => openInBeanconqueror(r),
-    ],
+    // Admin → Integrations: Beanconqueror off takes its option away.
+    ...(R.homeStatusCache()?.config?.integrationBeanconqueror === false
+      ? []
+      : [
+          __WEBUI_TEXT__("stats.open_in"),
+          [
+            ICON.bean,
+            "Beanconqueror",
+            __WEBUI_TEXT__("stats.beanconqueror_hint"),
+            () => openInBeanconqueror(r),
+          ],
+        ]),
     __WEBUI_TEXT__("stats.download"),
     [
       ICON.json,

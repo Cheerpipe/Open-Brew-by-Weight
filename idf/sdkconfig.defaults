@@ -79,6 +79,15 @@ CONFIG_LWIP_TCPIP_TASK_AFFINITY_CPU0=y
 CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=y
 CONFIG_ESP_TIMER_TASK_AFFINITY_CPU0=y
 
+# Every build has a TLS client (the Mahlkönig E65/E80 grinder, the Linea
+# Micra's cloud): keep every mbedTLS allocation in PSRAM so short-lived
+# certificate/handshake objects do not fragment scarce internal DRAM; dynamic
+# record buffers still free at idle.
+# CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC is not set
+# CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not set
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+
 # Bounded Wi-Fi pools for Web UI transfers, STA + SoftAP, and OTA. Static
 # RX/TX buffers reserve ~1.6 KB each until deinit; 8/16 costs ~19.2 KB more
 # internal DMA RAM than 6/6. RX_BA_WIN must stay <= min(2*STATIC_RX, DYNAMIC_RX).
@@ -105,7 +114,9 @@ CONFIG_LWIP_TCP_SND_BUF_DEFAULT=16384
 CONFIG_LWIP_TCP_WND_DEFAULT=16384
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=16
 # Peak with every network feature active: httpd (max_open_sockets + 3) = 10,
-# mDNS 1, SNTP 1, DNS 1, webhook 1, Micra WSS 1 and HTTPS 1 = 16, plus 2 spare.
+# mDNS 1, SNTP 1, DNS 1, webhook 1, Micra WSS 1 and HTTPS 1 = 16, plus 2 spare
+# (a Mahlkönig grinder's HTTPS request takes one of them, a few times a minute
+# at most).
 # Slots are allocated per open socket, and its buffers prefer PSRAM.
 CONFIG_LWIP_MAX_SOCKETS=18
 CONFIG_LWIP_DHCPS_MAX_STATION_NUM=4

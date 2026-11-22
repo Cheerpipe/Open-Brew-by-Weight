@@ -1,10 +1,5 @@
-# The Micra integration keeps its HTTPS client between polls. Keep every
-# mbedTLS allocation in PSRAM so short-lived certificate/handshake objects do
-# not fragment scarce internal DRAM; dynamic record buffers still free at idle.
-# CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC is not set
-# CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not set
-CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
-CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+# The Micra integration keeps its HTTPS client between polls; every mbedTLS
+# allocation stays in PSRAM (sdkconfig.defaults).
 # The transport's HTTP upgrade buffer also exceeds ALWAYSINTERNAL=2048.
 CONFIG_WS_BUFFER_SIZE=4096
 # Precomputed fixed-point tables (flash, not RAM) make the per-request ECDSA

@@ -116,11 +116,12 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       jsonFieldPresent(root, "scheduledRestartEnabled") ||
       jsonFieldPresent(root, "scheduledRestartMinuteOfDay");
   // Log/debug fields stay public with the Diagnostic page; the visibility
-  // toggle, Frontend preferences and Machine control always need Admin.
+  // toggle, Frontend, Machine control and Integrations always need Admin.
   const bool diagnosticPagePatch = jsonFieldPresent(root, "showDiagnosticPage") ||
       jsonFieldPresent(root, "machinePowerControlEnabled") ||
       jsonFieldPresent(root, "idlePowerSavingEnabled") ||
-      jsonFieldPresent(root, "performanceBoostEnabled") || jsonFieldPresent(root, "heroCardMode");
+      jsonFieldPresent(root, "performanceBoostEnabled") || jsonFieldPresent(root, "heroCardMode") ||
+      jsonFieldPresent(root, "integrationBeanconqueror") || jsonFieldPresent(root, "integrationMahlkonig");
   // Patch: seed live effective config; only present keys overwrite.
   RuntimeConfig candidate = {};
   if (self.callbacks_.copyRuntimeConfig != nullptr) {
@@ -189,12 +190,12 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "timezoneDetected", "timezoneAutomatic", "ntpSyncEnabled",
       "ntpServerPreset",
       "ntpServerCustom", "scheduledRestartEnabled", "scheduledRestartMinuteOfDay",
-      "scaleMacCacheMode", "preferredScaleMac", "bookooVolume",
+      "scaleMacCacheMode", "preferredScaleMac", "bookooVolume", "mahlkonigModel", "mahlkonigPushCadenceS",
       "bookooKeepAwakeWhileMachineOn", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
       "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode", "beanconquerorEndpoint",
-      "machinePowerControlEnabled"};
+      "machinePowerControlEnabled", "integrationBeanconqueror", "integrationMahlkonig"};
   ValidationFailure parseError;
   size_t settingFieldCount = 0;
   if (root != nullptr) {
@@ -521,6 +522,16 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "beanconquerorEndpoint") && !jsonEnumId(root, "beanconquerorEndpoint",
              BEANCONQUEROR_ENDPOINT_COUNT, beanconquerorEndpointId, candidate.beanconquerorEndpoint)) {
     parseError = validationFailure("FIELD_ENUM", "beanconquerorEndpoint", "off, gaggiuino, or gaggimate");
+  } else if (!jsonOptionalBoolean(root, "integrationBeanconqueror", candidate.integrationBeanconqueror)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "integrationBeanconqueror");
+  } else if (!jsonOptionalBoolean(root, "integrationMahlkonig", candidate.integrationMahlkonig)) {
+    parseError = validationFailure("FIELD_BOOLEAN", "integrationMahlkonig");
+  } else if (jsonFieldPresent(root, "mahlkonigModel") &&
+             !jsonEnumId(root, "mahlkonigModel", GBS_MODEL_COUNT, gbsModelId, candidate.mahlkonigModel)) {
+    parseError = validationFailure("FIELD_ENUM", "mahlkonigModel", "none, e64ws, e65w, e65t, e80w, or e80t");
+  } else if (jsonFieldPresent(root, "mahlkonigPushCadenceS") &&
+             !(jsonUint8(root, "mahlkonigPushCadenceS", candidate.mahlkonigPushCadenceS) && gbsCadenceValid(candidate.mahlkonigPushCadenceS))) {
+    parseError = validationFailure("FIELD_ENUM", "mahlkonigPushCadenceS", "15, 20, or 25");
   } else if (jsonFieldPresent(root, "ringRetainLogLevel") &&
              !jsonLogLevel(root, "ringRetainLogLevel",
                            candidate.ringRetainLogLevel)) {

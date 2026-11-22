@@ -191,6 +191,7 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         "\"ntpServerPreset\":\"%s\",\"ntpSyncEnabled\":%s,"
         "\"ntpServerCustom\":\"%s\",\"showDiagnosticPage\":%s,"
         "\"machinePowerControlEnabled\":%s,"
+        "\"integrationBeanconqueror\":%s,\"integrationMahlkonig\":%s,"
         "\"idlePowerSavingEnabled\":%s,\"performanceBoostEnabled\":%s,"
         "\"heroCardMode\":\"%s\","
         "\"persistPending\":%s,\"persistFailed\":%s,"
@@ -205,6 +206,8 @@ esp_err_t OpenBrewByWeightNetwork::statusHandler(httpd_req_t *request) {
         control.config.ntpSyncEnabled ? "true" : "false", safeNtpCustom,
         control.config.showDiagnosticPage ? "true" : "false",
         control.config.machinePowerControlEnabled ? "true" : "false",
+        control.config.integrationBeanconqueror ? "true" : "false",
+        control.config.integrationMahlkonig ? "true" : "false",
         control.config.idlePowerSavingEnabled ? "true" : "false",
         control.config.performanceBoostEnabled != 0 ? "true" : "false",
         heroCardModeId(control.config.heroCardMode),

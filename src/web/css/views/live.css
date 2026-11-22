@@ -21,6 +21,13 @@
   --z: var(--wn);
 }
 
+/* D9: the line that stands in for grind advice while a Mahlkönig grinder
+   corrects the grind itself. */
+.ghGbs {
+  border-left-color: var(--ok);
+  font-size: 0.9rem;
+}
+
 .ghTop {
   display: flex;
   align-items: center;

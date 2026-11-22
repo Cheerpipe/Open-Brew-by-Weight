@@ -699,6 +699,7 @@ void OpenBrewByWeightNetwork::service() {
   serviceWifiScan(now);
   serviceUiStream(now);
   serviceCompanion(now);
+  serviceMahlkonig(now);
 
   const NetworkStatusSnapshot networkSnapshot = snapshot();
   // serviceStaState already reconciled staState against the WiFi driver

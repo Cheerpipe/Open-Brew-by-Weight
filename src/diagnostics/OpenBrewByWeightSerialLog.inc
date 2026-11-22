@@ -137,7 +137,9 @@ int openBrewByWeightEspLogVprintf(const char *format, va_list args) {
   // uri-handler echo joins them because every real handler failure carries
   // its own obbw.* line. All stay DEBUG traces on both sinks. A bound UI
   // stream sends through uiStreamSend, whose rate-limited ui_stream warning
-  // already reports each failed WS send with size, timing, and errno.
+  // already reports each failed WS send with size, timing, and errno. The
+  // Mahlkönig client's connection attempts to a grinder that is off join them:
+  // its own line in the Web UI log carries the same error codes, once.
   if (strstr(line.text,
              "HTTP_CLIENT: Connection timed out before data was ready!") !=
           nullptr ||
@@ -152,7 +154,9 @@ int openBrewByWeightEspLogVprintf(const char *format, va_list args) {
       strstr(line.text, "httpd_ws_get_frame_type: Failed to read header") !=
           nullptr ||
       strstr(line.text, "httpd_ws_send_frame_async: Failed to send WS") !=
-          nullptr) {
+          nullptr ||
+      // The Mahlkönig client's own transport attempts: it logs their codes once.
+      espLogQuietTask.load(std::memory_order_acquire) == xTaskGetCurrentTaskHandle()) {
     line.text[0] = 'D';
   }
   retainEspLogLine(line.text);

@@ -105,7 +105,9 @@ inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
     SF(88, performanceBoostEnabled), SF(89, buzzerScaleConnectedStockTone),
     SF(90, buzzerScaleLostStockTone), SF(91, beanconquerorEndpoint),
     SF(92, buzzerBackflushReadyBeep), SF(93, machinePowerControlEnabled),
-    SF(94, bookooKeepAwakeWhileMachineOn), SF(95, bookooVolume)};
+    SF(94, bookooKeepAwakeWhileMachineOn), SF(95, bookooVolume),
+    SF(96, integrationBeanconqueror), SF(97, integrationMahlkonig), SF(98, mahlkonigModel),
+    SF(99, mahlkonigPushCadenceS)};
 #undef SF
 
 // Retired runtime tags 55/56: the Bookoo mute toggle and volume level that
@@ -229,7 +231,7 @@ constexpr size_t settingsFieldBytes(const SettingsField (&fields)[N]) {
                          [](size_t bytes, const SettingsField &field) { return bytes + field.size; });
 }
 
-static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 16 == sizeof(RuntimeConfig),
+static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 12 == sizeof(RuntimeConfig),
               "every RuntimeConfig member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 1 == sizeof(ShotPreset),
               "every ShotPreset member needs a settings field row");

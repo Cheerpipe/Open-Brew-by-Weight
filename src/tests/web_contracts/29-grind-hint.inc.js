@@ -59,9 +59,32 @@
       !codeIncludes(viewJs.home, '$("grindHintNewBeans").onclick = () => R.startNewCoffee()') ||
       !codeIncludes(partialHtml.home, '<button id="grindHintDismiss" class="cardClose" type="button" aria-label="Hide for now">×</button>') ||
       !partialHtml.home.includes('<span class="t">Relearn</span>') ||
-      !codeIncludes(runtimeJs, 'reveal(card, !!v && !dismissed.grind.includes(v.key))') ||
+      !codeIncludes(runtimeJs, 'reveal(card, !!v && !paused && !dismissed.grind.includes(v.key))') ||
       !codeIncludes(runtimeJs, '$("grindHintNewBeans").hidden = !v.relearn'))
     throw new Error('Grind hint card must offer Relearn and a close that holds per advice on the controller (D6)');
+
+  // D9: while the Mahlkönig grinder corrects the active preset's grind (its
+  // last shot reached the grinder), one line stands in for Grind hint,
+  // Dialling in and Checking your change; Shots vary stays; the advice comes
+  // back as soon as the controller stops saying so.
+  const shown = {};
+  const el = (id) => ({id, dataset: {}, style: {}, set className(v) {}, replaceChildren() {}});
+  const render = (adjusts, state) => {
+    const fn = new Function('$', 'reveal', 'homeStatusCache', 'presetState', 'dismissed', 'grindHintView',
+        'document', `${blockAt(runtimeJs, 'function renderHomeCards(')};return renderHomeCards;`)(
+        el, (node, on) => (shown[node.id] = on), () => ({gbs: {adjusts}}),
+        {activeId: 3, items: [preset(hint(state ? {state, direction: null, tier: null} : {}))]},
+        {grind: []}, view, {createElement: () => ({})});
+    fn();
+    return [shown.grindHintCard, shown.grindHintGbs];
+  };
+  assert.deepEqual(render(true), [false, true], 'a delivered shot pauses Grind hint');
+  assert.deepEqual(render(true, 'checking'), [false, true], 'and Checking your change');
+  assert.deepEqual(render(true, 'vary'), [true, false], 'Shots vary stays');
+  assert.deepEqual(render(false), [true, false], 'the advice resumes once a shot is not delivered');
+  if (!partialHtml.home.includes('id="grindHintGbs"') ||
+      !partialHtml.home.includes('Your Mahlkönig adjusts the grind'))
+    throw new Error('Home must carry the line that replaces paused grind advice (D9)');
 }
 // Inline preset rename: the 4 s Settings poll leaves a card being renamed alone,
 // and Enter or Escape settle it once even though removing the input blurs it.

@@ -707,7 +707,7 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
   // Marzocco ones exist only on La Marzocco cloud builds.
   const bool record = !strcmp(type, "rx") || !strcmp(type, "rf") || !strcmp(type, "rt");
   if (strcmp(type, "ping") != 0 && strcmp(type, "logsub") != 0 && strcmp(type, "ps") != 0 &&
-      !record &&
+      strcmp(type, "gbs") != 0 && !record &&
       (!kCompanionLm || (strcmp(type, "lm") != 0 && strcmp(type, "creds") != 0 &&
                          strcmp(type, "res") != 0 && strcmp(type, "st") != 0))) {
     static RefusalLog unknown;
@@ -740,6 +740,16 @@ esp_err_t OpenBrewByWeightNetwork::companionLinkInbound(
       events.armed = true;
       events.afterMs = millis();
     }
+  } else if (!strcmp(type, "gbs")) {
+    // The companion's Mahlkönig state (docs/COMPANION_LINK.md); an `st` this
+    // controller does not know reads as unknown.
+    bool own = false;
+    char state[16] = {};
+    uint32_t delivered = 0;
+    if (!jsonBoolean(frame, "own", own) || !jsonString(frame, "st", state, sizeof(state), false) ||
+        !jsonUint32(frame, "ok", delivered))
+      return companionLinkRefuse(slot, "a malformed frame arrived", false);
+    mahlkonigCompanionFrame(own, gbsCompanionStateOf(state), delivered);
   } else if (!strcmp(type, "logsub") || record) {
     if (!(record ? companionLinkRecordRequest(slot, frame, type) : companionLinkLogSub(slot, frame)))
       return companionLinkRefuse(slot, "a malformed frame arrived", false);
@@ -863,16 +873,22 @@ void OpenBrewByWeightNetwork::serviceCompanion(uint32_t now) {
     companionSyncHeld_ = syncHold;
     int silent[2] = {-1, -1};
     bool holdChanged = false;
-    // A format chosen in Settings reaches the companion in the next cfg.
+    // A format chosen in Settings, or a Mahlkönig change, reaches the
+    // companion in the next cfg.
     const uint8_t format = beanconquerorEndpoint();
+    char gbsConfig[COMPANION_GBS_CONFIG_TEXT];
+    const size_t gbsLength = mahlkonigCompanionConfig(gbsConfig, sizeof(gbsConfig));
     {
       TaskLockGuard lock(dataMux_);
       const uint8_t beanconqueror = companionBeanconquerorFormat(g_companion.stored, format);
+      const uint32_t gbs = companionGbsConfigHash(g_companion.stored, gbsConfig, gbsLength);
       for (size_t index = 0; index < 2; ++index) {
         CompanionLinkSlot &slot = g_companion.links[index];
         holdChanged |= slot.fd >= 0 && slot.snapshotSent &&
-                       (slot.sentSync != syncHold || slot.sentBc != beanconqueror);
-        if (slot.fd < 0 || slot.closing || !companionLinkSilent(slot, route, now, syncHold))
+                       (slot.sentSync != syncHold || slot.sentBc != beanconqueror ||
+                        slot.sentGbs != gbs);
+        if (slot.fd < 0 || slot.closing ||
+            !companionLinkSilent(slot, route, now, syncHold, g_gbsLink.own))
           continue;
         slot.closing = true;
         slot.closeReason = "the companion went silent";
@@ -1008,6 +1024,9 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
   const bool syncHold = companionSyncHold();
   const uint8_t format = beanconquerorEndpoint();
   uint8_t beanconqueror;  // set under the lock before any use
+  char gbsConfig[COMPANION_GBS_CONFIG_TEXT];
+  size_t gbsLength = mahlkonigCompanionConfig(gbsConfig, sizeof(gbsConfig));
+  uint32_t gbs;  // set under the lock before any use
   char deviceName[DEVICE_NAME_CAPACITY] = {};
   CompanionLinkSlot sent;
   uint8_t secret[COMPANION_SECRET_BYTES];
@@ -1029,6 +1048,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
     logSwitch = g_companion.stored.logSwitch != 0;
     archive = g_companion.stored.archiveSwitch != 0;
     beanconqueror = companionBeanconquerorFormat(g_companion.stored, format);
+    gbs = companionGbsConfigHash(g_companion.stored, gbsConfig, gbsLength);
     pingReply = g_companion.pingReply;
     g_companion.pingReply = false;
     memcpy(deviceName, status_.deviceName, sizeof(deviceName));
@@ -1060,17 +1080,20 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
              *archiveText = archive ? "true" : "false", *bcText = beanconquerorEndpointId(beanconqueror);
   due.config = snapshotDue || outbox.configSequence != sent.sentConfig ||
                ui != sent.sentUi || logSwitch != sent.sentLog || archive != sent.sentArchive ||
-               beanconqueror != sent.sentBc;
+               beanconqueror != sent.sentBc || gbs != sent.sentGbs;
+  // cfg.gbs only while the companion should talk to the grinder (A6).
+  if (gbs == 0) gbsConfig[0] = '\0';
+  const char *gbsKey = gbs != 0 ? ",\"gbs\":" : "";
   built.config = due.config &&
       (kCompanionLm ? companionAddBody(count, "\"t\":\"cfg\",\"lm\":%s,\"conn\":\"%s\",\"observe\":%s,"
-                                              "\"ui\":%s,\"log\":%s,\"archive\":%s,\"bc\":\"%s\"}",
+                                              "\"ui\":%s,\"log\":%s,\"archive\":%s,\"bc\":\"%s\"%s%s}",
                                        outbox.lmSwitch ? "true" : "false",
                                        outbox.websocketConnection ? "ws" : "api",
                                        outbox.observe ? "true" : "false", uiText, logText, archiveText,
-                                       bcText)
+                                       bcText, gbsKey, gbsConfig)
                     : companionAddBody(count, "\"t\":\"cfg\",\"ui\":%s,\"log\":%s,\"archive\":%s,"
-                                              "\"bc\":\"%s\"}",
-                                       uiText, logText, archiveText, bcText));
+                                              "\"bc\":\"%s\"%s%s}",
+                                       uiText, logText, archiveText, bcText, gbsKey, gbsConfig));
 #if OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION == OPEN_BREW_BY_WEIGHT_MACHINE_INTEGRATION_LA_MARZOCCO_CLOUD
   due.credentials = outbox.credentialsGeneration != 0 &&
       (snapshotDue || outbox.credentialsGeneration != sent.sentCredentials);
@@ -1164,6 +1187,7 @@ void OpenBrewByWeightNetwork::companionPrepareSends() {
       slot.sentLog = logSwitch;
       slot.sentArchive = archive;
       slot.sentBc = beanconqueror;
+      slot.sentGbs = gbs;
     }
     if (built.device) {
       memcpy(slot.sentDeviceName, deviceName, sizeof(slot.sentDeviceName));

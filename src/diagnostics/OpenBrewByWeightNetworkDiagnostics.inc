@@ -959,6 +959,7 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
     ok = debugExportChunk(request, "null},");
   }
 
+  ok = ok && self.mahlkonigDebugExport(request, buf, cap);
   size_t shotTotal = 0;
   work.statsCache.valid = false;  // Debug export borrows the same record array.
   if (self.callbacks_.copyShotRecords != nullptr) {

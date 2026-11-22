@@ -2021,8 +2021,13 @@ void p58_reset_all_durable_stores_and_mid_fail_keeps_settings() {
   CHECK(saveBbwLearning(learning));
   uint32_t rejectedAccount = 5;
   CHECK(saveSettingsBlob(NvsSubsystem::SETTINGS, LA_MARZOCCO_REJECTED_KEY, rejectedAccount));
+  GbsIdentity grinder;
+  grinder.paired = 1;
+  CHECK(saveGbsIdentity(grinder));
 
   CHECK(resetAllDurableStores(settings, ble, log, history, lastShot));
+  // The Mahlkönig pairing goes with a factory reset.
+  CHECK(loadGbsIdentity(grinder) == SettingsBlobLoad::MISSING && !grinder.paired);
   CHECK(loadSettingsBlob(NvsSubsystem::SETTINGS, LA_MARZOCCO_REJECTED_KEY, rejectedAccount,
                          [](uint32_t) { return true; }) == SettingsBlobLoad::MISSING);
   CHECK(verifyFactorySettings(settings));
@@ -3354,6 +3359,56 @@ void p91g_beanconqueror_endpoint_tag() {
   CHECK(strcmp(beanconquerorEndpointId(BEANCONQUEROR_GAGGIUINO), "gaggiuino") == 0);
 }
 
+// Tags 96-99 are additive: an older blob, so every OTA from an earlier
+// image, starts with Beanconqueror on, the Mahlkönig grinder off and unset,
+// and the 20 s cadence; written values round-trip, others repair.
+void p91k_integrations_and_mahlkonig_tags() {
+  const std::vector<uint8_t> runtime = {96, 1, 0, 97, 1, 1, 98, 1, GBS_MODEL_E80T, 99, 1, 15};
+  std::vector<uint8_t> body = {SETTINGS_GROUP_RUNTIME, static_cast<uint8_t>(runtime.size())};
+  body.insert(body.end(), runtime.begin(), runtime.end());
+  PersistedSettings settings;
+  uint32_t malformed = 0;
+  std::vector<uint8_t> blob = settingsBlobWithBody(body);
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), settings, malformed) && malformed == 0);
+  CHECK(!settings.runtime.integrationBeanconqueror && settings.runtime.integrationMahlkonig &&
+        settings.runtime.mahlkonigModel == GBS_MODEL_E80T && settings.runtime.mahlkonigPushCadenceS == 15);
+  blob = settingsBlobWithBody({});
+  PersistedSettings older;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), older, malformed));
+  CHECK(older.runtime.integrationBeanconqueror && !older.runtime.integrationMahlkonig &&
+        older.runtime.mahlkonigModel == GBS_MODEL_NONE && older.runtime.mahlkonigPushCadenceS == 20);
+  older.runtime.mahlkonigModel = GBS_MODEL_COUNT;
+  older.runtime.mahlkonigPushCadenceS = 16;
+  CHECK(repairPersistedSettings(older) && older.runtime.mahlkonigModel == GBS_MODEL_NONE &&
+        older.runtime.mahlkonigPushCadenceS == 20);
+  for (const uint8_t s : {15, 20, 25}) CHECK(gbsCadenceS(s) == s);
+  for (const uint8_t s : {0, 10, 19, 21, 30, 255}) CHECK(gbsCadenceS(s) == 20);
+  CHECK(strcmp(gbsModelId(GBS_MODEL_E64WS), "e64ws") == 0 && strcmp(gbsModelId(99), "none") == 0);
+}
+
+// gbs_ident: its own NVS record, outside the settings (no backup carries it);
+// a damaged one reads as never paired, Forget erases it.
+void p91l_mahlkonig_identity_store() {
+  resetHostPersistence();
+  GbsIdentity identity;
+  CHECK(loadGbsIdentity(identity) == SettingsBlobLoad::MISSING);
+  snprintf(identity.brewDeviceId, sizeof(identity.brewDeviceId), "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b");
+  snprintf(identity.host, sizeof(identity.host), "192.168.1.87");
+  identity.pairingId = 4821;
+  identity.paired = identity.pinned = 1;
+  identity.pin[0] = 0xAB;
+  CHECK(saveGbsIdentity(identity));
+  GbsIdentity loaded;
+  CHECK(loadGbsIdentity(loaded) == SettingsBlobLoad::LOADED && memcmp(&loaded, &identity, sizeof(loaded)) == 0);
+  GbsIdentityStored bad;
+  bad.identity = identity;
+  snprintf(bad.identity.host, sizeof(bad.identity.host), "a/b");
+  bad.checksum = gbsIdentityChecksum(bad);
+  persistence_host::putRaw(SETTINGS_NAMESPACE, GBS_IDENTITY_KEY, &bad, sizeof(bad));
+  CHECK(loadGbsIdentity(loaded) == SettingsBlobLoad::INVALID && !loaded.paired);
+  CHECK(eraseGbsIdentity() && loadGbsIdentity(loaded) == SettingsBlobLoad::MISSING);
+}
+
 // Tag 94 is additive: an older blob, so every OTA upgrade, keeps the Bookoo
 // awake option off; a blob with it round-trips.
 void p91i_bookoo_keep_awake_tag() {
@@ -3831,6 +3886,8 @@ const TestCase tests[] = {
     {"P91H", p91h_machine_power_control_tag},
     {"P91I", p91i_bookoo_keep_awake_tag},
     {"P91J", p91j_bookoo_volume_migrates_retired_tags},
+    {"P91K", p91k_integrations_and_mahlkonig_tags},
+    {"P91L", p91l_mahlkonig_identity_store},
     {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},

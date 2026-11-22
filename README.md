@@ -88,6 +88,7 @@ from a shopping list to your first shot by weight in six steps:
 | See everything at a glance | A live dashboard on Home: the shot chart with its cut line, your presets, and the state of your scale and machine |
 | Review results | [Shot history and statistics](docs/features/shot-history.md), with export to Visualizer.coffee and the Gaggiuino format |
 | Log shots in Beanconqueror | [Beanconqueror](docs/settings/beanconqueror.md) imports your shots in the Gaggiuino or GaggiMate format, as if the controller were one of those machines |
+| Let your grinder dial itself in | [Mahlkönig Grind-by-Sync](docs/settings/mahlkonig.md): the grinder learns each shot's real time and yield and adjusts its grind for the next one; the E64 WS works on its own, the E65W, E65T, E80W and E80T work best with [the companion](docs/features/companion.md). Not yet tested with a real grinder |
 | Place the cup after starting | [Tare and retare](docs/features/tare-retare.md) |
 | Handle cup removal or bumps | [Cup protection](docs/features/cup-protection.md) |
 | Limit a shot after scale loss | [Scale-loss backup](docs/features/auto-to-manual.md): a timed limit takes over if the scale drops out |

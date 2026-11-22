@@ -130,11 +130,11 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (!self.requireAdminUnlock(request)) return ESP_OK;
   const esp_err_t body = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
   if (body != ESP_OK) return body;
-  static const char *const fields[] = {"action", "code", "lm", "ui", "log", "archive", "bc"};
+  static const char *const fields[] = {"action", "code", "lm", "ui", "log", "archive", "bc", "gbs"};
   char action[12] = {}, code[8] = {};
-  bool lm = true, ui = true, log = true, archive = true, bc = true;
+  bool lm = true, ui = true, log = true, archive = true, bc = true, gbs = true;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
-  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 7) &&
+  bool valid = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 8) &&
                jsonString(root, "action", action, sizeof(action), false);
   if (valid && jsonFieldPresent(root, "code")) valid = jsonString(root, "code", code, sizeof(code), false);
   const bool hasLm = valid && jsonFieldPresent(root, "lm");
@@ -147,6 +147,8 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
   if (hasArchive) valid = jsonBoolean(root, "archive", archive);
   const bool hasBc = valid && jsonFieldPresent(root, "bc");
   if (hasBc) valid = jsonBoolean(root, "bc", bc);
+  const bool hasGbs = valid && jsonFieldPresent(root, "gbs");
+  if (hasGbs) valid = jsonBoolean(root, "gbs", gbs);
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   if (!valid)
@@ -180,7 +182,7 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       if (pending.serial == serial)
         result = expected != UINT32_MAX
             ? companionPairApprove(g_companion.pairing, static_cast<uint32_t>(atol(code)),
-                                   expected, lm, log, archive, bc, now)
+                                   expected, lm, log, archive, bc, now, gbs)
             : pending.state == CompanionPairState::PENDING && !pending.approving
                 ? CompanionApproveResult::NOT_READY
                 : CompanionApproveResult::NOT_PENDING;
@@ -254,10 +256,10 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
       if (fd >= 0) (void)httpd_sess_trigger_close(request->handle, fd);
     self.closeRelayedUiStreams();
     self.lifecycleLogf("Companion '%s' forgotten", name);
-  } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog || hasArchive || hasBc) &&
+  } else if (!strcmp(action, "switches") && (hasLm || hasUi || hasLog || hasArchive || hasBc || hasGbs) &&
              (kCompanionLm || !hasLm)) {
     bool paired, lmChanged = false, uiChanged = false, logChanged = false, archiveChanged = false,
-         bcChanged = false, linkUp = false;
+         bcChanged = false, gbsChanged = false, linkUp = false;
     {
       TaskLockGuard lock(self.dataMux_);
       CompanionStored &stored = g_companion.stored;
@@ -273,7 +275,10 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
         if (hasArchive) stored.archiveSwitch = archive ? 1 : 0;
         bcChanged = hasBc && (stored.bcSwitch != 0) != bc;
         if (hasBc) stored.bcSwitch = bc ? 1 : 0;
-        g_companion.dirty |= lmChanged || uiChanged || logChanged || archiveChanged || bcChanged;
+        gbsChanged = hasGbs && (stored.gbsSwitch != 0) != gbs;
+        if (hasGbs) stored.gbsSwitch = gbs ? 1 : 0;
+        g_companion.dirty |=
+            lmChanged || uiChanged || logChanged || archiveChanged || bcChanged || gbsChanged;
         linkUp = g_companion.active != 0;
         // Its next relayed request is stale, and the new handshake carries ui and link.
         if (lmChanged || uiChanged || logChanged || archiveChanged)
@@ -297,7 +302,10 @@ esp_err_t OpenBrewByWeightNetwork::companionAdminHandler(httpd_req_t *request) {
     }
     // An open link learns these from the next cfg frame; the relay handshake
     // re-answers whether the link is needed at all.
-    if (logChanged || archiveChanged || bcChanged) companionOutboxChanged();
+    if (logChanged || archiveChanged || bcChanged || gbsChanged) companionOutboxChanged();
+    if (gbsChanged)
+      self.lifecycleLog(gbs ? "Companion: Mahlkönig through the companion turned on"
+                            : "Companion: Mahlkönig through the companion turned off");
     if (logChanged)
       self.lifecycleLog(log ? "Companion: Diagnostic log through the companion turned on"
                             : "Companion: Diagnostic log through the companion turned off");

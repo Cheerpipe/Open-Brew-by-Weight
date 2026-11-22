@@ -99,6 +99,14 @@ inline bool repairPersistedSettings(PersistedSettings &s) {
     r.bookooVolume = RuntimeConfig{}.bookooVolume;
     repaired = true;
   }
+  if (r.mahlkonigModel >= GBS_MODEL_COUNT) {
+    r.mahlkonigModel = GBS_MODEL_NONE;
+    repaired = true;
+  }
+  if (gbsCadenceS(r.mahlkonigPushCadenceS) != r.mahlkonigPushCadenceS) {
+    r.mahlkonigPushCadenceS = gbsCadenceS(r.mahlkonigPushCadenceS);
+    repaired = true;
+  }
   if (validateRuntimeConfig(r) != ConfigValidationError::NONE ||
       r.timezoneSource >= 3 || r.timezoneAutomatic > 1) {
     reset(r);

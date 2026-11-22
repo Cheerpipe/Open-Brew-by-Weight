@@ -88,6 +88,17 @@ that closes the flash-write gate — and record answers are paced at 100 ms.
 An unchanged store costs one small index frame per sync; a new shot about
 40 KiB in one burst (two indexes, its row, its trace).
 
+A Mahlkönig grinder ([Grind-by-Sync](MAHLKONIG_GBS.md)) is answered or
+asked only while its integration is on. An E64 WS polls every 2 s; each poll
+gets a precomputed answer of about 230 bytes with its request, also during a
+shot, because an unanswered poll costs more airtime. Without the companion
+the controller asks an E65/E80 every 15, 20 or 25 s (one TLS handshake per
+request, the grinder drops kept-open connections), backs off to 60 and 120 s
+while it does not answer, starts nothing during a sync hold, and asks once
+right after a shot. With the companion route the controller sends or
+receives nothing per poll: the companion polls the grinder, and the link
+carries only `cfg.gbs` and a status frame on change.
+
 Documented exception: the Admin page reads its own status by REST every 10
 seconds while visible and owned. Live and shared state (machine, scale,
 presets, command results, configuration revision) reaches every page on the
@@ -272,7 +283,10 @@ session-only. Deferred persistence retains offsets, gain/provenance, and
 profile through the existing dual-slot owner.
 `idlePowerSavingEnabled` (tag 3, the former single power setting),
 `performanceBoostEnabled` (tag 88, inherits tag 3 when a blob predates it),
-`beanconquerorEndpoint` (tag 91, Off when a blob predates it), webhook preset
+`beanconquerorEndpoint` (tag 91, Off when a blob predates it),
+`integrationBeanconqueror`/`integrationMahlkonig` (tags 96/97, on/off when a
+blob predates them), `mahlkonigModel` and `mahlkonigPushCadenceS` (tags 98/99,
+none and 20 s when a blob predates them), webhook preset
 delivery, and Rinse without a scale are current explicit fields.
 Presets never copy the global power settings.
 `touchStopFallbackEnabled` is a device-level runtime field, defaulting to true. Revisions and

@@ -47,19 +47,19 @@
   for (const id of ['saveWebhookButton',
     'saveNetworkButton', 'saveDateTimeButton', 'changeDevicePasswordButton',
     'saveFirmwareModeButton', 'saveBleButton', 'savePowerButton', 'saveFrontendButton',
-    'saveMachineControlButton', 'saveScheduledRestartButton'])
+    'saveMachineControlButton', 'saveScheduledRestartButton', 'saveIntegrationsButton'])
     assert(new RegExp(`id="${id}"[^>]*data-dirty="0"[^>]*disabled`).test(normalizedUi),
         `${id} must start visibly disabled`);
   for (const id of ['revertWebhookButton', 'revertNetworkButton', 'revertDateTimeButton', 'revertDevicePasswordButton',
     'revertFirmwareModeButton', 'revertBleButton', 'revertPowerButton', 'revertFrontendButton',
-    'revertMachineControlButton', 'revertScheduledRestartButton'])
+    'revertMachineControlButton', 'revertScheduledRestartButton', 'revertIntegrationsButton'])
     assert(new RegExp(`id="${id}"[^>]*data-dirty="0"[^>]*disabled`).test(normalizedUi),
         `${id} must start visibly disabled next to its save button`);
   // Settings saves every edit by itself: no Save/Revert button or unsaved hint.
   assert(!/id="(saveConfigButton|saveBrewPresetButton|laMarzoccoSaveButton|revert(Config|BrewPreset|LaMarzocco)Button|(config|brew|laMarzocco)DirtyHint)"/
       .test(partialHtml.settings), 'Settings must not offer Save/Revert buttons or unsaved hints');
   assert(codeIncludes(viewJs.settings,
-      "if(['presetRenameInput','dripSetG','alphaSet'].includes(el.id)||el.closest('#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app]'))return"),
+      "if(['presetRenameInput','dripSetG','alphaSet'].includes(el.id)||el.closest('#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app],.gbsLocal'))return"),
       'The preset rename dialog, the drip set fields, Micra sign-in inputs and the browser-local app group must not dirty a settings section');
   assert(codeIncludes(js, 'e.dataset.dirty!=null') &&
          codeIncludes(js, "setSaveDirty('saveDateTimeButton','dateTimeDirtyHint',false)") &&
@@ -71,6 +71,7 @@
          codeIncludes(adminUi, "R.command('/api/v1/device/password',{newPassword:") &&
          // Every Admin section marks itself dirty through one named helper.
          codeIncludes(adminUi, "for(const name of['ble','power','frontend','machineControl','scheduledRestart'])sectionChanged('#'+name+'Panel',()=>sectionDirty(name,true))") &&
+         codeIncludes(adminUi, "sectionChanged('#integrationsPanel',()=>sectionDirty('integrations',true))") &&
          codeIncludes(adminUi, "R.setSaveDirty('save'+name[0].toUpperCase()+name.slice(1)+'Button',name+'DirtyHint',on)") &&
          codeIncludes(adminUi, "const b=$('savePowerButton');b.classList.add('busy')") &&
          css.includes('.btnGlyph:disabled{opacity:.4;cursor:not-allowed}'),

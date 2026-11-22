@@ -116,6 +116,15 @@ bool OpenBrewByWeightNetwork::sendHomeStream(UiStreamSession &session,
   delta.field("snapshotStale", bool(control.snapshotStale));
   delta.field("webUiOverrideActive", bool(override));
   delta.field("liveShot", bool(control.activeCycle || control.relayClosed));
+  // Admin → Integrations, which every page's menus follow, and the Mahlkönig
+  // grinder correcting the grind, which pauses Home's own advice (D9).
+  delta.field("config.integrationBeanconqueror", bool(control.config.integrationBeanconqueror));
+  delta.field("config.integrationMahlkonig", bool(control.config.integrationMahlkonig));
+  {
+    GbsView gbs;
+    mahlkonigView(gbs);
+    delta.field("gbs.adjusts", bool(gbs.adjusts));
+  }
   // Home's recording card: changes on start and stop, and while a save or a
   // download keeps a held recording from being deleted.
   {

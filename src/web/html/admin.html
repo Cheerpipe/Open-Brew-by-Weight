@@ -19,6 +19,9 @@
     <rect x="3" y="4" width="18" height="12" rx="2" />
     <path d="M8 20h8m-4-4v4" />
   </symbol>
+  <symbol id="g-integrations" viewBox="0 0 24 24">
+    <path d="M9 3v4m6-4v4M7 7h10v4a5 5 0 0 1-10 0V7Zm5 9v5" />
+  </symbol>
   <symbol id="g-webhooks" viewBox="0 0 24 24">
     <path
       d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L12 6.3M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"
@@ -470,6 +473,46 @@
       </button>
     </div>
   </details>
+  <details id="integrationsPanel" data-g="integrations" class="cfgGroup">
+    <summary>{{webui:admin.integrations}}</summary>
+    <small class="fieldHint">{{webui:admin.integrations_hint}}</small>
+    <label
+      ><input id="integrationBeanconqueror" type="checkbox" role="switch" checked />
+      {{webui:admin.integration_bc}}<small class="fieldHint"
+        >{{webui:admin.integration_bc_hint}}</small
+      ></label
+    >
+    <label
+      ><input id="integrationMahlkonig" type="checkbox" role="switch" />
+      {{webui:admin.integration_gbs}}
+      <span class="presetCardBadge gbsBadge">{{webui:settings.gbs_untested}}</span
+      ><small class="fieldHint">{{webui:admin.integration_gbs_hint}}</small></label
+    >
+    <p class="readyMsg" role="note">{{webui:admin.integration_gbs_note}}</p>
+    <div class="btnBar">
+      <button
+        id="saveIntegrationsButton"
+        class="btnGlyph mutable btnInvert"
+        data-dirty="0"
+        disabled
+        type="button"
+      >
+        <span class="g" aria-hidden="true">✓</span
+        ><span class="t">{{webui:admin.save_integrations}}</span></button
+      ><button
+        id="revertIntegrationsButton"
+        class="btnGlyph mutable btnRevert"
+        data-dirty="0"
+        disabled
+        title="{{webui:runtime.revert_unsaved_changes}}"
+        aria-label="{{webui:runtime.revert_unsaved_changes}}"
+        type="button"
+      >
+        <span class="g" aria-hidden="true">↺</span>
+      </button>
+    </div>
+    <small id="integrationsDirtyHint" class="warn hidden">{{webui:admin.unsaved_changes}}</small>
+  </details>
   <details id="webhookPanel" data-g="webhooks" class="cfgGroup">
     <summary>{{webui:admin.webhooks}}</summary>
     <form class="enterForm" novalidate>
@@ -753,6 +796,12 @@
           >{{webui:admin.companion_bc_approve_hint}}</small
         ></label
       >
+      <label
+        ><input id="companionApproveGbs" type="checkbox" role="switch" checked />
+        {{webui:admin.companion_gbs}}<small class="fieldHint"
+          >{{webui:admin.companion_gbs_approve_hint}}</small
+        ></label
+      >
       <div class="btnBar">
         <button id="companionApproveButton" class="btnGlyph btnInvert" type="submit" disabled>
           <span class="g" aria-hidden="true">✓</span
@@ -817,6 +866,14 @@
         ><input id="companionBc" type="checkbox" role="switch" /> {{webui:admin.companion_bc}}<small
           class="fieldHint"
           >{{webui:admin.companion_bc_hint}}</small
+        ></label
+      >
+      <label
+        ><input id="companionGbs" type="checkbox" role="switch" />
+        {{webui:admin.companion_gbs}}<small class="fieldHint"
+          >{{webui:admin.companion_gbs_hint}}</small
+        ><small id="companionGbsOff" class="fieldHint warn" hidden
+          >{{webui:admin.companion_gbs_off}}</small
         ></label
       >
       <div class="btnBar">

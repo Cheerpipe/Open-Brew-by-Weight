@@ -25,6 +25,7 @@ needed rather than reading the entire directory.
 - [Home Assistant integration](features/home-assistant.md) ([integration repository](https://github.com/Cheerpipe/ha-open-brew-by-weight))
 - [Generic webhooks](features/webhooks.md)
 - [Open Brew by Weight Companion](features/companion.md) ([companion repository](https://github.com/Cheerpipe/open-brew-by-weight-companion))
+- [Mahlkönig grinder](settings/mahlkonig.md): the grinder learns from your shots (untested with a real grinder yet)
 - [Notifications](features/notifications.md)
 
 ## Settings
@@ -34,6 +35,7 @@ needed rather than reading the entire directory.
 | Physical switch | [Paddle](settings/paddle.md) / [momentary](settings/momentary.md) |
 | Machine integration | [La Marzocco Linea Micra](settings/linea-micra.md) / [machine control](settings/machine-control.md) |
 | Coffee apps | [Beanconqueror](settings/beanconqueror.md) |
+| Grinder | [Mahlkönig](settings/mahlkonig.md) (untested with a real grinder yet) |
 | Without a scale / rinse | [Scale guard](settings/no-scale-bbw.md) / [quick rinse](settings/quick-rinse.md) |
 | Scale and cup | [Scales](settings/scales.md) / [Bluetooth on/off](settings/scales.md#bluetooth-onoff) / [cup detection](settings/cup.md) / [tare](settings/tare.md) |
 | Network | [Wi-Fi](settings/wifi.md) / [access point](settings/ap.md) / [device name](settings/wifi.md#discovery-by-name) / [Web UI access](settings/web-access.md) |
@@ -79,6 +81,7 @@ risk gate in [VALIDATION.md](../VALIDATION.md).
 | Shot trace format and flash pool | [`SHOT_TRACE.md`](SHOT_TRACE.md) | `src/OpenBrewByWeightShotTrace.h`, `src/OpenBrewByWeightShotTracePool.h`, `src/diagnostics/OpenBrewByWeightShotTraceRoutes.inc` | `TRC*`/`TPW*` host cases, `src/tests/shot_trace_test_decoder.h`, `shot_trace_pool_host_test.cpp`, `shot_trace_routes_host_test.cpp` | `./scripts/dev test normal` |
 | Shot export formats and the trace view | [`schemas/README.md`](schemas/README.md) | `src/web/js/stats.js` (`shotsJson`, `decodeShotTrace`, `shotGaggiuino`, `shotVisualizer`, `shotBeanconquerorLink`) | `33-shot-export.inc.js` | `./scripts/dev test web` |
 | Beanconqueror machine endpoints | [`schemas/README.md`](schemas/README.md#beanconqueror-machine-endpoints-v1) | `src/OpenBrewByWeightBeanconqueror.h`, `src/network/OpenBrewByWeightBeanconquerorHttp.inc`, `src/web/js/settings.js` (Coffee apps) | `beanconqueror_host_test.cpp`, `34-beanconqueror.inc.js`, `docs/schemas/beanconqueror-v1.vectors.json` | `./scripts/dev validate --risk R3` |
+| Mahlkönig Grind-by-Sync | [`MAHLKONIG_GBS.md`](MAHLKONIG_GBS.md) | `src/OpenBrewByWeightMahlkonig.h`, `src/network/OpenBrewByWeightMahlkonig*.inc`, `src/web/js/settings.js` (Mahlkönig) | `mahlkonig_host_test.cpp`, `36-mahlkonig.inc.js`, `docs/schemas/mahlkonig-gbs-v1.vectors.json` | `./scripts/dev validate --risk R3` |
 | Firmware OTA | `features/ota.md`, `features/ota-image-identity.md`, `EMERGENCY_RECOVERY.md` | `scripts/internal/ota-idf`, `src/OpenBrewByWeightOta*` | OTA host, CLI, and Web resilience tests | `./scripts/dev test ota` |
 | Persistence | `ARCHITECTURE.md`, settings docs | `src/OpenBrewByWeightPersist*`, durable stores/logs | `persistence_host_test.cpp` | `./scripts/dev test normal` |
 | Web UI | `SCREENSHOTS.md`, feature/settings docs | `src/web/` | Web asset/contract tests | `./scripts/dev test web` |
