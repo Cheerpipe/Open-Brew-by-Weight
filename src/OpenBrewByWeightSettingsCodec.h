@@ -119,10 +119,11 @@ inline constexpr SettingsField SETTINGS_RETIRED_BOOKOO_FIELDS[] = {
     OBBW_SETTINGS_FIELD(56, RetiredBookooVolume, level)};
 
 // Keeps what the user hears in the saved alert mode: an unmuted Buzzer only
-// left the speaker alone, so it becomes Don't change; otherwise the level.
+// with sound alerts on left the speaker alone, so it becomes Don't change;
+// otherwise the level (muted alerts silenced the scale either way).
 inline uint8_t migratedBookooVolume(const RetiredBookooVolume &retired,
-                                    uint8_t alertOutputChannel) {
-  if (!retired.muteOnBuzzerOnly &&
+                                    uint8_t alertOutputChannel, bool soundAlertsMuted) {
+  if (!retired.muteOnBuzzerOnly && !soundAlertsMuted &&
       effectiveAlertOutputChannel(alertOutputChannel) == AlertOutputChannel::BUZZER_ONLY)
     return BOOKOO_VOLUME_KEEP;
   return retired.level <= BOOKOO_BEEP_LEVEL_MAX ? retired.level
@@ -521,7 +522,8 @@ inline bool settingsBlobIntact(const uint8_t *blob, size_t length, uint32_t &rev
     settings.runtime.performanceBoostEnabled = settings.runtime.idlePowerSavingEnabled;
   if (settings.runtime.bookooVolume == kVolumeAbsent)
     settings.runtime.bookooVolume =
-        migratedBookooVolume(retiredVolume, settings.runtime.alertOutputChannel);
+        migratedBookooVolume(retiredVolume, settings.runtime.alertOutputChannel,
+                             settings.runtime.soundAlertsMuted);
   settings.presets.count = presets;
   return true;
 }

@@ -209,8 +209,8 @@ would be heard, or a volume with **Buzzer only**, where the scale stays
 silent anyway. The value is still saved exactly as you chose it.
 
 Firmware updates keep what you hear today: a previously muted scale keeps its
-level, and a scale that was left alone in **Buzzer only** becomes
-**Don't change**.
+level, and a scale that was left alone in **Buzzer only** with sound alerts on
+becomes **Don't change**.
 
 ## Keep a Bookoo awake while the machine is on
 
@@ -226,6 +226,11 @@ The option needs a machine connection that reports whether the machine is on,
 with its power monitoring turned on; without one it is unavailable and does
 nothing. A machine that is only assumed to be on — for example right after a
 wake command, before the machine confirms it — does not count.
+
+If your machine connection also puts the machine in standby when the scale
+switches off, keeping the scale awake means that only happens when you switch
+the scale off yourself: its auto-off no longer does it while the machine is
+on.
 
 Keeping the scale awake uses more of its battery. It works with Bookoo Themis
 Mini firmware 1.4.3 or later and Themis Ultra firmware 4.0.1 or later; BooKoo

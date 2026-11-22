@@ -3048,11 +3048,11 @@ void w03_runtime_timing_relations_are_transactional() {
     CHECK(bookooDesiredVolume(true, channel, 3) == (scaleChannel ? 3 : 0));
     CHECK(bookooDesiredVolume(false, channel, 3) == 0);
   }
-  CHECK(migratedBookooVolume({false, 4},
-                             static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY)) ==
+  const uint8_t buzzerOnly = static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
+  CHECK(migratedBookooVolume({false, 4}, buzzerOnly, false) ==
         (BUZZER_SUPPORT_ENABLED ? BOOKOO_VOLUME_KEEP : 4));
-  CHECK(migratedBookooVolume({true, 4},
-                             static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY)) == 4);
+  CHECK(migratedBookooVolume({true, 4}, buzzerOnly, false) == 4);
+  CHECK(migratedBookooVolume({false, 4}, buzzerOnly, true) == 4);
   config = RuntimeConfig{};
   config.buzzerExtendedPulseRate = 9;
   CHECK(validateRuntimeConfig(config) ==
@@ -6212,10 +6212,10 @@ void k01_scale_auto_off_reset_follows_request_and_period() {
   scale.connectedFeatures.flags |= ScaleFeatureAutoOffReset;
   publishScaleKeepAwake(true);
   hostMillis += SCALE_AUTO_OFF_RESET_FIRST_DELAY_MS - 1;
-  serviceScaleAutoOffReset();
+  CHECK(!serviceScaleAutoOffReset());  // Idle ticks are not command work.
   CHECK(scaleAutoOffResets() == 0);
   hostMillis += 1;
-  serviceScaleAutoOffReset();
+  CHECK(serviceScaleAutoOffReset());
   CHECK(scaleAutoOffResets() == 1);
   hostMillis += SCALE_AUTO_OFF_RESET_PERIOD_MS - 1;
   serviceScaleAutoOffReset();

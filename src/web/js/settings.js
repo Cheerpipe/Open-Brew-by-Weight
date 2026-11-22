@@ -660,7 +660,8 @@ function loadBullseyeConfig(c) {
 }
 // Explains, below the volume, a value that does not suit the alert output;
 // the value itself is always kept.
-function refreshBookooVolumeWarning() {
+function refreshBookooVolumeWarning(s) {
+  if (s) R.uiState.bookooModel = s.scale?.model;
   const volume = +$("bookooVolume").value,
     noBuzzer = !!$("alertOutputChannel").closest(".buzzerOpt.hidden"),
     channel = noBuzzer ? "scale_only" : $("alertOutputChannel").value,
@@ -704,8 +705,7 @@ function applySettingsStatus(s) {
   $("bookooKeepAwakeWrap").classList.toggle("fieldOff", !powerKnown);
   $("bookooKeepAwakeWhileMachineOn").disabled = !R.controlsMutable || !powerKnown;
   $("bookooKeepAwakeUnavailable").hidden = powerKnown;
-  R.uiState.bookooModel = s.scale?.model;
-  refreshBookooVolumeWarning();
+  refreshBookooVolumeWarning(s);
   R.updateBbwControls();
   const sl = s.scaleLoss,
     active = R.presetState.items.find((x) => x.id === R.presetState.activeId);
@@ -2313,7 +2313,10 @@ export function init() {
     syncHeroTintAvailability();
   });
   R.setSettingsForm({ validateBrewClient, renderPresetReview });
-  R.registerViewStatus("settingsLive", updateCupMinGuidance);
+  R.registerViewStatus("settingsLive", (s) => {
+    updateCupMinGuidance(s);
+    refreshBookooVolumeWarning(s);
+  });
   $("presetCards")?.addEventListener("click", () => setTimeout(updateSettingsOverrides));
   R.uiState.flushSettings = flushSettings;
   if ($("presetNewBtn"))

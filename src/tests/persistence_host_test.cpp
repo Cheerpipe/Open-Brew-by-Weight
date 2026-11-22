@@ -3387,6 +3387,8 @@ void p91j_bookoo_volume_migrates_retired_tags() {
       {{55, 1, 0, 56, 1, 4, 26, 1, buzzer}, BUZZER_SUPPORT_ENABLED ? BOOKOO_VOLUME_KEEP : uint8_t{4}},
       {{55, 1, 0, 56, 1, 2, 26, 1, scale}, 2},
       {{55, 1, 1, 56, 1, 0, 26, 1, scale}, 0},
+      // Muted sound alerts silenced the scale even in unmuted Buzzer only.
+      {{15, 1, 1, 55, 1, 0, 56, 1, 4, 26, 1, buzzer}, 4},
       {{55, 1, 0, 56, 1, 2, 26, 1, buzzer, 95, 1, 5}, 5},
       {{26, 1, scale}, DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL},
   };

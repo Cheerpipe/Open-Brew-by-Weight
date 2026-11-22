@@ -2662,22 +2662,24 @@ void publishScaleKeepAwake(bool requested) {
 // Restarts the scale's own auto-off countdown while the control task asks for
 // it. Last in the worker's command order, so never ahead of a queued or
 // pending command; never during connection setup or a power-off. A failure is
-// logged once per connection and never touches link state.
-static void serviceScaleAutoOffReset() {
+// logged once per connection and never touches link state. True when a reset
+// was attempted, so idle ticks never count as command work.
+static bool serviceScaleAutoOffReset() {
   const uint32_t now = millis();
   if (!scaleKeepAwakeRequested.load(std::memory_order_acquire) ||
       bookooConnectVolumePending ||
       !scale.features().has(ScaleFeatureAutoOffReset) ||
       scalePowerOffBlocksGeneration(scaleConnectionGenerationNow()) ||
       now - autoOffResetAtMs < SCALE_AUTO_OFF_RESET_PERIOD_MS) {
-    return;
+    return false;
   }
   autoOffResetAtMs = now;
-  if (scaleCommandOk(scale.resetAutoOff()) || autoOffResetFailureLogged) return;
+  if (scaleCommandOk(scale.resetAutoOff()) || autoOffResetFailureLogged) return true;
   autoOffResetFailureLogged = true;
   serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
                        "Scale auto-off reset not sent; retrying in %lu s",
                        static_cast<unsigned long>(SCALE_AUTO_OFF_RESET_PERIOD_MS / 1000));
+  return true;
 }
 
 void serviceScaleWorkerLink() {
@@ -2961,8 +2963,8 @@ void scaleWorkerTask(void *) {
               executeScaleDebugCommand(debugAction, debugLevel);
               finishScaleSection(ScaleWorkerPhase::COMMANDS);
             } else if (linked) {
-              serviceScaleAutoOffReset();
-              finishScaleSection(ScaleWorkerPhase::COMMANDS);
+              if (serviceScaleAutoOffReset())
+                finishScaleSection(ScaleWorkerPhase::COMMANDS);
             } else if (!applyScaleDiscoveryPause()) {
               serviceScaleWorkerDiscovery(discovery);
               finishScaleSection(ScaleWorkerPhase::DISCOVERY);

@@ -1927,8 +1927,9 @@ if (html.includes('id="debugPanel"') ||
   guidance({scale: {observedWeightG: 4.2}});
   assert(hint.hidden, 'An unparseable minimum must keep the guidance hidden');
   assert(settingsHtml.includes('id="cupMinGuidance" class="fieldHint" hidden'));
-  assert(codeIncludes(viewJs.settings, 'R.registerViewStatus("settingsLive", updateCupMinGuidance)'),
-      'The guidance follows every Home frame while Settings is shown');
+  assert(codeIncludes(viewJs.settings,
+      'R.registerViewStatus("settingsLive",(s)=>{updateCupMinGuidance(s);refreshBookooVolumeWarning(s);})'),
+      'The guidance and the Bookoo volume warning follow every Home frame while Settings is shown');
 }
 
 // NET-05: POST /api/v1/config validates every field into the candidate in one
