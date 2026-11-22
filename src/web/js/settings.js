@@ -2170,7 +2170,8 @@ async function gbsAddress(s) {
   const here = await R.companionHere(),
     controller = s.network?.staIp || location.hostname;
   if (!here?.paired) return { addr: controller };
-  if (!s.companion?.gbs || here.gbs === undefined)
+  // An older companion reports no `gbs`; one not answering an E64 WS, no `pull`.
+  if (!s.companion?.gbs || here.gbs?.pull !== true)
     return { addr: controller, note: __WEBUI_TEXT__("settings.gbs_note_off") };
   if (here.httpPort > 0 && here.httpPort !== 80)
     return {

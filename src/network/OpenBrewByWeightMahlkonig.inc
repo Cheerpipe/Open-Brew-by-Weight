@@ -84,7 +84,10 @@ struct GbsTlsPin {
   uint8_t seen[32] = {};
   bool captured = false, mismatch = false;
 };
-GbsTlsPin g_gbsPin;
+OPEN_BREW_BY_WEIGHT_PSRAM_BSS GbsTlsPin g_gbsPin;
+// esp-tls requires a CA chain before it calls the verify callback; an empty
+// certificate satisfies that and verifies nothing (as esp_crt_bundle does).
+OPEN_BREW_BY_WEIGHT_PSRAM_BSS mbedtls_x509_crt g_gbsEmptyCa;
 
 // The leaf certificate decides: pinned, it must be the pinned one; unpinned,
 // it is captured (trust on first use, docs/MAHLKONIG_GBS.md). The grinder's
@@ -105,14 +108,10 @@ int gbsVerifyCertificate(void *, mbedtls_x509_crt *certificate, int depth, uint3
   return 0;
 }
 
-// esp-tls requires a CA chain before it calls the verify callback; an empty
-// certificate satisfies that and verifies nothing (as esp_crt_bundle does).
 esp_err_t gbsAttachPin(void *configuration) {
-  static mbedtls_x509_crt empty;
-  static bool ready = false;
-  if (!ready) mbedtls_x509_crt_init(&empty), ready = true;
+  mbedtls_x509_crt_init(&g_gbsEmptyCa);  // zeroes it: never parsed, nothing to free
   auto *ssl = static_cast<mbedtls_ssl_config *>(configuration);
-  mbedtls_ssl_conf_ca_chain(ssl, &empty, nullptr);
+  mbedtls_ssl_conf_ca_chain(ssl, &g_gbsEmptyCa, nullptr);
   mbedtls_ssl_conf_verify(ssl, gbsVerifyCertificate, nullptr);
   return ESP_OK;
 }
@@ -460,7 +459,8 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
     char deviceIdText[24] = {};
     deviceId(deviceIdText, sizeof(deviceIdText));
     char body[GBS_BODY_CAPACITY];
-    g_gbsMachine.publish(body, gbsMachineBody(body, sizeof(body), deviceIdText));
+    const size_t length = gbsMachineBody(body, sizeof(body), deviceIdText);
+    g_gbsMachine.publish(body, length);
     work.publishedAtMs = now - GBS_PUBLISH_MS;
   }
   // The companion's report; its route ends with the link, its switch or cfg.gbs.
@@ -562,7 +562,8 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
     if (changed || before != work.pull.state || ticksSince(now, work.publishedAtMs) >= static_cast<int32_t>(GBS_PUBLISH_MS)) {
       const TimeStatusSnapshot clock = g_wallClock.snapshot(now);
       char body[GBS_BODY_CAPACITY];
-      g_gbsMako.publish(body, gbsMakoBody(body, sizeof(body), work.pull, now, clock.utcSec));
+      const size_t length = gbsMakoBody(body, sizeof(body), work.pull, now, clock.utcSec);
+      g_gbsMako.publish(body, length);
       work.publishedAtMs = now;
     }
     g_gbsCounters.serving.store(true, std::memory_order_release);

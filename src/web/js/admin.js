@@ -793,9 +793,16 @@ function companionCopy(here) {
   ]);
 }
 const companionSwitches = () => document.querySelectorAll("#companionPaired input");
-// Beanconqueror and the Mahlkönig grinder through the companion work from its archive.
-const companionBcNeedsArchive = () =>
-  ($("companionBc").disabled = $("companionGbs").disabled = !$("companionArchive").checked);
+// Beanconqueror and the Mahlkönig grinder through the companion work from its
+// archive; the grinder's switch also waits for its integration, as the
+// Integrations form shows it now (saved or not). Disabled keeps the value.
+function companionBcNeedsArchive() {
+  const archive = $("companionArchive").checked,
+    grinder = $("integrationMahlkonig").checked;
+  $("companionBc").disabled = !archive;
+  $("companionGbs").disabled = !archive || !grinder;
+  $("companionGbsOff").hidden = grinder;
+}
 async function saveCompanionSettings() {
   if (!R.uiState.companionDirty) return;
   const ui = $("companionUi").checked;
@@ -1225,6 +1232,7 @@ function applyAdminStatus(s) {
     R.uiState.integrationsBaseline = R.snapshotControls(
       document.querySelectorAll("#integrationsPanel input"),
     );
+  companionBcNeedsArchive();
   $("restartButton").disabled = !R.controlsMutable;
   applyOtaStatus(s.ota);
   loadAdminConfig(s.config);
@@ -2266,7 +2274,9 @@ export function init() {
   $("revertPowerButton").onclick = () => revertSection("power");
   $("saveFrontendButton").onclick = saveFrontendSettings;
   $("saveIntegrationsButton").onclick = saveIntegrationsSettings;
-  $("revertIntegrationsButton").onclick = () => revertSection("integrations");
+  $("integrationMahlkonig").addEventListener("change", companionBcNeedsArchive);
+  $("revertIntegrationsButton").onclick = () =>
+    revertSection("integrations", companionBcNeedsArchive);
   $("revertFrontendButton").onclick = () => revertSection("frontend");
   if (__LA_MARZOCCO__) {
     $("saveMachineControlButton").onclick = saveMachineControlSettings;

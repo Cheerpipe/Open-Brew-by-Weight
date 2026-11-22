@@ -64,14 +64,14 @@
   assert.deepEqual({...(await gbsAddress(s))}, {addr: '192.168.1.42'}, 'no companion');
   here = {paired: true, ip: '192.168.1.20', httpPort: 80};
   assert.equal((await gbsAddress(s)).note, errorCatalog['settings.gbs_note_off'], 'an older companion');
-  here = {paired: true, ip: '192.168.1.20', httpPort: 80, gbs: true};
+  here = {paired: true, ip: '192.168.1.20', httpPort: 80, gbs: {pull: true}};
   assert.equal((await gbsAddress({...s, companion: {gbs: false}})).note, errorCatalog['settings.gbs_note_off'],
       'its switch off');
   const via = await gbsAddress(s);
   assert.deepEqual([via.addr, via.alt, via.note], ['192.168.1.20',
     errorCatalog['settings.gbs_cant_connect'].replace('{0}', '192.168.1.42'),
     errorCatalog['settings.gbs_note_companion']], 'the companion answers, the controller is the way back');
-  here = {paired: true, ip: '192.168.1.20', httpPort: 8080, gbs: true};
+  here = {paired: true, ip: '192.168.1.20', httpPort: 8080, gbs: {pull: true}};
   const port = await gbsAddress(s);
   assert.deepEqual([port.addr, port.note],
       ['192.168.1.42', errorCatalog['settings.gbs_note_port'].replace('{0}', 8080)], 'port 80 only');
@@ -125,3 +125,30 @@
   console.error(error);
   process.exitCode = 1;
 });
+// Admin → Companion: "Mahlkönig through the companion" waits for its
+// integration as the Integrations form shows it, saved or not, and keeps its
+// own value; the shot archive's dependency stays as it was, with one reason.
+{
+  const assert = require('assert').strict;
+  const vm = require('vm');
+  const dom = {};
+  const el = (id) => (dom[id] ||= {id, checked: false, disabled: false, hidden: false});
+  const context = vm.createContext({$: el});
+  vm.runInContext(blockAt(viewJs.admin, 'function companionBcNeedsArchive('), context);
+  const apply = (archive, grinder) => {
+    el('companionArchive').checked = archive;
+    el('integrationMahlkonig').checked = grinder;
+    vm.runInContext('companionBcNeedsArchive()', context);
+    return [dom.companionGbs.disabled, dom.companionGbsOff.hidden, dom.companionBc.disabled];
+  };
+  el('companionGbs').checked = true;
+  assert.deepEqual(apply(true, false), [true, false, false], 'integration off: disabled, with the reason');
+  assert.deepEqual(apply(true, true), [false, true, false], 'integration on: enabled');
+  assert.deepEqual(apply(false, true), [true, true, true], 'archive off: the existing treatment alone');
+  assert.equal(dom.companionGbs.checked, true, 'the stored value is kept');
+  const admin = viewJs.admin;
+  assert.ok(codeIncludes(admin, '$("integrationMahlkonig").addEventListener("change", companionBcNeedsArchive)'),
+      'an unsaved Integrations toggle updates it live');
+  assert.ok(codeIncludes(admin, 'revertSection("integrations", companionBcNeedsArchive)'));
+  assert.ok(partialHtml.admin.includes(errorCatalog['admin.companion_gbs_off']));
+}

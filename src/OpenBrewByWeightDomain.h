@@ -550,9 +550,8 @@ constexpr size_t GBS_HOST_CAPACITY = 48;  // an IP or a short name the grinder s
 // How often the controller asks an E65/E80 for a new grind without the
 // companion (D12): 15, 20 (the default) or 25 s; anything else reads as 20.
 constexpr uint8_t GBS_CADENCE_DEFAULT_S = 20;
-inline uint8_t gbsCadenceS(uint8_t seconds) {
-  return seconds == 15 || seconds == 20 || seconds == 25 ? seconds : GBS_CADENCE_DEFAULT_S;
-}
+inline bool gbsCadenceValid(uint8_t seconds) { return seconds == 15 || seconds == 20 || seconds == 25; }
+inline uint8_t gbsCadenceS(uint8_t seconds) { return gbsCadenceValid(seconds) ? seconds : GBS_CADENCE_DEFAULT_S; }
 inline const char *gbsModelId(uint8_t model) {
   static const char *const ids[] = {"none", "e64ws", "e65w", "e65t", "e80w", "e80t"};
   return model < GBS_MODEL_COUNT ? ids[model] : ids[0];

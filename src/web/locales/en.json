@@ -64,6 +64,7 @@
     "admin.companion_gbs": "Mahlkönig through the companion",
     "admin.companion_gbs_approve_hint": "The companion talks to your Mahlkönig grinder for the controller and checks an E65 or E80 every 2 seconds. Needs Shot archive in the companion.",
     "admin.companion_gbs_hint": "On: the companion talks to your Mahlkönig grinder for the controller and checks it every 2 seconds, so the controller’s Wi-Fi stays free for the scale. For an E64 WS, enter the companion’s address on the grinder; Settings → Mahlkönig shows it. Needs Shot archive in the companion. Off: the controller talks to the grinder itself.",
+    "admin.companion_gbs_off": "Turn on Mahlkönig grinder in Integrations above to use this.",
     "admin.companion_ignore": "Ignore",
     "admin.companion_ignored": "Ignored companions: {0}",
     "admin.companion_ignored_now": "Request ignored. This companion won't ask again until you stop ignoring it.",
