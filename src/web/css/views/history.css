@@ -1466,7 +1466,8 @@
 /* "Untested" in the Mahlkönig note (Settings) and beside its switch (Admin). */
 .gbsBadge {
   margin-left: 0.35rem;
-  vertical-align: 0.1em;
+  color: var(--dn);
+  font-weight: 700;
 }
 
 .presetCardMeta {
