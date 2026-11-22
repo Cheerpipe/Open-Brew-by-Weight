@@ -216,8 +216,9 @@ void OpenBrewByWeightNetwork::mahlkonigShots(uint32_t now) {
   work.recordId = shot.id;
   work.recordKnown = true;
   // A shot from before the integration was on, or from another boot, is no grind's.
-  if (!known || shot.bootId != callbacks_.bootId()) return;
-  const GbsShotReport report = gbsReport(gbsShotFactsOf(shot));
+  const GbsShotFacts facts = gbsShotFactsOf(shot);
+  if (!known || shot.bootId != callbacks_.bootId() || !gbsIsShot(facts)) return;
+  const GbsShotReport report = gbsReport(facts);
   const uint32_t end = shot.endedAtMs, start = end - shot.durationDs * 100U;
   const uint32_t polls = g_gbsCounters.polls.load(std::memory_order_acquire);
   uint8_t random[16];

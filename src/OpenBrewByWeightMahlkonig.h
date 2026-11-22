@@ -90,6 +90,10 @@ inline GbsShotFacts gbsShotFactsOf(const ShotLogRecord &record) {
   return facts;
 }
 
+// A cycle too short to be a shot (a group flush after grinding) settles no
+// grind: the shot that follows does (A4). The grinder learns nothing under 10 s.
+inline bool gbsIsShot(const GbsShotFacts &facts) { return facts.durationDs > MIN_SHOT_LOG_DURATION_MS / 100U; }
+
 struct GbsShotReport {
   bool success = false;
   uint32_t timeMs = 0;  // pump time: start to the relay cut, drip excluded

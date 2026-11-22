@@ -144,7 +144,9 @@ yield source is `post_drip`. Everything else reports **Canceled**: a hand
 stop, scale loss, a cup removed, a cut-short drip, a fault or safety limit.
 The grinder applies its own windows (E64 WS 10–80 s; push ±15 s of the job);
 the controller does not pre-filter. Rinses leave no shot record and are never
-reported.
+reported. A cycle of 12 s or less (stored as a `short` shot, typically a group
+flush after grinding) settles no grind either: the grind waits for the next
+shot, so a flush between grinding and brewing does not cancel the sync.
 
 ## Wi-Fi and BLE safeguards
 

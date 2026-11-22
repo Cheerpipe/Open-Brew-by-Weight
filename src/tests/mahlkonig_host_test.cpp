@@ -116,7 +116,14 @@ void testVectors() {
     if (found) CHECK(value == expected->valuedouble);
     CHECK((found && value == 9.0 && text(c, "key") == "ID") == cJSON_IsTrue(item(c, "arms")));
   }
+  GbsShotFacts flush;
+  flush.durationDs = MIN_SHOT_LOG_DURATION_MS / 100U;
+  CHECK(!gbsIsShot(flush));  // a flush after grinding leaves the grind for the next shot
+  ++flush.durationDs;
+  CHECK(gbsIsShot(flush));
   cJSON_ArrayForEach(c, item(root, "report")) {
+    const cJSON *bad = item(item(c, "row"), "badReason");
+    CHECK(gbsIsShot(factsOf(item(c, "row"))) == !(cJSON_IsString(bad) && std::string(bad->valuestring) == "short"));
     const GbsShotReport report = gbsReport(factsOf(item(c, "row")));
     CHECK(report.success == (text(c, "result") == "Success"));
     CHECK(report.timeMs == number(c, "durationMs"));
