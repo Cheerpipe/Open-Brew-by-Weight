@@ -789,10 +789,14 @@
   <fieldset id="mahlkonigSettings" hidden>
     <legend>
       {{webui:settings.mahlkonig}}
-      <span class="presetCardBadge gbsBadge">{{webui:settings.gbs_untested}}</span>
       <span id="gbsLegendHint" class="hint"></span>
     </legend>
-    <p class="scopeNote">{{webui:settings.gbs_scope_note}}</p>
+    <p class="scopeNote">
+      <span
+        >{{webui:settings.gbs_scope_note}}
+        <span class="presetCardBadge gbsBadge">{{webui:settings.gbs_untested}}</span></span
+      >
+    </p>
     <details data-g="mahlkonigGrinder" class="cfgGroup">
       <summary>{{webui:settings.gbs_grinder}}</summary>
       <div id="gbsChoose" class="gbsLocal" hidden>

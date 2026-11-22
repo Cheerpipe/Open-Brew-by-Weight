@@ -1463,7 +1463,7 @@
   text-transform: uppercase;
 }
 
-/* "Untested" beside the Mahlkönig legend (Settings) and its switch (Admin). */
+/* "Untested" in the Mahlkönig note (Settings) and beside its switch (Admin). */
 .gbsBadge {
   margin-left: 0.35rem;
   vertical-align: 0.1em;
