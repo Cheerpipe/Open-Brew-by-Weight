@@ -1792,6 +1792,8 @@ profile_common = [
     '# CONFIG_GDMA_ISR_HANDLER_IN_IRAM is not set',
     'CONFIG_LWIP_IPV6=y',
     'CONFIG_LWIP_MAX_SOCKETS=18',
+    'CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y',
+    'CONFIG_MBEDTLS_DYNAMIC_BUFFER=y',
     'CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=8',
     'CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32',
     'CONFIG_ESP_WIFI_RX_BA_WIN=16',
@@ -1829,14 +1831,10 @@ for arch, arch_selectors in profile_arch.items():
         assert result.returncode == 1 and "Production profile mismatch" in result.stderr
     assert verify_production_profile(
         arch, selectors + ["CONFIG_SPIRAM_MODE_QUAD=y"]).returncode == 1
-    micra = selectors + ["CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y",
-                         "CONFIG_MBEDTLS_DYNAMIC_BUFFER=y",
-                         "CONFIG_WS_BUFFER_SIZE=4096"]
+    micra = selectors + ["CONFIG_WS_BUFFER_SIZE=4096"]
     assert verify_production_profile(arch, micra, "la_marzocco_cloud").returncode == 0
     assert "CONFIG_WS_BUFFER_SIZE=4096" in verify_production_profile(
-        arch, micra[:-1], "la_marzocco_cloud").stderr
-    assert "unexpected La Marzocco TLS allocator" in verify_production_profile(
-        arch, micra).stderr
+        arch, selectors, "la_marzocco_cloud").stderr
     jtag_define = "-DOPEN_BREW_BY_WEIGHT_ENABLE_JTAG=1"
     jtag_selectors = [item for item in selectors if item not in {
         "CONFIG_OPEN_BREW_BY_WEIGHT_ENABLE_JTAG=0", "CONFIG_ESP_CONSOLE_NONE=y"}] + [

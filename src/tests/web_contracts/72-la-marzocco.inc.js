@@ -789,7 +789,7 @@ if (!rawCss.includes('html:not(.laMarzoccoIntegration) .laMarzoccoOnly') ||
     codeIncludes(rawRuntimeJs, "['queued','authenticating','listing','running','backoff'].includes(m.phase)") ||
     codeIncludes(rawAllJs, 'laMarzoccoConnectionType') ||
     codeIncludes(rawRuntimeJs, 'laMarzoccoSaveButton') ||
-    !codeIncludes(viewJs.settings, "el.closest('#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app]')") ||
+    !codeIncludes(viewJs.settings, "el.closest('#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app],.gbsLocal')") ||
     laMarzoccoSettingsHtml.indexOf('id="laMarzoccoSettings"') > laMarzoccoSettingsHtml.indexOf('{{webui:settings.shared_settings}}') ||
     !laMarzoccoSettingsHtml.includes('<option value="15" selected>') ||
     laMarzoccoSettingsHtml.includes('id="laMarzoccoPowerOnWithScale" type="checkbox" checked') ||

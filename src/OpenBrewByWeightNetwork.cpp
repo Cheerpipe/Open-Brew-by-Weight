@@ -64,7 +64,10 @@
 #include "OpenBrewByWeightIntegrationRequest.h"
 #include "OpenBrewByWeightCardDismissals.h"
 #include "network/OpenBrewByWeightCompanionStore.h"
+#include "OpenBrewByWeightMahlkonigStore.h"
 #include <arpa/inet.h>
+#include <esp_http_client.h>
+#include <mbedtls/ssl.h>
 #include <psa/crypto.h>
 
 // The application logger is owned by openBrewByWeight.cpp. Network diagnostics use
@@ -263,6 +266,10 @@ static void formatCardDismissals(char *out, size_t cap) {
 }
 // Companion pairing, link and relay; dataMux_ guards it (network/OpenBrewByWeightCompanion.inc).
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionState g_companion;
+// Mahlkönig Grind-by-Sync (network/OpenBrewByWeightMahlkonig.inc): the
+// companion's report and the streams' view, both under dataMux_.
+static OPEN_BREW_BY_WEIGHT_PSRAM_BSS GbsCompanionReport g_gbsLink;
+static OPEN_BREW_BY_WEIGHT_PSRAM_BSS GbsView g_gbsView;
 // Relayed requests' browser identities by socket: httpd writes them at
 // admission, handlers and the OTA worker read them; dataMux_ guards them.
 static OPEN_BREW_BY_WEIGHT_PSRAM_BSS CompanionRelayIdentity g_relayIdentities[COMPANION_RELAY_SOCKETS];
@@ -1358,3 +1365,5 @@ OpenBrewByWeightNetwork *OpenBrewByWeightNetwork::instance_ = nullptr;
 #include "network/OpenBrewByWeightCompanionRecords.inc"
 #include "network/OpenBrewByWeightCompanionStatus.inc"
 #include "network/OpenBrewByWeightCompanionRelay.inc"
+#include "network/OpenBrewByWeightMahlkonig.inc"
+#include "network/OpenBrewByWeightMahlkonigHttp.inc"

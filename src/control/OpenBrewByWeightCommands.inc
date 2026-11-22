@@ -328,6 +328,21 @@ void processWebCommand(const WebCommand &command) {
                              beanconquerorEndpointId(command.config.beanconquerorEndpoint));
       }
       candidate.beanconquerorEndpoint = command.config.beanconquerorEndpoint;
+      if (candidate.integrationBeanconqueror != command.config.integrationBeanconqueror ||
+          candidate.integrationMahlkonig != command.config.integrationMahlkonig) {
+        serialTraceCategoryf(LogLevel::INFO, DebugCategory::CONFIG,
+                             "Integrations: Beanconqueror %s, Mahlkönig %s",
+                             command.config.integrationBeanconqueror ? "on" : "off",
+                             command.config.integrationMahlkonig ? "on" : "off");
+      }
+      candidate.integrationBeanconqueror = command.config.integrationBeanconqueror;
+      candidate.integrationMahlkonig = command.config.integrationMahlkonig;
+      if (candidate.mahlkonigModel != command.config.mahlkonigModel) {
+        serialTraceCategoryf(LogLevel::INFO, DebugCategory::CONFIG, "Mahlkönig grinder: %s",
+                             gbsModelId(command.config.mahlkonigModel));
+      }
+      candidate.mahlkonigModel = command.config.mahlkonigModel;
+      candidate.mahlkonigPushCadenceS = gbsCadenceS(command.config.mahlkonigPushCadenceS);
 #if defined(OPEN_BREW_BY_WEIGHT_HOST_TEST)
       // Host APPLY_CONFIG still carries brew fields; update the active recipe.
       {

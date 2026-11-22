@@ -569,13 +569,10 @@ obbw_idf_verify_production_profile() {
   else
     required+=("# CONFIG_SPIRAM_ECC_ENABLE is not set")
   fi
+  # Every build has a TLS client (a Mahlkönig grinder); its allocations stay in PSRAM.
+  required+=("CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y" "CONFIG_MBEDTLS_DYNAMIC_BUFFER=y")
   if [[ "${OPENBREWBYWEIGHT_MACHINE_INTEGRATION:-none}" == "la_marzocco_cloud" ]]; then
-    required+=("CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y"
-      "CONFIG_MBEDTLS_DYNAMIC_BUFFER=y"
-      "CONFIG_WS_BUFFER_SIZE=4096")
-  elif grep -Fqx 'CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y' "$sdkconfig"; then
-    echo "Production profile mismatch: unexpected La Marzocco TLS allocator" >&2
-    return 1
+    required+=("CONFIG_WS_BUFFER_SIZE=4096")
   fi
   for selector in "${required[@]}"; do
     if ! grep -Fqx "$selector" "$sdkconfig"; then

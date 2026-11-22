@@ -310,13 +310,13 @@ if (!sdkconfigDefaults.includes('CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768') |
 if (!idfHelpers.includes('sdkconfig.defaults.la_marzocco') ||
     !idfHelpers.includes('obbw_idf_config_fingerprint') ||
     !idfBuildScript.includes('obbw_idf_refresh_config') ||
-    !sdkconfigLaMarzocco.includes('# CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC is not set') ||
-    !sdkconfigLaMarzocco.includes('# CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not set') ||
-    !sdkconfigLaMarzocco.includes('CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y') ||
-    !sdkconfigLaMarzocco.includes('CONFIG_MBEDTLS_DYNAMIC_BUFFER=y') ||
+    !sdkconfigDefaults.includes('# CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC is not set') ||
+    !sdkconfigDefaults.includes('# CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not set') ||
+    !sdkconfigDefaults.includes('CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y') ||
+    !sdkconfigDefaults.includes('CONFIG_MBEDTLS_DYNAMIC_BUFFER=y') ||
     !sdkconfigLaMarzocco.includes('CONFIG_WS_BUFFER_SIZE=4096')) {
   throw new Error(
-      'Micra-only mbedTLS must use PSRAM and dynamic record buffers');
+      'Every build\'s mbedTLS must use PSRAM and dynamic record buffers');
 }
 if (sdkconfigDefaults.includes('CONFIG_FREERTOS_USE_TICKLESS_IDLE=y') ||
     !sdkconfigDefaults.includes('CONFIG_PM_ENABLE=y') ||

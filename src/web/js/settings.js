@@ -311,6 +311,7 @@ function machinePayload() {
     assumeIdleWhenScaleConnects: $("assumeIdleWhenScaleConnects")?.checked ?? true,
     shotReactTimeoutS: $("shotReactTimeoutS") ? R.number("shotReactTimeoutS") || 0 : undefined,
     beanconquerorEndpoint: $("beanconquerorEndpoint").value,
+    mahlkonigPushCadenceS: Number($("mahlkonigPushCadenceS").value) || 20,
     canTareStartTimer: $("canTareStartTimer").checked,
     bookooVolume: Number($("bookooVolume").value),
     bookooKeepAwakeWhileMachineOn: $("bookooKeepAwakeWhileMachineOn").checked,
@@ -700,6 +701,7 @@ function applySettingsStatus(s) {
   R.loadSettingsConfig(s);
   loadBullseyeConfig(s.config);
   applyLaMarzoccoStatus(s);
+  renderMahlkonig(s);
   // Keep-awake follows any machine integration that reports its power.
   const powerKnown = !!s.machinePowerKnown;
   $("bookooKeepAwakeWrap").classList.toggle("fieldOff", !powerKnown);
@@ -2142,6 +2144,328 @@ function beanconquerorChart(points) {
   if (points.length) svg.append(path("bcFlow", line(2, fMax)), path("bcWeight", line(1, wMax)));
   return svg;
 }
+// Settings → Mahlkönig (docs/settings/mahlkonig.md): the grinder's setup and
+// what reached it. The firmware runs the protocol; this words its state and
+// sends the person's choices.
+const GBS_MODELS = { e64ws: "E64 WS", e65w: "E65W", e65t: "E65T", e80w: "E80W", e80t: "E80T" };
+// The ages a frame carries tick on here, from when each last changed.
+const gbsAges = {};
+function gbsElapsed(key, value) {
+  const was = gbsAges[key];
+  if (!was || was.value !== value) gbsAges[key] = { value, at: Date.now() };
+  return Math.floor((Date.now() - gbsAges[key].at) / 1000);
+}
+const gbsAge = (key, value) => (value < 0 ? -1 : value + gbsElapsed(key, value));
+function gbsSpan(s) {
+  return s < 60
+    ? R.sub(__WEBUI_TEXT__("settings.gbs_seconds"), [s])
+    : s < 3600
+      ? R.sub(__WEBUI_TEXT__("settings.gbs_minutes"), [Math.floor(s / 60)])
+      : R.sub(__WEBUI_TEXT__("settings.gbs_hours"), [Math.floor(s / 3600)]);
+}
+// The E64 WS address follows Beanconqueror's rule (beanconquerorAddress): the
+// companion's while it answers the grinder, with the controller's as the way
+// back; otherwise the controller's, saying why. The grinder only uses port 80.
+async function gbsAddress(s) {
+  const here = await R.companionHere(),
+    controller = s.network?.staIp || location.hostname;
+  if (!here?.paired) return { addr: controller };
+  if (!s.companion?.gbs || here.gbs === undefined)
+    return { addr: controller, note: __WEBUI_TEXT__("settings.gbs_note_off") };
+  if (here.httpPort > 0 && here.httpPort !== 80)
+    return {
+      addr: controller,
+      note: R.sub(__WEBUI_TEXT__("settings.gbs_note_port"), [here.httpPort]),
+    };
+  return {
+    addr: here.ip || location.hostname,
+    alt: R.sub(__WEBUI_TEXT__("settings.gbs_cant_connect"), [controller]),
+    note: __WEBUI_TEXT__("settings.gbs_note_companion"),
+    companion: true,
+  };
+}
+// Change grinder shows the chooser at once; the model clears on the device.
+let gbsChoosing = false;
+function gbsPhase(s) {
+  const g = s.gbs || {},
+    model = s.config?.mahlkonigModel;
+  if (!GBS_MODELS[model] || gbsChoosing) return "choose";
+  const via = g.route === "companion";
+  if (model === "e64ws") {
+    if (g.pull === "armed" || g.pull === "brewing") return "armed";
+    const seen = gbsAge("seen", g.seenAgeS ?? -1);
+    if (via && g.companion === "seen") return "synced";
+    if (seen >= 0 && seen < 30) return "synced";
+    return seen < 0 && !(via && g.companion === "lost") ? "pull-setup" : "lost";
+  }
+  if (g.pairing === "applying" || g.pairing === "accepting") return "push-code";
+  if (g.pairing === "need_id") return "push-id";
+  if (!g.paired) return "push-setup";
+  const link = via ? g.companion : g.link;
+  return { unreach: "unreach", unpaired: "unpaired", identity: "identity" }[link] || "synced";
+}
+function gbsLegend(s, phase) {
+  const name = GBS_MODELS[s.config?.mahlkonigModel];
+  if (!name || phase === "choose") return __WEBUI_TEXT__("settings.gbs_hint_not_set");
+  const text = {
+    "pull-setup": __WEBUI_TEXT__("settings.gbs_hint_waiting"),
+    "push-setup": __WEBUI_TEXT__("settings.gbs_hint_not_paired"),
+    "push-code": __WEBUI_TEXT__("settings.gbs_hint_pairing"),
+    "push-id": __WEBUI_TEXT__("settings.gbs_hint_pairing"),
+    synced: __WEBUI_TEXT__("settings.gbs_hint_synced"),
+    armed: __WEBUI_TEXT__("settings.gbs_hint_armed"),
+    lost: __WEBUI_TEXT__("settings.gbs_hint_lost"),
+    unreach: __WEBUI_TEXT__("settings.gbs_hint_unreach"),
+    unpaired: __WEBUI_TEXT__("settings.gbs_hint_unpaired"),
+    identity: __WEBUI_TEXT__("settings.gbs_hint_identity"),
+  }[phase];
+  return R.sub(text, [name]);
+}
+function gbsDelivery(g) {
+  const last = g.last || {};
+  if (!last.id) return "";
+  return !last.success
+    ? __WEBUI_TEXT__("settings.gbs_cancelled")
+    : last.delivered
+      ? __WEBUI_TEXT__("settings.gbs_received")
+      : __WEBUI_TEXT__("settings.gbs_pending");
+}
+const gbsShow = (id, on) => ($(id).hidden = !on);
+const gbsText = (id, text) => $(id).textContent !== text && ($(id).textContent = text);
+async function renderMahlkonig(s = R.settingsStatus() || {}) {
+  const on = s.config?.integrationMahlkonig === true;
+  gbsShow("mahlkonigSettings", on);
+  gbsShow("coffeeAppsSettings", s.config?.integrationBeanconqueror !== false);
+  if (!on) return;
+  const g = s.gbs || {},
+    model = s.config?.mahlkonigModel,
+    phase = gbsPhase(s),
+    pull = model === "e64ws",
+    via = g.route === "companion";
+  gbsText("gbsLegendHint", gbsLegend(s, phase));
+  for (const radio of document.querySelectorAll("[name=gbsModel]")) {
+    radio.checked = radio.value === model && !gbsChoosing;
+    radio.disabled = !R.controlsMutable;
+  }
+  gbsShow("gbsChoose", phase === "choose");
+  gbsShow("gbsPullSetup", phase === "pull-setup");
+  gbsShow("gbsPushSetup", phase === "push-setup");
+  gbsShow("gbsPushCode", phase === "push-code");
+  gbsShow("gbsPushId", phase === "push-id");
+  const ready = ["synced", "armed", "lost", "unreach", "unpaired", "identity"].includes(phase);
+  gbsShow("gbsStatus", ready);
+  gbsShow("gbsSync", ready);
+  gbsShow("gbsPairFailed", phase === "push-setup" && g.pairing === "failed");
+  if (phase === "push-setup" && !$("gbsHost").value && g.host) $("gbsHost").value = g.host;
+  gbsText("gbsStepFound", R.sub(__WEBUI_TEXT__("settings.gbs_step_found"), [g.host || ""]));
+  const code = g.pairing === "accepting" && g.code ? String(g.code) : "";
+  if ($("gbsCode").dataset.code !== code) {
+    $("gbsCode").dataset.code = code;
+    $("gbsCode").replaceChildren(
+      ...[...(code || "…")].map((d) =>
+        Object.assign(document.createElement("span"), { textContent: d }),
+      ),
+    );
+  }
+  const a = pull ? await gbsAddress(s) : null;
+  if (pull && phase === "pull-setup") {
+    gbsText("gbsAddr", a.addr);
+    gbsText("gbsAddrAlt", a.alt || "");
+    gbsShow("gbsAddrAlt", !!a.alt);
+    gbsText("gbsAddrNote", a.note || "");
+    gbsShow("gbsAddrNote", !!a.note);
+  }
+  if (ready) {
+    const where = pull ? (via ? a.addr : s.network?.staIp || location.hostname) : g.host;
+    gbsText("gbsModelName", GBS_MODELS[model]);
+    gbsText(
+      "gbsWhereLabel",
+      pull
+        ? via
+          ? __WEBUI_TEXT__("settings.gbs_answered_by")
+          : __WEBUI_TEXT__("settings.gbs_address_on_grinder")
+        : __WEBUI_TEXT__("settings.gbs_grinder"),
+    );
+    gbsText(
+      "gbsWhere",
+      pull && via
+        ? a.companion
+          ? R.sub(__WEBUI_TEXT__("settings.gbs_companion_at"), [a.addr])
+          : __WEBUI_TEXT__("settings.gbs_companion")
+        : where || "",
+    );
+    const seen = gbsAge("seen", g.seenAgeS ?? -1),
+      ok = gbsAge("ok", g.okAgeS ?? -1);
+    const [pill, tone, age] = {
+      synced: [
+        __WEBUI_TEXT__("settings.gbs_connected"),
+        "on",
+        pull
+          ? seen >= 0 && R.sub(__WEBUI_TEXT__("settings.gbs_checked_in"), [gbsSpan(seen)])
+          : !via && ok >= 0 && R.sub(__WEBUI_TEXT__("settings.gbs_reached"), [gbsSpan(ok)]),
+      ],
+      armed: [__WEBUI_TEXT__("settings.gbs_connected"), "on", ""],
+      lost: [
+        seen < 0
+          ? __WEBUI_TEXT__("settings.gbs_never_seen")
+          : R.sub(__WEBUI_TEXT__("settings.gbs_not_seen"), [gbsSpan(seen)]),
+        "warn",
+        "",
+      ],
+      unreach: [__WEBUI_TEXT__("settings.gbs_unreachable"), "warn", ""],
+      unpaired: [__WEBUI_TEXT__("settings.gbs_pairing_removed"), "error", ""],
+      identity: [__WEBUI_TEXT__("settings.gbs_identity_changed"), "error", ""],
+    }[phase];
+    gbsText("gbsConnection", pill);
+    $("gbsConnection").dataset.tone = tone;
+    gbsText("gbsConnectionAge", age || "");
+    gbsShow("gbsCheckedRow", !pull);
+    const cadence = $("mahlkonigPushCadenceS").value;
+    gbsText(
+      "gbsCheckedBy",
+      via
+        ? __WEBUI_TEXT__("settings.gbs_checked_companion")
+        : R.sub(__WEBUI_TEXT__("settings.gbs_checked_controller"), [cadence]),
+    );
+    // D12: the controller's own cadence, for the four models it must ask;
+    // through the companion the choice is kept for when it checks itself.
+    gbsShow("gbsCadence", !pull);
+    gbsShow("gbsCadenceCompanion", via);
+    for (const radio of document.querySelectorAll("[name=gbsCadence]")) {
+      radio.checked = radio.value === cadence;
+      radio.disabled = !R.controlsMutable || via;
+    }
+    const note =
+      {
+        lost: R.sub(__WEBUI_TEXT__("settings.gbs_lost_note"), [where || ""]),
+        unreach: R.sub(__WEBUI_TEXT__("settings.gbs_unreach_note"), [g.host || ""]),
+        unpaired: __WEBUI_TEXT__("settings.gbs_unpaired_note"),
+        identity: __WEBUI_TEXT__("settings.gbs_identity_note"),
+      }[phase] ||
+      (!pull && !via ? R.sub(__WEBUI_TEXT__("settings.gbs_direct_note"), [cadence]) : "");
+    gbsText("gbsStatusNote", note);
+    gbsShow("gbsStatusNote", !!note);
+    $("gbsStatusNote").classList.toggle("isErr", phase === "unpaired" || phase === "identity");
+    gbsShow("gbsTrust", phase === "identity");
+    gbsShow("gbsRepair", phase === "unpaired");
+    gbsText(
+      "gbsForget",
+      pull || phase === "unpaired"
+        ? __WEBUI_TEXT__("settings.gbs_forget")
+        : __WEBUI_TEXT__("settings.gbs_unpair"),
+    );
+    // Shot sync: the wait, the last shot and its delivery, the Brew Time tip.
+    const wait = Math.max(0, (g.waitS ?? 0) - gbsElapsed("wait", g.waitS ?? 0));
+    gbsShow("gbsArmed", phase === "armed");
+    gbsText(
+      "gbsArmedText",
+      R.sub(__WEBUI_TEXT__("settings.gbs_armed"), [
+        Math.floor(wait / 60) + ":" + String(wait % 60).padStart(2, "0"),
+      ]),
+    );
+    const last = g.last || {},
+      lastAge = gbsAge("last", last.ageS ?? -1);
+    gbsText(
+      "gbsLastShot",
+      !last.id
+        ? __WEBUI_TEXT__("settings.gbs_last_none")
+        : last.success
+          ? R.sub(__WEBUI_TEXT__("settings.gbs_last_value"), [
+              (+last.timeS).toFixed(1),
+              (+last.g).toFixed(1),
+              gbsSpan(Math.max(0, lastAge)),
+            ])
+          : R.sub(__WEBUI_TEXT__("settings.gbs_last_cancelled"), [
+              (+last.timeS).toFixed(1),
+              gbsSpan(Math.max(0, lastAge)),
+            ]),
+    );
+    gbsShow("gbsDeliveryRow", !!last.id);
+    gbsText("gbsDelivery", gbsDelivery(g));
+    $("gbsDelivery").dataset.tone = last.success && last.delivered ? "on" : "warn";
+    const p = R.presetState.items.find((x) => x.id === R.presetState.activeId);
+    const t1 = +p?.fastBeforeS,
+      t2 = +p?.slowAfterS;
+    gbsText(
+      "gbsBrewTime",
+      p && t2 > t1
+        ? R.sub(__WEBUI_TEXT__("settings.gbs_brew_time"), [
+            Math.round((t1 + t2) / 2),
+            p.name,
+            +t1,
+            +t2,
+          ])
+        : "",
+    );
+  }
+}
+async function gbsAction(body, button) {
+  button?.classList.add("busy");
+  try {
+    await R.api("/api/v1/mahlkonig", { method: "POST", body: R.body(body) });
+    return true;
+  } catch (e) {
+    R.message(
+      R.formatCommandError(__WEBUI_TEXT__("runtime.could_not_save_shared_settings"), e),
+      "error",
+    );
+    return false;
+  } finally {
+    button?.classList.remove("busy");
+  }
+}
+function initMahlkonig() {
+  const fs = $("mahlkonigSettings");
+  fs.addEventListener("change", async ({ target }) => {
+    if (target.name !== "gbsModel" || !R.controlsMutable) return;
+    gbsChoosing = false;
+    await saveMachineConfig({ mahlkonigModel: target.value });
+    renderMahlkonig();
+  });
+  // A cadence writes the hidden field, which saves with the config section.
+  $("gbsCadenceChoices").onchange = ({ target }) => {
+    if (target.name !== "gbsCadence" || !R.controlsMutable) return;
+    $("mahlkonigPushCadenceS").value = target.value;
+    $("mahlkonigPushCadenceS").dispatchEvent(new Event("change"));
+    renderMahlkonig();
+  };
+  $("gbsPushSetup").onsubmit = async (event) => {
+    event.preventDefault();
+    const host = $("gbsHost").value.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9.-]{0,46}$/.test(host))
+      return R.showFieldError("gbsHost", __WEBUI_TEXT__("settings.gbs_address_wrong"));
+    R.clearFieldErrors();
+    await gbsAction({ action: "pair", host }, event.submitter);
+  };
+  $("gbsPushId").onsubmit = async (event) => {
+    event.preventDefault();
+    const id = $("gbsPairingId").value.trim();
+    if (!/^[1-9][0-9]{0,9}$/.test(id) || +id > 4294967295)
+      return R.showFieldError("gbsPairingId", __WEBUI_TEXT__("settings.gbs_pairing_id_wrong"));
+    R.clearFieldErrors();
+    await gbsAction({ action: "pairing_id", pairingId: +id }, event.submitter);
+  };
+  fs.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-gbs]");
+    if (!button || !R.controlsMutable) return;
+    const s = R.settingsStatus() || {},
+      act = button.dataset.gbs;
+    if (act === "change") {
+      // Forgetting the grinder ends its pairing; the model goes with it.
+      if (s.gbs?.paired) await gbsAction({ action: "forget" }, button);
+      if (GBS_MODELS[s.config?.mahlkonigModel]) gbsChoosing = true;
+      await saveMachineConfig({ mahlkonigModel: "none" });
+      gbsChoosing = false;
+    } else if (act === "repair" && s.gbs?.host) {
+      await gbsAction({ action: "pair", host: s.gbs.host }, button);
+    } else if (act !== "repair") {
+      await gbsAction({ action: act }, button);
+    }
+    renderMahlkonig();
+  });
+  // Ages and the wait count on between frames while the section is shown.
+  setInterval(() => !$("mahlkonigSettings").hidden && renderMahlkonig(), 1000);
+}
 // Each group row summarizes its current values and follows the form while it
 // is edited; keys are the groups' data-g names.
 const on = (id) => !!$(id)?.checked,
@@ -2150,6 +2474,11 @@ const on = (id) => !!$(id)?.checked,
   OFF = __WEBUI_TEXT__("settings.disabled"),
   ON = __WEBUI_TEXT__("runtime.on_2");
 const GROUP_SUMMARIES = {
+  mahlkonigGrinder: () => {
+    const s = R.settingsStatus() || {};
+    return gbsLegend(s, gbsPhase(s));
+  },
+  mahlkonigSync: () => gbsDelivery(R.settingsStatus()?.gbs || {}),
   beanconqueror: () =>
     ({
       gaggiuino: __WEBUI_TEXT__("settings.beanconqueror_gaggiuino"),
@@ -2435,7 +2764,7 @@ export function init() {
     .forEach((el) => {
       if (
         ["presetRenameInput", "dripSetG", "alphaSet"].includes(el.id) ||
-        el.closest("#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app]")
+        el.closest("#laMarzoccoSignIn,#laMarzoccoChoose,[data-g=app],.gbsLocal")
       )
         return;
       // Typing waits for a pause; leaving the field (a trusted change) saves
@@ -2519,6 +2848,7 @@ export function init() {
     };
   }
   syncHeroTintAvailability();
+  initMahlkonig();
   // A choice writes the hidden field, which saves with the config section.
   $("beanconquerorChoices").onchange = ({ target }) => {
     if (target.name !== "beanconquerorChoice" || !R.controlsMutable) return;

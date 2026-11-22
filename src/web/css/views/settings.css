@@ -771,6 +771,49 @@ summary {
   font-size: 0.75rem;
 }
 
+/* The address typed on an E64 WS: large and readable at arm's length, the
+   number alone (Edit Host wants an IP, not a URL). */
+.gbsAddr {
+  display: block;
+  margin: 0.55rem 0 0.2rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--ln);
+  border-radius: calc(var(--r) * 0.75);
+  background: var(--in);
+  color: var(--fg);
+  font:
+    700 1.45rem/1.1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+/* The pairing code an E65/E80 also shows, to compare at a glance. */
+.gbsCode {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.8rem 0 0.2rem;
+}
+
+.gbsCode span {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 3.2rem;
+  border: 1px solid var(--ln);
+  border-radius: calc(var(--r) * 0.75);
+  background: var(--in);
+  color: var(--fg);
+  font:
+    700 1.5rem/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
 .bcPreview {
   margin: 0.9rem 0 0;
   padding: 0.8rem 0.85rem 0.7rem;

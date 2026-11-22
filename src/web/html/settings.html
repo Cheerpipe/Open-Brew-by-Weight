@@ -23,6 +23,12 @@
       <path d="M15.6 17.2c1.8-2.7-1.6-4.7 0-7.4s-1.7-4.7 0-7.4" />
     </g>
   </symbol>
+  <symbol id="g-mahlkonigGrinder" viewBox="0 0 24 24">
+    <path d="M7 3h10l-2 6H9L7 3Zm2 6h6v3H9zm-3 3h12v9H6zm4 4h4" />
+  </symbol>
+  <symbol id="g-mahlkonigSync" viewBox="0 0 24 24">
+    <path d="M4 12a8 8 0 0 1 13.7-5.6L20 9m0-5v5h-5M12 8v4l3 2" />
+  </symbol>
   <symbol id="g-drip" viewBox="0 0 24 24">
     <path
       d="M12 3c3 4 6 7.2 6 10.5a6 6 0 0 1-12 0C6 10.2 9 7 12 3Zm-2.5 11a2.5 2.5 0 0 0 2.5 2.5"
@@ -779,6 +785,246 @@
         >
       </details>
     </div>
+  </fieldset>
+  <fieldset id="mahlkonigSettings" hidden>
+    <legend>
+      {{webui:settings.mahlkonig}}
+      <span class="presetCardBadge gbsBadge">{{webui:settings.gbs_untested}}</span>
+      <span id="gbsLegendHint" class="hint"></span>
+    </legend>
+    <p class="scopeNote">{{webui:settings.gbs_scope_note}}</p>
+    <details data-g="mahlkonigGrinder" class="cfgGroup">
+      <summary>{{webui:settings.gbs_grinder}}</summary>
+      <div id="gbsChoose" class="gbsLocal" hidden>
+        <small class="fieldHint">{{webui:settings.gbs_choose}}</small>
+        <div class="setupChoices" role="radiogroup" aria-label="{{webui:settings.gbs_grinder}}">
+          <label class="setupChoice"
+            ><input type="radio" name="gbsModel" value="e64ws" /><span
+              ><b>E64 WS</b> <span class="presetCardBadge">{{webui:settings.gbs_badge_setup}}</span
+              ><small>{{webui:settings.gbs_e64_hint}}</small></span
+            ></label
+          ><label class="setupChoice"
+            ><input type="radio" name="gbsModel" value="e65w" /><span
+              ><b>E65W</b> <span class="presetCardBadge">{{webui:settings.gbs_badge_pairing}}</span
+              ><small>{{webui:settings.gbs_pairs_hint}}</small></span
+            ></label
+          ><label class="setupChoice"
+            ><input type="radio" name="gbsModel" value="e65t" /><span
+              ><b>E65T</b> <span class="presetCardBadge">{{webui:settings.gbs_badge_pairing}}</span
+              ><small>{{webui:settings.gbs_pairs_hint}}</small></span
+            ></label
+          ><label class="setupChoice"
+            ><input type="radio" name="gbsModel" value="e80w" /><span
+              ><b>E80W</b> <span class="presetCardBadge">{{webui:settings.gbs_badge_pairing}}</span
+              ><small>{{webui:settings.gbs_pairs_hint}}</small></span
+            ></label
+          ><label class="setupChoice"
+            ><input type="radio" name="gbsModel" value="e80t" /><span
+              ><b>E80T</b> <span class="presetCardBadge">{{webui:settings.gbs_badge_pairing}}</span
+              ><small>{{webui:settings.gbs_pairs_hint}}</small></span
+            ></label
+          >
+        </div>
+      </div>
+      <div id="gbsPullSetup" hidden>
+        <div class="bcHelp">
+          <b>{{webui:settings.gbs_connect_title}}</b>
+          <ol>
+            <li>{{webui:settings.gbs_connect_step_xenia}}</li>
+            <li>{{webui:settings.gbs_connect_step_host}}</li>
+          </ol>
+          <code id="gbsAddr" class="gbsAddr"></code>
+          <small id="gbsAddrAlt" class="bcAlt"></small>
+          <small class="bcAlt">{{webui:settings.gbs_reserve}}</small>
+        </div>
+        <p id="gbsAddrNote" class="readyMsg" role="status" hidden></p>
+        <ol class="laMarzoccoStepList">
+          <li class="on">{{webui:settings.gbs_waiting_checkin}}</li>
+        </ol>
+        <div class="btnBar">
+          <button class="btnGlyph mutable" type="button" data-gbs="change">
+            {{webui:settings.gbs_change_grinder}}
+          </button>
+        </div>
+      </div>
+      <form id="gbsPushSetup" class="enterForm gbsLocal" novalidate hidden>
+        <div class="bcHelp">
+          <b>{{webui:settings.gbs_pair_title}}</b>
+          <ol>
+            <li>{{webui:settings.gbs_pair_step_wifi}}</li>
+            <li>{{webui:settings.gbs_pair_step_head}}</li>
+            <li>{{webui:settings.gbs_pair_step_start}}</li>
+          </ol>
+        </div>
+        <p id="gbsPairFailed" class="readyMsg isErr" role="status" hidden>
+          {{webui:settings.gbs_pair_failed}}
+        </p>
+        <label
+          >{{webui:settings.gbs_address}}<input
+            id="gbsHost"
+            type="text"
+            maxlength="47"
+            spellcheck="false"
+            autocomplete="off"
+            autocapitalize="off"
+            placeholder="192.168.1.87"
+          /><small class="fieldHint">{{webui:settings.gbs_address_hint}}</small></label
+        >
+        <div class="btnBar">
+          <button class="btnGlyph mutable btnInvert" type="submit">
+            <span class="g" aria-hidden="true">↻</span
+            ><span class="t">{{webui:settings.gbs_pair}}</span></button
+          ><button class="btnGlyph mutable" type="button" data-gbs="change">
+            {{webui:settings.gbs_change_grinder}}
+          </button>
+        </div>
+      </form>
+      <div id="gbsPushCode" hidden>
+        <ol class="laMarzoccoStepList">
+          <li id="gbsStepFound" class="ok"></li>
+          <li class="on">{{webui:settings.gbs_step_accept}}</li>
+          <li>{{webui:settings.gbs_step_paired}}</li>
+        </ol>
+        <div class="bcHelp">
+          <b>{{webui:settings.gbs_step_accept}}</b>
+          <span class="bcAlt">{{webui:settings.gbs_accept_text}}</span>
+          <p id="gbsCode" class="gbsCode"></p>
+        </div>
+        <small class="fieldHint">{{webui:settings.gbs_restart_note}}</small>
+        <div class="btnBar">
+          <button class="btnGlyph mutable" type="button" data-gbs="cancel">
+            {{webui:settings.gbs_cancel_pairing}}
+          </button>
+        </div>
+      </div>
+      <form id="gbsPushId" class="enterForm gbsLocal" novalidate hidden>
+        <p class="readyMsg" role="status">{{webui:settings.gbs_already_paired}}</p>
+        <label
+          >{{webui:settings.gbs_pairing_id}}<input
+            id="gbsPairingId"
+            type="text"
+            inputmode="numeric"
+            maxlength="10"
+            autocomplete="off"
+          /><small class="fieldHint">{{webui:settings.gbs_pairing_id_hint}}</small></label
+        >
+        <div class="btnBar">
+          <button class="btnGlyph mutable btnInvert" type="submit">
+            <span class="g" aria-hidden="true">✓</span
+            ><span class="t">{{webui:settings.gbs_use_pairing}}</span></button
+          ><button class="btnGlyph mutable" type="button" data-gbs="cancel">
+            {{webui:settings.cancel}}
+          </button>
+        </div>
+      </form>
+      <div id="gbsStatus" hidden>
+        <div class="metric">
+          <strong>{{webui:settings.gbs_model}}</strong>
+          <div>
+            <span id="gbsModelName"></span>
+            <button class="inlineAction mutable" type="button" data-gbs="change">
+              ({{webui:settings.change}})
+            </button>
+          </div>
+        </div>
+        <div class="metric">
+          <strong id="gbsWhereLabel"></strong>
+          <div><code id="gbsWhere"></code></div>
+        </div>
+        <div class="metric">
+          <strong>{{webui:settings.gbs_connection}}</strong>
+          <div>
+            <span id="gbsConnection" class="laMarzoccoPill"></span>
+            <small id="gbsConnectionAge" class="fieldHint"></small>
+          </div>
+        </div>
+        <div id="gbsCheckedRow" class="metric">
+          <strong>{{webui:settings.gbs_checked_by}}</strong>
+          <div><span id="gbsCheckedBy"></span></div>
+        </div>
+        <div id="gbsCadence" hidden>
+          <small class="fieldHint"
+            ><b>{{webui:settings.gbs_cadence}}</b> {{webui:settings.gbs_cadence_hint}}</small
+          >
+          <p id="gbsCadenceCompanion" class="readyMsg isOk" role="status" hidden>
+            {{webui:settings.gbs_cadence_companion}}
+          </p>
+          <div
+            id="gbsCadenceChoices"
+            class="setupChoices gbsLocal"
+            role="radiogroup"
+            aria-label="{{webui:settings.gbs_cadence}}"
+          >
+            <label class="setupChoice"
+              ><input type="radio" name="gbsCadence" value="15" /><span
+                ><b>{{webui:settings.gbs_cadence_15}}</b
+                ><small>{{webui:settings.gbs_cadence_15_hint}}</small></span
+              ></label
+            ><label class="setupChoice"
+              ><input type="radio" name="gbsCadence" value="20" /><span
+                ><b>{{webui:settings.gbs_cadence_20}}</b>
+                <span class="presetCardBadge">{{webui:settings.gbs_cadence_20_badge}}</span
+                ><small>{{webui:settings.gbs_cadence_20_hint}}</small></span
+              ></label
+            ><label class="setupChoice"
+              ><input type="radio" name="gbsCadence" value="25" /><span
+                ><b>{{webui:settings.gbs_cadence_25}}</b
+                ><small>{{webui:settings.gbs_cadence_25_hint}}</small></span
+              ></label
+            >
+          </div>
+          <select id="mahlkonigPushCadenceS" class="hidden" aria-hidden="true" tabindex="-1">
+            <option value="15"></option>
+            <option value="20" selected></option>
+            <option value="25"></option>
+          </select>
+          <p class="readyMsg" role="note">{{webui:settings.gbs_cadence_tip}}</p>
+        </div>
+        <p id="gbsStatusNote" class="readyMsg" role="status" hidden></p>
+        <div class="btnBar">
+          <button
+            id="gbsTrust"
+            class="btnGlyph mutable btnInvert"
+            type="button"
+            data-gbs="trust"
+            hidden
+          >
+            <span class="g" aria-hidden="true">✓</span
+            ><span class="t">{{webui:settings.gbs_trust}}</span></button
+          ><button
+            id="gbsRepair"
+            class="btnGlyph mutable btnInvert"
+            type="button"
+            data-gbs="repair"
+            hidden
+          >
+            <span class="g" aria-hidden="true">↻</span
+            ><span class="t">{{webui:settings.gbs_pair_again}}</span></button
+          ><button id="gbsForget" class="btnGlyph mutable" type="button" data-gbs="change"></button>
+        </div>
+      </div>
+    </details>
+    <details id="gbsSync" data-g="mahlkonigSync" class="cfgGroup" hidden>
+      <summary>{{webui:settings.gbs_shot_sync}}</summary>
+      <div id="gbsArmed" hidden>
+        <p id="gbsArmedText" class="readyMsg isOk" role="status"></p>
+        <div class="btnBar">
+          <button class="btnGlyph mutable" type="button" data-gbs="release">
+            {{webui:settings.gbs_release}}
+          </button>
+        </div>
+      </div>
+      <div class="metric">
+        <strong>{{webui:settings.gbs_last_shot}}</strong>
+        <div><span id="gbsLastShot"></span></div>
+      </div>
+      <div id="gbsDeliveryRow" class="metric">
+        <strong>{{webui:settings.gbs_delivery}}</strong>
+        <div><span id="gbsDelivery" class="laMarzoccoPill"></span></div>
+      </div>
+      <small id="gbsBrewTime" class="fieldHint"></small>
+      <small class="fieldHint">{{webui:settings.gbs_rules}}</small>
+    </details>
   </fieldset>
   <fieldset id="coffeeAppsSettings">
     <legend>{{webui:settings.coffee_apps}}</legend>

@@ -28,6 +28,7 @@
 #include "OpenBrewByWeightScaleProfiler.h"
 #include "OpenBrewByWeightWebhook.h"
 #include "network/OpenBrewByWeightCompanionLink.h"
+#include "OpenBrewByWeightMahlkonig.h"
 
 #include <atomic>
 
@@ -200,8 +201,8 @@ struct NetworkWorkBuf;
 // companion's (uiStreamFreeSlot).
 constexpr size_t UI_STREAM_SESSIONS = 3;
 struct UiStreamFingerprints {
-  static constexpr size_t kHomeFields = 144, kDiagFields = 224, kCardFields = 32,
-                          kSettingsFields = 80;
+  static constexpr size_t kHomeFields = 148, kDiagFields = 224, kCardFields = 32,
+                          kSettingsFields = 100;
   // The shot card's ten curve scalars (forEachShotCurveScalar) follow its
   // card fields in cardHashes.
   static constexpr size_t kCurveFields = 10;
@@ -1153,6 +1154,21 @@ class OpenBrewByWeightNetwork {
   bool companionSyncHeld_ = false;  // network task: the sync hold the route last heard
   // This boot's id, captured once for the link's log frames (network task).
   uint32_t companionLogBootId_ = 0;
+  // Mahlkönig Grind-by-Sync (network/OpenBrewByWeightMahlkonig.inc and
+  // OpenBrewByWeightMahlkonigHttp.inc): the E64 WS answers, the Settings
+  // actions, the network task's service and direct push client, and what
+  // the streams, the companion link and the debug export read of it.
+  static esp_err_t mahlkonigPullHandler(httpd_req_t *request);
+  static esp_err_t mahlkonigHandler(httpd_req_t *request);
+  void serviceMahlkonig(uint32_t now);
+  void mahlkonigShots(uint32_t now);
+  void mahlkonigClientStep(uint32_t now, bool hold, bool direct);
+  void mahlkonigFinishRequest(uint32_t now, esp_err_t performed);
+  void mahlkonigLogTransitions(uint32_t now);
+  size_t mahlkonigCompanionConfig(char *out, size_t capacity) const;
+  void mahlkonigCompanionFrame(bool own, GbsCompanionState state, uint32_t delivered);
+  void mahlkonigView(GbsView &out) const;
+  bool mahlkonigDebugExport(httpd_req_t *request, char *buf, size_t cap) const;
   bool diagnosticPageEnabled();
   bool webUiOverrideAllowed(httpd_req_t *request);
   uint32_t webUiOverrideRemainingMs(httpd_req_t *request);

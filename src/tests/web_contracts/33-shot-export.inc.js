@@ -17,7 +17,7 @@
   // retired files are gone.
   assert.deepEqual(fs.readdirSync(schemaDir).sort(), ['README.md', 'beanconqueror-v1.vectors.json',
     'companion-link-v1.vectors.json',
-    'companion-records-v1.vectors.json',
+    'companion-records-v1.vectors.json', 'mahlkonig-gbs-v1.vectors.json',
     'openbrewbyweight-shot-export-v1.example.json', 'openbrewbyweight-shot-export-v1.schema.json',
     'stats-header-v1.vectors.json']);
   assert.ok(example.shots.some((x) => x.trace), 'The example shows a trace');

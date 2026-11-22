@@ -70,5 +70,33 @@
       "answerPlain": "{\"error\":\"AUTH_REQUIRED\"}",
       "answerSealed": "e/4gEdbOWtG23pBEoeEwGga94s3JmiQwXQ0XMnAg6UmKRR8CAQSjvcE="
     }
+  },
+  "gbs": {
+    "description": "Mahlkönig Grind-by-Sync on the link (docs/COMPANION_LINK.md): cfg.gbs as the controller sends it (empty: no member) and the companion's gbs status values (state: the controller's enum, 0 unknown).",
+    "cfg": [
+      {"model": "e64ws", "host": "", "brewDeviceId": "", "pairingId": 0, "paired": false, "pin": "", "gbs": "{\"m\":\"e64ws\"}"},
+      {"model": "e65w", "host": "192.168.1.87", "brewDeviceId": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b", "pairingId": 4821, "paired": true, "pin": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+       "gbs": "{\"m\":\"e65w\",\"h\":\"192.168.1.87\",\"d\":\"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\",\"p\":4821,\"fp\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\"}"},
+      {"model": "e80t", "host": "grinder.local", "brewDeviceId": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b", "pairingId": 7, "paired": true, "pin": "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100",
+       "gbs": "{\"m\":\"e80t\",\"h\":\"grinder.local\",\"d\":\"3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b\",\"p\":7,\"fp\":\"ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100\"}"},
+      {"model": "e65t", "host": "192.168.1.87", "brewDeviceId": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b", "pairingId": 4821, "paired": true, "pin": "", "gbs": ""},
+      {"model": "e80w", "host": "192.168.1.87", "brewDeviceId": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b", "pairingId": 0, "paired": false, "pin": "", "gbs": ""},
+      {"model": "e65w", "host": "a b", "brewDeviceId": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b", "pairingId": 4821, "paired": true, "pin": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", "gbs": ""},
+      {"model": "none", "host": "", "brewDeviceId": "", "pairingId": 0, "paired": false, "pin": "", "gbs": ""}
+    ],
+    "frames": [
+      "{\"t\":\"gbs\",\"own\":true,\"st\":\"ok\",\"ok\":1003}",
+      "{\"t\":\"gbs\",\"own\":true,\"st\":\"seen\",\"ok\":0}",
+      "{\"t\":\"gbs\",\"own\":false,\"st\":\"identity\",\"ok\":0}"
+    ],
+    "status": [
+      {"st": "ok", "state": 1},
+      {"st": "unreach", "state": 2},
+      {"st": "unpaired", "state": 3},
+      {"st": "identity", "state": 4},
+      {"st": "seen", "state": 5},
+      {"st": "lost", "state": 6},
+      {"st": "paused", "state": 0}
+    ]
   }
 }

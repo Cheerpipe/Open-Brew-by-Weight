@@ -12,6 +12,7 @@ const REVERT_BUTTONS = {
   savePowerButton: "revertPowerButton",
   saveFrontendButton: "revertFrontendButton",
   saveMachineControlButton: "revertMachineControlButton",
+  saveIntegrationsButton: "revertIntegrationsButton",
   saveCompanionButton: "revertCompanionButton",
 };
 function setSaveDirty(id, hintId, dirty) {
@@ -32,6 +33,7 @@ function setSaveDirty(id, hintId, dirty) {
 // refused, and the form shows the saved values again.
 const formRevisions = {};
 const POWER_KEYS = ["performanceBoostEnabled", "idlePowerSavingEnabled"];
+const INTEGRATION_KEYS = ["integrationBeanconqueror", "integrationMahlkonig"];
 // With no feature needing the link nothing shows a companion is alive: the relay
 // session outlives one that went away, so Admin says when it last worked.
 const companionRelayOnly = (c) => c.relay === "ready" && !c.log && !c.archive && !c.lm;
@@ -706,7 +708,10 @@ function applyCompanionStatus(c) {
     $("companionCode").value = "";
     if (__LA_MARZOCCO__) $("companionApproveLm").checked = true;
     $("companionApproveLog").checked = true;
-    $("companionApproveArchive").checked = $("companionApproveBc").checked = true;
+    $("companionApproveArchive").checked =
+      $("companionApproveBc").checked =
+      $("companionApproveGbs").checked =
+        true;
   }
   // Beanconqueror is served from the archive: it needs the archive on.
   $("companionApproveBc").disabled = !$("companionApproveArchive").checked;
@@ -757,6 +762,7 @@ function applyCompanionStatus(c) {
     $("companionLog").checked = !!c.log;
     $("companionArchive").checked = !!c.archive;
     $("companionBc").checked = c.bc !== false;
+    $("companionGbs").checked = c.gbs !== false;
     companionBcNeedsArchive();
     R.uiState.companionBaseline = R.snapshotControls(companionSwitches());
   }
@@ -787,8 +793,9 @@ function companionCopy(here) {
   ]);
 }
 const companionSwitches = () => document.querySelectorAll("#companionPaired input");
-// Beanconqueror through the companion is served from its archive.
-const companionBcNeedsArchive = () => ($("companionBc").disabled = !$("companionArchive").checked);
+// Beanconqueror and the Mahlkönig grinder through the companion work from its archive.
+const companionBcNeedsArchive = () =>
+  ($("companionBc").disabled = $("companionGbs").disabled = !$("companionArchive").checked);
 async function saveCompanionSettings() {
   if (!R.uiState.companionDirty) return;
   const ui = $("companionUi").checked;
@@ -809,6 +816,7 @@ async function saveCompanionSettings() {
         log: $("companionLog").checked,
         archive: $("companionArchive").checked,
         bc: $("companionBc").checked,
+        gbs: $("companionGbs").checked,
         ...(__LA_MARZOCCO__ && { lm: $("companionLm").checked }),
       },
       __WEBUI_TEXT__("admin.setting_saved"),
@@ -848,6 +856,7 @@ function initCompanion() {
           log: $("companionApproveLog").checked,
           archive: $("companionApproveArchive").checked,
           bc: $("companionApproveBc").checked && $("companionApproveArchive").checked,
+          gbs: $("companionApproveGbs").checked && $("companionApproveArchive").checked,
           ...(__LA_MARZOCCO__ && { lm: $("companionApproveLm").checked }),
         }),
       });
@@ -1174,16 +1183,23 @@ function applyAdminStatus(s) {
     );
   // The switches take their saved values before the baselines are taken, so
   // flipping one and back before the next poll reads as clean.
-  for (const id of POWER_KEYS.concat("showDiagnosticPage", "machinePowerControlEnabled")) {
+  for (const id of POWER_KEYS.concat(
+    "showDiagnosticPage",
+    "machinePowerControlEnabled",
+    ...INTEGRATION_KEYS,
+  )) {
     const el = $(id),
       v = s.config && s.config[id];
     if (
       el &&
       typeof v === "boolean" &&
       !R.uiState[
-        { showDiagnosticPage: "frontendDirty", machinePowerControlEnabled: "machineControlDirty" }[
-          id
-        ] || "powerDirty"
+        {
+          showDiagnosticPage: "frontendDirty",
+          machinePowerControlEnabled: "machineControlDirty",
+          integrationBeanconqueror: "integrationsDirty",
+          integrationMahlkonig: "integrationsDirty",
+        }[id] || "powerDirty"
       ]
     )
       el.checked = v;
@@ -1204,6 +1220,10 @@ function applyAdminStatus(s) {
   if (!R.uiState.machineControlDirty)
     R.uiState.machineControlBaseline = R.snapshotControls(
       document.querySelectorAll("#machineControlPanel input"),
+    );
+  if (!R.uiState.integrationsDirty)
+    R.uiState.integrationsBaseline = R.snapshotControls(
+      document.querySelectorAll("#integrationsPanel input"),
     );
   $("restartButton").disabled = !R.controlsMutable;
   applyOtaStatus(s.ota);
@@ -1814,6 +1834,7 @@ export function applyStatus(s) {
       ? __WEBUI_TEXT__("admin.hidden_notes_restored")
       : __WEBUI_TEXT__("admin.hidden_notes_none");
   const compat = !!s.compatibilityMode;
+  $("integrationsPanel").classList.toggle("hidden", compat);
   ["blePanel", "dateTimePanel", "webhookPanel", "companionPanel", "machineControlPanel"].forEach(
     (id) => {
       const el = $(id);
@@ -2035,6 +2056,25 @@ async function saveMachineControlSettings() {
     b.classList.remove("busy");
   }
 }
+// Admin → Integrations: what Settings shows and the controller serves. One
+// Save writes each switch that changed.
+async function saveIntegrationsSettings() {
+  if (!R.uiState.integrationsDirty) return;
+  const b = $("saveIntegrationsButton");
+  b.classList.add("busy");
+  try {
+    for (const key of INTEGRATION_KEYS)
+      if (controlChanged(key, R.uiState.integrationsBaseline))
+        await saveDurableConfigKey(key, __WEBUI_TEXT__("admin.integrations_setting"));
+    sectionDirty("integrations", false);
+    return true;
+  } catch (e) {
+    R.message(e.message, "error");
+    return false;
+  } finally {
+    b.classList.remove("busy");
+  }
+}
 // Scheduled restart: two 24-hour fields stored as one minute of the day.
 const restartMinute = () =>
   Number($("scheduledRestartHour").value) * 60 + Number($("scheduledRestartMinute").value);
@@ -2132,6 +2172,13 @@ const ADMIN_SUMMARIES = {
   clock: () => ($("timezoneId").value || R.uiState.savedTimezoneId || "").replaceAll("_", " "),
   frontend: () => onOff("showDiagnosticPage") + " · " + ($("heroCardMode")?.value ?? ""),
   machine: () => onOff("machinePowerControlEnabled"),
+  integrations: () =>
+    [
+      $("integrationBeanconqueror").checked && __WEBUI_TEXT__("admin.integration_bc"),
+      $("integrationMahlkonig").checked && __WEBUI_TEXT__("admin.integration_gbs"),
+    ]
+      .filter(Boolean)
+      .join(" · ") || __WEBUI_TEXT__("runtime.off_2"),
   schedule: () =>
     $("scheduledRestartEnabled").checked
       ? restartTime(restartMinute())
@@ -2204,6 +2251,7 @@ export function init() {
   };
   for (const name of ["ble", "power", "frontend", "machineControl", "scheduledRestart"])
     sectionChanged("#" + name + "Panel", () => sectionDirty(name, true));
+  sectionChanged("#integrationsPanel", () => sectionDirty("integrations", true));
   // Two-digit hours and minutes once a value settles (stepper keys or blur).
   for (const id of ["scheduledRestartHour", "scheduledRestartMinute"])
     $(id).addEventListener("change", (e) => {
@@ -2217,6 +2265,8 @@ export function init() {
   $("savePowerButton").onclick = savePowerSettings;
   $("revertPowerButton").onclick = () => revertSection("power");
   $("saveFrontendButton").onclick = saveFrontendSettings;
+  $("saveIntegrationsButton").onclick = saveIntegrationsSettings;
+  $("revertIntegrationsButton").onclick = () => revertSection("integrations");
   $("revertFrontendButton").onclick = () => revertSection("frontend");
   if (__LA_MARZOCCO__) {
     $("saveMachineControlButton").onclick = saveMachineControlSettings;

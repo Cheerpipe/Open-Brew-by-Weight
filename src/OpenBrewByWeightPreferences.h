@@ -36,6 +36,7 @@ enum class NvsSubsystem : uint8_t {
   WEB_ACCESS,
   COMPANION,
   CARD_DISMISSALS,
+  MAHLKONIG,
 };
 
 enum class NvsOperation : uint8_t {
@@ -82,6 +83,7 @@ inline const char *nvsSubsystemName(NvsSubsystem subsystem) {
     case NvsSubsystem::WEB_ACCESS: return "webAccess";
     case NvsSubsystem::COMPANION: return "companion";
     case NvsSubsystem::CARD_DISMISSALS: return "cardDismissals";
+    case NvsSubsystem::MAHLKONIG: return "mahlkonig";
     default: return "unknown";
   }
 }

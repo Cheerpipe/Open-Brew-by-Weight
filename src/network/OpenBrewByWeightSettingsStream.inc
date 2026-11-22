@@ -49,6 +49,20 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   const bool companionBeanconqueror =
       companion.paired && companion.archiveSwitch && companion.bcSwitch;
   gate = gateOver(gate, &companionBeanconqueror, sizeof(companionBeanconqueror));
+  // Settings → Mahlkönig. The gate leaves the ages out: they tick, and go
+  // with the next change (the page counts on from them).
+  GbsView gbs;
+  mahlkonigView(gbs);
+  const uint32_t gbsNow = millis();
+  const bool gbsSeen = gbs.seenAtMs != 0 && ticksSince(gbsNow, gbs.seenAtMs) < static_cast<int32_t>(GBS_SEEN_MS);
+  const bool companionGbs = companion.paired && companion.archiveSwitch && companion.gbsSwitch;
+  const uint8_t gbsState[] = {gbs.enabled, gbs.model, gbs.companionRoute, gbs.paired,
+                              static_cast<uint8_t>(gbs.pull), static_cast<uint8_t>(gbs.phase),
+                              static_cast<uint8_t>(gbs.link), static_cast<uint8_t>(gbs.companion),
+                              gbs.lastSuccess, gbs.lastDelivered, gbs.adjusts, gbsSeen, companionGbs};
+  const uint32_t gbsValues[] = {gbs.pairingCode, gbs.lastId, gbs.armedAtMs};
+  gate = gateOver(gate, gbsState, sizeof(gbsState));
+  gate = gateOver(gate, gbsValues, sizeof(gbsValues));
   // Whether any machine integration can report a confirmed power state.
   const bool machinePowerKnown = machineIntegrationReportsPower();
   gate = gateOver(gate, &machinePowerKnown, sizeof(machinePowerKnown));
@@ -91,6 +105,30 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("config.beanconquerorEndpoint", "\"%s\"",
                beanconquerorEndpointId(config.beanconquerorEndpoint));
   fields.field("companion.beanconqueror", companionBeanconqueror);
+  fields.field("config.mahlkonigModel", "\"%s\"", gbsModelId(config.mahlkonigModel));
+  fields.field("config.mahlkonigPushCadenceS", static_cast<unsigned long>(gbsCadenceS(config.mahlkonigPushCadenceS)));
+  {
+    char host[GBS_HOST_CAPACITY * 2];
+    sanitizeJsonEmbed(gbs.host, host, sizeof(host));
+    fields.field("gbs.host", "\"%s\"", host);
+  }
+  const auto ageS = [gbsNow](uint32_t at) { return at == 0 ? -1L : static_cast<long>((gbsNow - at) / 1000U); };
+  const bool armed = gbs.pull == GbsPullState::ARMED || gbs.pull == GbsPullState::BREWING;
+  fields.field("companion.gbs", companionGbs);
+  fields.field("gbs.route", "\"%s\"", gbs.companionRoute ? "companion" : "direct");
+  fields.field("gbs.pull", "\"%s\"", gbsPullStateName(gbs.pull));
+  fields.field("gbs.waitS", "%ld",
+               armed ? (static_cast<long>(GBS_PULL_WINDOW_MS) - (static_cast<long>(gbsNow - gbs.armedAtMs))) / 1000L : 0L);
+  fields.field("gbs.seenAgeS", "%ld", ageS(gbs.seenAtMs));
+  fields.field("gbs.okAgeS", "%ld", ageS(gbs.okAtMs));
+  fields.field("gbs.paired", bool(gbs.paired));
+  fields.field("gbs.pairing", "\"%s\"", gbsPairPhaseName(gbs.phase));
+  fields.field("gbs.code", static_cast<unsigned long>(gbs.pairingCode));
+  fields.field("gbs.link", "\"%s\"", gbsLinkName(gbs.link));
+  fields.field("gbs.companion", "\"%s\"", gbsCompanionStateName(gbs.companion));
+  fields.field("gbs.last", "{\"id\":%lu,\"timeS\":%.1f,\"g\":%.1f,\"ageS\":%ld,\"success\":%s,\"delivered\":%s}",
+               static_cast<unsigned long>(gbs.lastId), gbs.lastTimeMs / 1000.0, gbs.lastMassMg / 1000.0,
+               ageS(gbs.lastAtMs), gbs.lastSuccess ? "true" : "false", gbs.lastDelivered ? "true" : "false");
   fields.field("config.autoTareOutsideBrew", bool(config.autoTareOutsideBrew));
   fields.field("config.retareAccessoryOutsideBrew",
                bool(idleAccessoryRetareEnabled(config.noScaleBbwMode)));

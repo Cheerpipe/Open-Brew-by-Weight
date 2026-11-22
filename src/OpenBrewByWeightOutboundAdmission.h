@@ -19,7 +19,11 @@ inline bool outboundScaleInhibited() {
 }
 inline std::atomic<uint32_t> outboundAcquisitionGeneration{0};
 inline std::atomic<uint32_t> outboundAcquisitionAtMs{0};
-enum class OutboundClient : uint8_t { LA_MARZOCCO_HTTP, WEBHOOK, NTP, COUNT };
+enum class OutboundClient : uint8_t { LA_MARZOCCO_HTTP, WEBHOOK, NTP, MAHLKONIG_HTTP, COUNT };
+// The task whose ESP-IDF transport lines (esp-tls, HTTP_CLIENT) read as DEBUG
+// while it works: the Mahlkönig client, which polls a grinder that may be off
+// all night and logs one rate-limited line with the same codes instead.
+inline std::atomic<void *> espLogQuietTask{nullptr};
 struct OutboundPauseCompletion {
   std::atomic<uint32_t> generation{0}, latencyMs{0};
 };

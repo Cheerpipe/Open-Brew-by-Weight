@@ -2315,6 +2315,13 @@ const errorReasonTexts = {
   MACHINE_POWER_DISABLED: __WEBUI_TEXT__("err.machine_power_disabled"),
   MACHINE_POWER_REQUIRES_READY: __WEBUI_TEXT__("err.machine_power_requires_ready"),
   MACHINE_TYPE_UNSUPPORTED: __WEBUI_TEXT__("err.machine_type_unsupported"),
+  MAHLKONIG_ACTION_INVALID: __WEBUI_TEXT__("err.mahlkonig_action_invalid"),
+  MAHLKONIG_BODY_TOO_LARGE: __WEBUI_TEXT__("err.mahlkonig_body_too_large"),
+  MAHLKONIG_HOST_INVALID: __WEBUI_TEXT__("err.mahlkonig_host_invalid"),
+  MAHLKONIG_NOT_READY: __WEBUI_TEXT__("err.mahlkonig_not_ready"),
+  MAHLKONIG_OFF: __WEBUI_TEXT__("err.mahlkonig_off"),
+  MAHLKONIG_PAIRING_ID_INVALID: __WEBUI_TEXT__("err.mahlkonig_pairing_id_invalid"),
+  MAHLKONIG_PEER: __WEBUI_TEXT__("err.mahlkonig_peer"),
   LA_MARZOCCO_ACTION_FIELDS_INVALID: __WEBUI_TEXT__("err.la_marzocco_action_fields_invalid"),
   LA_MARZOCCO_ACTION_UNKNOWN: __WEBUI_TEXT__("err.la_marzocco_action_unknown"),
   LA_MARZOCCO_BOUNDED_JSON_REQUIRED: __WEBUI_TEXT__("err.la_marzocco_bounded_json_required"),
@@ -3878,14 +3885,17 @@ function settingsSectionOf(id) {
   if (BREW_CONTROL_IDS.includes(id)) return "brew";
   return id.startsWith("laMarzocco") ? "laMarzocco" : "config";
 }
-// The browser-local "This device" group (data-g=app) sits inside #workflowPanel
-// but never joins a controller section sweep.
+// The browser-local "This device" group (data-g=app) and the Mahlkönig
+// grinder's own forms (.gbsLocal: their actions post on their own) sit inside
+// #workflowPanel but never join a controller section sweep.
 function settingsSectionEls(section) {
   return [
     ...document.querySelectorAll(
       "#workflowPanel input,#workflowPanel select,#workflowPanel textarea",
     ),
-  ].filter((el) => el.id && !el.closest("[data-g=app]") && settingsSectionOf(el.id) === section);
+  ].filter(
+    (el) => el.id && !el.closest("[data-g=app],.gbsLocal") && settingsSectionOf(el.id) === section,
+  );
 }
 function snapshotControls(els) {
   const s = {};
@@ -7824,9 +7834,13 @@ function grindHintView(p) {
 }
 function renderHomeCards() {
   const v = grindHintView(presetState.items.find((x) => x.id === presetState.activeId)),
-    card = $("grindHintCard");
+    card = $("grindHintCard"),
+    // D9: while a Mahlkönig grinder corrects the grind from the active
+    // preset's shots, one line stands in for the advice; a spread stays.
+    paused = !!v && v.cls !== "isSpread" && homeStatusCache()?.gbs?.adjusts === true;
+  reveal($("grindHintGbs"), paused);
   if (card) {
-    reveal(card, !!v && !dismissed.grind.includes(v.key));
+    reveal(card, !!v && !paused && !dismissed.grind.includes(v.key));
     if (v) {
       card.dataset.key = v.key;
       card.className = "homeCard ghCard " + v.cls;
@@ -8067,6 +8081,8 @@ function loadSettingsConfig({ config: c, quickRevert }) {
   $("noScaleBbwMode").value = c.noScaleBbwMode;
   if ($("beanconquerorEndpoint"))
     $("beanconquerorEndpoint").value = c.beanconquerorEndpoint || "off";
+  if ($("mahlkonigPushCadenceS"))
+    $("mahlkonigPushCadenceS").value = String(c.mahlkonigPushCadenceS || 20);
   $("buzzerExtendedPulseRate").value = extRate(c.buzzerExtendedPulseRate);
   $("buzzerSlowExtendedPulseRate").value = extRate(c.buzzerSlowExtendedPulseRate);
   $("alertOutputChannel").value = ["scale_only", "buzzer_only", "scale_priority"].includes(

@@ -13,6 +13,7 @@
 #include "OpenBrewByWeightAuditStore.h"
 #include "OpenBrewByWeightWebAccessStore.h"
 #include "OpenBrewByWeightCardDismissals.h"
+#include "OpenBrewByWeightMahlkonigStore.h"
 #include "network/OpenBrewByWeightCompanionStore.h"
 
 namespace openbrewbyweight {
@@ -126,6 +127,7 @@ inline bool resetAllDurableStores(PersistedSettings &settings,
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                      \
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
   if (!clearFirmwareMode() || !eraseWebAccessStored() || !eraseCardDismissals() ||
+      !eraseGbsIdentity() ||
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, QUICK_START_KEY) ||
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, BBW_LEARNING_KEY) ||
       !eraseSettingsNvsKey(NvsSubsystem::SETTINGS, LA_MARZOCCO_REJECTED_KEY)) {

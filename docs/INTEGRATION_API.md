@@ -257,6 +257,13 @@ params substituted in order (see the example above).
 | ``LA_MARZOCCO_STA_REQUIRED`` | Connect to Wi-Fi station mode and close setup AP first. |
 | ``MACHINE_POWER_DISABLED`` | Turning the machine on and off is disabled in Admin → Machine control. |
 | ``MACHINE_POWER_REQUIRES_READY`` | The machine can be turned on or off only when no shot or cycle is running. |
+| ``MAHLKONIG_ACTION_INVALID`` | action must be pair, cancel, pairing_id (with pairingId), release, trust, or forget. |
+| ``MAHLKONIG_BODY_TOO_LARGE`` | A grinder request body is at most 1024 bytes. |
+| ``MAHLKONIG_HOST_INVALID`` | pair needs host, the grinder's address: letters, digits, dots and hyphens; other actions take none. |
+| ``MAHLKONIG_NOT_READY`` | Choose an E65 or E80 grinder and enter its address first. |
+| ``MAHLKONIG_OFF`` | The Mahlkönig integration is off in Admin → Integrations. |
+| ``MAHLKONIG_PAIRING_ID_INVALID`` | pairingId must be the number the grinder shows, from 1 to 4294967295. |
+| ``MAHLKONIG_PEER`` | Grinder requests must come from the local network and not from a browser. |
 | ``NETWORK_SETTINGS_CHANGED_RETRY`` | Network settings changed; refresh and retry. |
 | ``NETWORK_SETTINGS_LOCKED_ACTIVE_CYCLE`` | Network settings are locked while a cycle is active. |
 | ``NETWORK_SSID_PASSWORD_INVALID`` | Invalid network SSID or password. |

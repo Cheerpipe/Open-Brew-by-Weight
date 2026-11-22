@@ -1463,6 +1463,12 @@
   text-transform: uppercase;
 }
 
+/* "Untested" beside the Mahlkönig legend (Settings) and its switch (Admin). */
+.gbsBadge {
+  margin-left: 0.35rem;
+  vertical-align: 0.1em;
+}
+
 .presetCardMeta {
   font-size: 0.75rem;
   color: var(--mu);

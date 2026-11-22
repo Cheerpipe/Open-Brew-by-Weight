@@ -27,8 +27,11 @@ uint32_t beanconquerorId(const char *text, const char *suffix) {
 uint8_t OpenBrewByWeightNetwork::beanconquerorEndpoint() const {
   RuntimeConfig config = {};
   if (callbacks_.copyRuntimeConfig) callbacks_.copyRuntimeConfig(&config);
-  return config.beanconquerorEndpoint < BEANCONQUEROR_ENDPOINT_COUNT ? config.beanconquerorEndpoint
-                                                                     : BEANCONQUEROR_OFF;
+  // Admin → Integrations off silences it everywhere, the companion's copy
+  // included (its cfg names this format), and keeps Settings' choice.
+  return config.integrationBeanconqueror && config.beanconquerorEndpoint < BEANCONQUEROR_ENDPOINT_COUNT
+             ? config.beanconquerorEndpoint
+             : BEANCONQUEROR_OFF;
 }
 
 // The newest-first records outside the Stats stream (the companion's record

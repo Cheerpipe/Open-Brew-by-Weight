@@ -246,6 +246,15 @@ host_test(beanconqueror_host_test LABEL "host;network" DEFINITIONS
   "BEANCONQUEROR_VECTORS=\"${CMAKE_SOURCE_DIR}/docs/schemas/beanconqueror-v1.vectors.json\"")
 target_include_directories(beanconqueror_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
 target_link_libraries(beanconqueror_host_test PRIVATE "${CJSON_LIBRARY}")
+# Mahlkönig Grind-by-Sync over the vectors the companion reproduces.
+host_test(mahlkonig_host_test LABEL "host;network;concurrency" DEFINITIONS
+  "GBS_VECTORS=\"${CMAKE_SOURCE_DIR}/docs/schemas/mahlkonig-gbs-v1.vectors.json\""
+  "COMPANION_VECTORS=\"${CMAKE_SOURCE_DIR}/docs/schemas/companion-link-v1.vectors.json\""
+  "GBS_HEADER=\"${CMAKE_SOURCE_DIR}/src/OpenBrewByWeightMahlkonig.h\""
+  "GBS_SERVICE=\"${CMAKE_SOURCE_DIR}/src/network/OpenBrewByWeightMahlkonig.inc\""
+  "GBS_HTTP=\"${CMAKE_SOURCE_DIR}/src/network/OpenBrewByWeightMahlkonigHttp.inc\"")
+target_include_directories(mahlkonig_host_test PRIVATE "${CJSON_INCLUDE_DIR}")
+target_link_libraries(mahlkonig_host_test PRIVATE "${CJSON_LIBRARY}")
 # The Stats header over the golden vectors the companion's port reproduces.
 host_test(stats_header_host_test LABEL "host;network;web" DEFINITIONS OPEN_BREW_BY_WEIGHT_HOST_TEST
   "STATS_HEADER_VECTORS=\"${CMAKE_SOURCE_DIR}/docs/schemas/stats-header-v1.vectors.json\"")

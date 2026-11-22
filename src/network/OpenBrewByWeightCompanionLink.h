@@ -41,12 +41,12 @@ constexpr size_t COMPANION_MAC_HEX = 32;  // first 16 bytes of the frame HMAC
 constexpr size_t COMPANION_ID_TEXT = 37, COMPANION_NAME_TEXT = 33,
                  COMPANION_VERSION_TEXT = 25, COMPANION_ADDRESS_TEXT = 48;
 constexpr uint32_t COMPANION_MAGIC = 0x434D504EU;  // "CMPN"
-constexpr uint16_t COMPANION_STORED_VERSION = 4;
+constexpr uint16_t COMPANION_STORED_VERSION = 5;
 constexpr size_t COMPANION_STORED_V1_BYTES = 328;  // version 1: no logSwitch tail
 
 // One NVS blob. Missing or invalid means "never paired". The tail switches
-// (`logSwitch` from v2, `archiveSwitch` from v3, `bcSwitch` from v4, in what
-// was padding) ride
+// (`logSwitch` from v2, `archiveSwitch` from v3, `bcSwitch` from v4,
+// `gbsSwitch` from v5, in what was padding) ride
 // after the checksum: an older blob is the same bytes without them, so
 // promotion is a version bump plus the defaults, and only those switches are
 // outside the checksum's coverage (corruption there changes a switch, not
@@ -71,6 +71,7 @@ struct CompanionStored {
   uint8_t logSwitch = 1;  // "Diagnostic log through the companion" (v2)
   uint8_t archiveSwitch = 1;  // "Shot archive in the companion" (v3)
   uint8_t bcSwitch = 1;  // "Beanconqueror through the companion" (v4)
+  uint8_t gbsSwitch = 1;  // "Mahlkönig through the companion" (v5)
 };
 static_assert(sizeof(CompanionStored) == 332, "companion blob layout changed");
 
@@ -90,20 +91,23 @@ inline bool validCompanionStored(const CompanionStored &stored) {
          stored.structureSize == sizeof(CompanionStored) && stored.paired <= 1 &&
          stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
          stored.logSwitch <= 1 && stored.archiveSwitch <= 1 && stored.bcSwitch <= 1 &&
-         stored.checksum == companionChecksum(stored);
+         stored.gbsSwitch <= 1 && stored.checksum == companionChecksum(stored);
 }
 
 // An older blob: v1 read raw into its first COMPANION_STORED_V1_BYTES (no
-// tail), v2 (logSwitch, then padding) or v3 (archiveSwitch too). Promotion
-// keeps the pairing and the switches it had, and turns the newer ones on (the
-// switches default on, plan T); the caller persists the v4 layout.
+// tail), v2 (logSwitch, then padding), v3 (archiveSwitch too) or v4
+// (bcSwitch too). Promotion keeps the pairing and the switches it had, and
+// turns the newer ones on (the switches default on, plan T); the caller
+// persists the v5 layout.
 inline bool validCompanionStoredOlder(const CompanionStored &stored) {
   const bool v1 = stored.version == 1 && stored.structureSize == COMPANION_STORED_V1_BYTES,
              v2 = stored.version == 2 && stored.structureSize == sizeof(CompanionStored) &&
                   stored.logSwitch <= 1,
              v3 = stored.version == 3 && stored.structureSize == sizeof(CompanionStored) &&
-                  stored.logSwitch <= 1 && stored.archiveSwitch <= 1;
-  return stored.magic == COMPANION_MAGIC && (v1 || v2 || v3) && stored.paired <= 1 &&
+                  stored.logSwitch <= 1 && stored.archiveSwitch <= 1,
+             v4 = stored.version == 4 && stored.structureSize == sizeof(CompanionStored) &&
+                  stored.logSwitch <= 1 && stored.archiveSwitch <= 1 && stored.bcSwitch <= 1;
+  return stored.magic == COMPANION_MAGIC && (v1 || v2 || v3 || v4) && stored.paired <= 1 &&
          stored.lmSwitch <= 1 && stored.forgotten <= 1 && stored.uiOff <= 1 &&
          stored.checksum == companionChecksum(stored);
 }
@@ -111,7 +115,8 @@ inline bool validCompanionStoredOlder(const CompanionStored &stored) {
 inline void promoteCompanionStored(CompanionStored &stored) {
   if (stored.version == 1) stored.logSwitch = 1;
   if (stored.version <= 2) stored.archiveSwitch = 1;
-  stored.bcSwitch = 1;
+  if (stored.version <= 3) stored.bcSwitch = 1;
+  stored.gbsSwitch = 1;
   stored.version = COMPANION_STORED_VERSION;
   stored.structureSize = sizeof(CompanionStored);
   // version and structureSize sit inside the checksummed prefix.
@@ -122,6 +127,16 @@ inline void promoteCompanionStored(CompanionStored &stored) {
 // controller's, while paired with the archive and Beanconqueror switches on.
 inline uint8_t companionBeanconquerorFormat(const CompanionStored &stored, uint8_t format) {
   return stored.paired && stored.archiveSwitch && stored.bcSwitch ? format : BEANCONQUEROR_OFF;
+}
+
+// cfg.gbs (docs/COMPANION_LINK.md): the controller's Mahlkönig setup while
+// paired with the shot archive and Mahlkönig switches on; 0 (none) otherwise,
+// else a hash of the text that names it in the link's sent state.
+constexpr size_t COMPANION_GBS_CONFIG_TEXT = 224;
+inline uint32_t companionGbsConfigHash(const CompanionStored &stored, const char *text, size_t length) {
+  return stored.paired && stored.archiveSwitch && stored.gbsSwitch && length != 0
+             ? webAccessFnv(text, length) | 1U
+             : 0U;
 }
 
 // --- Request validation and peers -----------------------------------------
@@ -630,7 +645,7 @@ struct CompanionRequest {
   bool revealed = false;   // companionKey holds the key matching the commitment
   bool approving = false;  // the code matched; the network task derives S
   bool lmSwitch = true,    // the switches chosen in the approval panel
-       logSwitch = true, archiveSwitch = true, bcSwitch = true;
+       logSwitch = true, archiveSwitch = true, bcSwitch = true, gbsSwitch = true;
   uint8_t wrongCodes = 0;
   uint32_t serial = 0;  // names the request key the network task made
   uint32_t untilMs = 0;
@@ -760,7 +775,8 @@ inline const char *companionPairPoll(CompanionPairing &pairing, const char *id, 
 inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, uint32_t code,
                                                    uint32_t expected, bool lmSwitch,
                                                    bool logSwitch, bool archiveSwitch,
-                                                   bool bcSwitch, uint32_t now) {
+                                                   bool bcSwitch, uint32_t now,
+                                                   bool gbsSwitch = true) {
   companionPairTick(pairing, now);
   CompanionRequest &request = pairing.request;
   if (request.state != CompanionPairState::PENDING || request.approving)
@@ -776,6 +792,7 @@ inline CompanionApproveResult companionPairApprove(CompanionPairing &pairing, ui
   request.logSwitch = logSwitch;
   request.archiveSwitch = archiveSwitch;
   request.bcSwitch = bcSwitch;
+  request.gbsSwitch = gbsSwitch;
   return CompanionApproveResult::OK;
 }
 
@@ -808,6 +825,7 @@ inline void companionPairComplete(CompanionPairing &pairing, CompanionStored &st
   stored.logSwitch = request.logSwitch ? 1 : 0;
   stored.archiveSwitch = request.archiveSwitch ? 1 : 0;
   stored.bcSwitch = request.bcSwitch ? 1 : 0;
+  stored.gbsSwitch = request.gbsSwitch ? 1 : 0;
   memcpy(stored.secret, secret, COMPANION_SECRET_BYTES);
   memcpy(stored.publicKey, request.companionKey, COMPANION_KEY_BYTES);
   memcpy(stored.id, request.id, sizeof(stored.id));
@@ -860,6 +878,7 @@ struct CompanionLinkSlot {
   // whole snapshot.
   bool snapshotSent = false, sentUi = true, sentLog = true, sentArchive = true;
   uint8_t sentBc = BEANCONQUEROR_OFF;  // the format cfg last told it to serve
+  uint32_t sentGbs = 0;  // a hash of the cfg.gbs text it last carried (0: none)
   uint32_t sentConfig = 0, sentCredentials = 0, sentRoute = 0, sentHold = 0;
   bool sentSync = false;  // the sync hold the last `hold` frame carried
   bool deviceSent = false;  // this session's `dev` frame
@@ -1168,7 +1187,8 @@ struct CompanionState {
 // Diagnostic → Companion; strings are sanitized on store.
 struct CompanionSnapshot {
   bool paired = false, lmSwitch = false, linkOpen = false, upstream = false, ui = true,
-       relayReady = false, logSwitch = false, archiveSwitch = false, bcSwitch = false;
+       relayReady = false, logSwitch = false, archiveSwitch = false, bcSwitch = false,
+       gbsSwitch = false;
   uint32_t relayRejects = 0;
   uint8_t protocol = 0;   // the open link's; 0 while down
   int32_t linkAgeS = -1;  // since the link came up or went down; -1: not since boot
@@ -1190,12 +1210,15 @@ struct CompanionSnapshot {
 };
 
 // Handshake 10 s; then two ping intervals of silence, 15 s pings only once the
-// route is the companion's. A route request (pending) keeps the long limit:
+// La Marzocco route is the companion's or it talks to the Mahlkönig grinder
+// for this controller. A route request (pending) keeps the long limit:
 // the companion answers it on its own cadence, and the La Marzocco service
 // gives up on it after 30 s without a ping or the full frame.
-inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, LaMarzoccoCompanionRoute route) {
-  return slot.phase != CompanionLinkPhase::READY ? 10000U
-         : route == LaMarzoccoCompanionRoute::COMPANION ? 35000U : 250000U;
+inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, LaMarzoccoCompanionRoute route,
+                                       bool gbsOwned = false) {
+  return slot.phase != CompanionLinkPhase::READY                     ? 10000U
+         : route == LaMarzoccoCompanionRoute::COMPANION || gbsOwned ? 35000U
+                                                                     : 250000U;
 }
 
 // Whether an open slot went silent. During a sync hold both sides trust the
@@ -1203,10 +1226,10 @@ inline uint32_t companionSilenceLimitMs(const CompanionLinkSlot &slot, LaMarzocc
 // restarts from the hold's end, when the companion pings at once. `now` is
 // the pass's start: a frame httpd heard after it is not silence.
 inline bool companionLinkSilent(CompanionLinkSlot &slot, LaMarzoccoCompanionRoute route, uint32_t now,
-                                bool syncHold) {
+                                bool syncHold, bool gbsOwned = false) {
   if (syncHold && slot.phase == CompanionLinkPhase::READY) slot.heardAtMs = now;
   return ticksSince(now, slot.heardAtMs) >=
-         static_cast<int32_t>(companionSilenceLimitMs(slot, route));
+         static_cast<int32_t>(companionSilenceLimitMs(slot, route, gbsOwned));
 }
 
 // Seconds since the link came up or went down; -1 before either since boot.
