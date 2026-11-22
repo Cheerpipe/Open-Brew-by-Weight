@@ -123,9 +123,8 @@ void p01_defaults_are_valid() {
   CHECK(DEFAULT_ALERT_OUTPUT_CHANNEL ==
         (BUZZER_SUPPORT_ENABLED ? AlertOutputChannel::BUZZER_ONLY
                                 : AlertOutputChannel::SCALE_ONLY));
-  CHECK(settings.runtime.bookooMuteOnBuzzerOnly);
-  CHECK(settings.runtime.bookooConnectBeepLevel ==
-        DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL);
+  CHECK(settings.runtime.bookooVolume == DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL);
+  CHECK(!settings.runtime.bookooKeepAwakeWhileMachineOn);
   CHECK(settings.runtime.buzzerExtendedPulseRate ==
         static_cast<uint8_t>(DEFAULT_EXTENDED_PULSE_RATE));
   CHECK(settings.runtime.buzzerSlowExtendedPulseRate ==
@@ -3359,6 +3358,69 @@ void p91g_beanconqueror_endpoint_tag() {
 // upgrade) reads Machine control off; a blob with it round-trips, and an
 // image that does not know the tag (an OTA downgrade) skips it like any
 // unknown field, so the rest of the group still loads.
+// Tag 94 is additive: an older blob, so every OTA upgrade, keeps the Bookoo
+// awake option off; a blob with it round-trips.
+void p91i_bookoo_keep_awake_tag() {
+  PersistedSettings on;
+  CHECK(initializeDefaultSettings(on));
+  on.runtime.bookooKeepAwakeWhileMachineOn = true;
+  std::vector<uint8_t> blob = settingsBlob(on);
+  PersistedSettings decoded;
+  uint32_t malformed = 0;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), decoded, malformed) &&
+        malformed == 0 && decoded.runtime.bookooKeepAwakeWhileMachineOn);
+  blob = settingsBlobWithBody({});
+  PersistedSettings older;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), older, malformed) &&
+        !older.runtime.bookooKeepAwakeWhileMachineOn);
+}
+
+// Tag 95 replaced the retired mute toggle (55) and level (56). A blob without
+// it keeps what the saved alert mode played: an unmuted Buzzer only becomes
+// Don't change, everything else keeps its level. Tag 95 wins when present,
+// and an out-of-range value repairs to the default alone.
+void p91j_bookoo_volume_migrates_retired_tags() {
+  const uint8_t buzzer = static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY),
+                scale = static_cast<uint8_t>(AlertOutputChannel::SCALE_ONLY);
+  const struct {
+    std::vector<uint8_t> runtime;
+    uint8_t volume;
+  } cases[] = {
+      {{55, 1, 1, 56, 1, 4, 26, 1, buzzer}, 4},
+      // A build without a buzzer always played on the scale.
+      {{55, 1, 0, 56, 1, 4, 26, 1, buzzer}, BUZZER_SUPPORT_ENABLED ? BOOKOO_VOLUME_KEEP : uint8_t{4}},
+      {{55, 1, 0, 56, 1, 2, 26, 1, scale}, 2},
+      {{55, 1, 1, 56, 1, 0, 26, 1, scale}, 0},
+      {{55, 1, 0, 56, 1, 2, 26, 1, buzzer, 95, 1, 5}, 5},
+      {{26, 1, scale}, DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL},
+  };
+  for (const auto &c : cases) {
+    std::vector<uint8_t> body = {SETTINGS_GROUP_RUNTIME,
+                                 static_cast<uint8_t>(c.runtime.size())};
+    body.insert(body.end(), c.runtime.begin(), c.runtime.end());
+    const std::vector<uint8_t> blob = settingsBlobWithBody(body);
+    PersistedSettings settings;
+    uint32_t malformed = 0;
+    CHECK(decodePersistedSettings(blob.data(), blob.size(), settings, malformed) &&
+          malformed == 0);
+    CHECK(settings.runtime.bookooVolume == c.volume);
+  }
+  PersistedSettings saved;
+  CHECK(initializeDefaultSettings(saved));
+  saved.runtime.bookooVolume = BOOKOO_VOLUME_KEEP;
+  std::vector<uint8_t> blob = settingsBlob(saved);
+  PersistedSettings decoded;
+  uint32_t malformed = 0;
+  CHECK(decodePersistedSettings(blob.data(), blob.size(), decoded, malformed) &&
+        decoded.runtime.bookooVolume == BOOKOO_VOLUME_KEEP);
+  PersistedSettings corrupt;
+  corrupt.runtime.bookooVolume = 9;
+  corrupt.runtime.goalWeightDg = DEFAULT_GOAL_WEIGHT_DG + 10;
+  CHECK(repairPersistedSettings(corrupt) &&
+        corrupt.runtime.bookooVolume == DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL &&
+        corrupt.runtime.goalWeightDg == DEFAULT_GOAL_WEIGHT_DG + 10);
+}
+
 void p91h_machine_power_control_tag() {
   PersistedSettings on;
   CHECK(initializeDefaultSettings(on));
@@ -3765,6 +3827,8 @@ const TestCase tests[] = {
     {"P91F", p91f_scale_stock_tone_tags_round_trip},
     {"P91G", p91g_beanconqueror_endpoint_tag},
     {"P91H", p91h_machine_power_control_tag},
+    {"P91I", p91i_bookoo_keep_awake_tag},
+    {"P91J", p91j_bookoo_volume_migrates_retired_tags},
     {"P61B", p61b_shot_curve_held_and_break_bits_round_trip},
     {"P61F", p61f_shot_curve_section_round_trip_is_lossless},
     {"P61K", p61k_shot_curve_cache_keeps_the_newest_and_their_pending_suffix},

@@ -8038,7 +8038,6 @@ function loadSettingsConfig({ config: c, quickRevert }) {
     "brewByWeight",
     "soundAlertsEnabled",
     "canTareStartTimer",
-    "bookooMuteOnBuzzerOnly",
     "bookooKeepAwakeWhileMachineOn",
     "firstDropBeep",
     "scaleConnectedLed",
@@ -8075,8 +8074,8 @@ function loadSettingsConfig({ config: c, quickRevert }) {
   )
     ? c.alertOutputChannel
     : "scale_priority";
-  $("bookooConnectBeepLevel").value = String(
-    [0, 1, 2, 3, 4, 5].includes(+c.bookooConnectBeepLevel) ? +c.bookooConnectBeepLevel : 4,
+  $("bookooVolume").value = String(
+    [255, 0, 1, 2, 3, 4, 5].includes(+c.bookooVolume) ? +c.bookooVolume : 3,
   );
   if ($("scalePreference")) {
     $("scalePreference").value = c.scaleMacCacheMode;

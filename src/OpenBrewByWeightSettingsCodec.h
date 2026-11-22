@@ -22,7 +22,8 @@ namespace openbrewbyweight {
 //
 // Evolution rules:
 // - every persisted struct member has one row below; a released tag keeps its
-//   meaning forever and is never reused (retired tags are listed here: none);
+//   meaning forever and is never reused (retired tags are listed here:
+//   runtime 55 and 56, read once to migrate into runtime 95);
 // - a member whose type or meaning changes gets a new tag;
 // - a missing field keeps the struct's default initializer and an unknown tag
 //   is skipped; a malformed value (length, range, unterminated text) keeps the
@@ -88,8 +89,7 @@ inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
     SF(44, ntpServerPreset), SF(45, ntpServerCustom), SF(46, fastSideEnabled),
     SF(47, fastMarginDg), SF(48, fastBeforeMs), SF(49, slowSideEnabled),
     SF(50, slowMarginDg), SF(51, slowAfterMs), SF(52, scaleLossFixedMs),
-    SF(53, scaleLossEnabled), SF(54, scaleMacCacheMode), SF(55, bookooMuteOnBuzzerOnly),
-    SF(56, bookooConnectBeepLevel), SF(57, cupProtectionEnabled),
+    SF(53, scaleLossEnabled), SF(54, scaleMacCacheMode), SF(57, cupProtectionEnabled),
     SF(58, stopIfCupRemoved), SF(59, requireCupToStart),
     SF(60, avoidAccidentalTouchEnabled), SF(61, cupRemovedWeightG),
     SF(62, noScaleBbwMode), SF(63, lastShotCooldownMs), SF(64, serialLogLevel),
@@ -105,8 +105,29 @@ inline constexpr SettingsField SETTINGS_RUNTIME_FIELDS[] = {
     SF(88, performanceBoostEnabled), SF(89, buzzerScaleConnectedStockTone),
     SF(90, buzzerScaleLostStockTone), SF(91, beanconquerorEndpoint),
     SF(92, buzzerBackflushReadyBeep), SF(93, machinePowerControlEnabled),
-    SF(94, bookooKeepAwakeWhileMachineOn)};
+    SF(94, bookooKeepAwakeWhileMachineOn), SF(95, bookooVolume)};
 #undef SF
+
+// Retired runtime tags 55/56: the Bookoo mute toggle and volume level that
+// runtime 95 replaced. Decoded only to migrate a blob without tag 95.
+struct RetiredBookooVolume {
+  bool muteOnBuzzerOnly = true;
+  uint8_t level = DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL;
+};
+inline constexpr SettingsField SETTINGS_RETIRED_BOOKOO_FIELDS[] = {
+    OBBW_SETTINGS_FIELD(55, RetiredBookooVolume, muteOnBuzzerOnly),
+    OBBW_SETTINGS_FIELD(56, RetiredBookooVolume, level)};
+
+// Keeps what the user hears in the saved alert mode: an unmuted Buzzer only
+// left the speaker alone, so it becomes Don't change; otherwise the level.
+inline uint8_t migratedBookooVolume(const RetiredBookooVolume &retired,
+                                    uint8_t alertOutputChannel) {
+  if (!retired.muteOnBuzzerOnly &&
+      effectiveAlertOutputChannel(alertOutputChannel) == AlertOutputChannel::BUZZER_ONLY)
+    return BOOKOO_VOLUME_KEEP;
+  return retired.level <= BOOKOO_BEEP_LEVEL_MAX ? retired.level
+                                                : DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL;
+}
 
 #define SF(tag, member) OBBW_SETTINGS_FIELD(tag, ShotPreset, member)
 inline constexpr SettingsField SETTINGS_PRESET_FIELDS[] = {
@@ -207,7 +228,7 @@ constexpr size_t settingsFieldBytes(const SettingsField (&fields)[N]) {
                          [](size_t bytes, const SettingsField &field) { return bytes + field.size; });
 }
 
-static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 15 == sizeof(RuntimeConfig),
+static_assert(settingsFieldBytes(SETTINGS_RUNTIME_FIELDS) + 16 == sizeof(RuntimeConfig),
               "every RuntimeConfig member needs a settings field row");
 static_assert(settingsFieldBytes(SETTINGS_PRESET_FIELDS) + 1 == sizeof(ShotPreset),
               "every ShotPreset member needs a settings field row");
@@ -441,6 +462,9 @@ inline bool settingsBlobIntact(const uint8_t *blob, size_t length, uint32_t &rev
   uint8_t presets = 0, scales = 0;
   constexpr uint8_t kBoostAbsent = 0xFF;  // Tag 88 not decoded (yet).
   settings.runtime.performanceBoostEnabled = kBoostAbsent;
+  constexpr uint8_t kVolumeAbsent = 0xFE;  // Tag 95 not decoded (yet).
+  settings.runtime.bookooVolume = kVolumeAbsent;
+  RetiredBookooVolume retiredVolume;
   while (body.at < body.end) {
     size_t tag = 0;
     SettingsReader group{};
@@ -448,7 +472,9 @@ inline bool settingsBlobIntact(const uint8_t *blob, size_t length, uint32_t &rev
     bool framed = true;
     switch (tag) {
       case SETTINGS_GROUP_RUNTIME:
-        framed = decodeSettingsGroup(group, SETTINGS_RUNTIME_FIELDS, &settings.runtime, malformed);
+        framed = decodeSettingsGroup(group, SETTINGS_RUNTIME_FIELDS, &settings.runtime, malformed) &&
+                 decodeSettingsGroup(group, SETTINGS_RETIRED_BOOKOO_FIELDS, &retiredVolume,
+                                     malformed);
         break;
       case SETTINGS_GROUP_BULLSEYE:
         framed = decodeSettingsGroup(group, SETTINGS_BULLSEYE_FIELDS, &settings.bullseyeMelody,
@@ -493,6 +519,9 @@ inline bool settingsBlobIntact(const uint8_t *blob, size_t length, uint32_t &rev
   // tag 88 keeps that choice for both.
   if (settings.runtime.performanceBoostEnabled == kBoostAbsent)
     settings.runtime.performanceBoostEnabled = settings.runtime.idlePowerSavingEnabled;
+  if (settings.runtime.bookooVolume == kVolumeAbsent)
+    settings.runtime.bookooVolume =
+        migratedBookooVolume(retiredVolume, settings.runtime.alertOutputChannel);
   settings.presets.count = presets;
   return true;
 }

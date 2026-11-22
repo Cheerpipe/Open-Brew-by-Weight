@@ -198,3 +198,48 @@
       !firmwareCore.includes('if (ended) request = ScaleProfilerRequest::END;'))
     throw new Error('Automatic scale recording must persist, load at boot, and decide per connection');
 }
+
+// The Bookoo volume explains, below itself, every value that does not suit
+// the alert output, keeps the value, and clears once the mismatch is gone.
+{
+  const assert = require('assert').strict;
+  const els = {
+    bookooVolume: {value: '3', attrs: {}, setAttribute(k, v) {this.attrs[k] = v;},
+      removeAttribute(k) {delete this.attrs[k];}},
+    alertOutputChannel: {value: 'scale_only', noBuzzer: false,
+      closest() {return this.noBuzzer ? {} : null;}},
+    soundAlertsEnabled: {checked: true},
+    bookooVolumeWarning: {id: 'bookooVolumeWarning', textContent: '', hidden: true},
+  };
+  const R = {uiState: {}};
+  const refresh = new Function('$', 'R',
+      blockAt(viewJs.settings, 'function refreshBookooVolumeWarning(') +
+      ';return refreshBookooVolumeWarning;')(id => els[id], R);
+  const cases = [
+    ['0', 'scale_only', true, false, null, "won't hear any alert"],
+    ['0', 'scale_priority', true, false, null, 'while it is connected'],
+    ['0', 'buzzer_only', true, false, null, ''],
+    ['3', 'buzzer_only', true, false, null, 'the scale stays silent'],
+    ['3', 'buzzer_only', true, true, null, ''],
+    ['3', 'scale_only', true, false, null, ''],
+    ['5', 'scale_priority', true, false, 'bookoo_ultra', 'goes up to 3'],
+    ['5', 'scale_priority', true, false, 'bookoo_mini', ''],
+    ['255', 'scale_only', true, false, null, ''],
+    ['0', 'scale_only', false, false, null, ''],
+  ];
+  for (const [volume, channel, sound, noBuzzer, model, expected] of cases) {
+    els.bookooVolume.value = volume;
+    els.alertOutputChannel.value = channel;
+    els.alertOutputChannel.noBuzzer = noBuzzer;
+    els.soundAlertsEnabled.checked = sound;
+    R.uiState.bookooModel = model;
+    refresh();
+    const w = els.bookooVolumeWarning;
+    assert.equal(els.bookooVolume.value, volume, 'the warning never changes the value');
+    assert.equal(w.hidden, !expected, `${volume}/${channel}`);
+    assert.ok(expected ? w.textContent.includes(expected) : w.textContent === '', `${volume}/${channel}`);
+    assert.equal(els.bookooVolume.attrs['aria-describedby'], expected ? w.id : undefined);
+  }
+  assert.ok(!/\bmessage\(/.test(blockAt(viewJs.settings, 'function refreshBookooVolumeWarning(')),
+      'Bookoo volume warnings belong below the setting, never in the message bar');
+}

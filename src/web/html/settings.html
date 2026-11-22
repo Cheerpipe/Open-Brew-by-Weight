@@ -1043,26 +1043,20 @@
             >{{webui:settings.combine_tare_timer_at_shot_start}}
             <strong>{{webui:settings.requires_shot_start_tare}}</strong></small
           ></label
-        ><label class="buzzerOpt"
-          ><input id="bookooMuteOnBuzzerOnly" type="checkbox" checked />
-          {{webui:settings.mute_scale_in_buzzer_only}}<small class="fieldHint"
-            >{{webui:settings.when_alerts_use_only_the_buzzer_keep}}
-            <strong>{{webui:settings.buzzer_only}}</strong> {{webui:settings.is_selected}}</small
-          ></label
         ><label
-          >{{webui:settings.scale_volume}}
+          >{{webui:settings.bookoo_volume}}
           <span class="selBox"
-            ><select id="bookooConnectBeepLevel">
+            ><select id="bookooVolume">
+              <option value="255">{{webui:settings.bookoo_volume_keep}}</option>
               <option value="0">{{webui:settings.disabled}}</option>
               <option value="1">1</option>
               <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4" selected>4</option>
+              <option value="3" selected>3</option>
+              <option value="4">4</option>
               <option value="5">5</option>
             </select></span
-          ><small class="fieldHint"
-            >{{webui:settings.how_loud_the_scale_is_when_it}}<strong>{{webui:settings.scale_only_or_scale_priority}}</strong>).</small
-          ></label
+          ><small class="fieldHint">{{webui:settings.bookoo_volume_hint}}</small
+          ><small id="bookooVolumeWarning" class="fieldWarning" role="status" hidden></small></label
         ><label id="bookooKeepAwakeWrap"
           ><input id="bookooKeepAwakeWhileMachineOn" type="checkbox" />
           {{webui:settings.bookoo_keep_awake}}<small class="fieldHint"

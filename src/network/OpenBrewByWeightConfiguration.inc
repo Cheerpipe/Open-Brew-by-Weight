@@ -189,8 +189,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "timezoneDetected", "timezoneAutomatic", "ntpSyncEnabled",
       "ntpServerPreset",
       "ntpServerCustom", "scheduledRestartEnabled", "scheduledRestartMinuteOfDay",
-      "scaleMacCacheMode", "preferredScaleMac", "bookooMuteOnBuzzerOnly",
-      "bookooConnectBeepLevel", "bookooKeepAwakeWhileMachineOn", "noScaleBbwMode",
+      "scaleMacCacheMode", "preferredScaleMac", "bookooVolume",
+      "bookooKeepAwakeWhileMachineOn", "noScaleBbwMode",
       "noScaleAllowRinseWhileArmed", "lastShotCooldownMs",
       "serialLogLevel", "ringRetainLogLevel", "showDiagnosticPage",
       "idlePowerSavingEnabled", "performanceBoostEnabled", "heroCardMode", "beanconquerorEndpoint",
@@ -487,17 +487,13 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
               (preferredScaleMac[0] != '\0' &&
                !validPreferredScaleMac(preferredScaleMac)))) {
     parseError = validationFailure("PREFERRED_SCALE_MAC_INVALID");
-  } else if (jsonFieldPresent(root, "bookooMuteOnBuzzerOnly") &&
-             !jsonBoolean(root, "bookooMuteOnBuzzerOnly", candidate.bookooMuteOnBuzzerOnly)) {
-    parseError = validationFailure("FIELD_BOOLEAN", "bookooMuteOnBuzzerOnly");
   } else if (!jsonOptionalBoolean(root, "bookooKeepAwakeWhileMachineOn",
                                   candidate.bookooKeepAwakeWhileMachineOn)) {
     parseError = validationFailure("FIELD_BOOLEAN", "bookooKeepAwakeWhileMachineOn");
-  } else if (jsonFieldPresent(root, "bookooConnectBeepLevel") &&
-             (!jsonUint8(root, "bookooConnectBeepLevel",
-                         candidate.bookooConnectBeepLevel) ||
-              candidate.bookooConnectBeepLevel > BOOKOO_BEEP_LEVEL_MAX)) {
-    parseError = validationFailure("FIELD_RANGE_INT", "bookooConnectBeepLevel", "0", "5");
+  } else if (jsonFieldPresent(root, "bookooVolume") &&
+             (!jsonUint8(root, "bookooVolume", candidate.bookooVolume) ||
+              !validBookooVolume(candidate.bookooVolume))) {
+    parseError = validationFailure("CONFIG_BOOKOO_VOLUME_RANGE");
   } else if (jsonFieldPresent(root, "noScaleBbwMode") &&
              !jsonNoScaleBbwMode(root, "noScaleBbwMode", parsedNoScaleMode)) {
     parseError = validationFailure("FIELD_ENUM", "noScaleBbwMode",

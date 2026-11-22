@@ -383,6 +383,11 @@ inline bool buzzerPatternIsSequence(BuzzerPattern pattern) {
 
 constexpr uint8_t BOOKOO_BEEP_LEVEL_MAX = 5;
 constexpr uint8_t DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL = 3;
+// Bookoo volume value that leaves the scale's own volume untouched.
+constexpr uint8_t BOOKOO_VOLUME_KEEP = 0xFF;
+inline bool validBookooVolume(uint8_t volume) {
+  return volume <= BOOKOO_BEEP_LEVEL_MAX || volume == BOOKOO_VOLUME_KEEP;
+}
 
 enum class BookooDebugAction : uint8_t {
   START = 0,
@@ -634,8 +639,8 @@ struct RuntimeConfig {
   bool scaleLossEnabled = true;
   uint8_t scaleMacCacheMode =
       static_cast<uint8_t>(ScaleMacCacheMode::PREFER);
-  bool bookooMuteOnBuzzerOnly = true;
-  uint8_t bookooConnectBeepLevel = DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL;
+  // 0-5, or BOOKOO_VOLUME_KEEP; see bookooDesiredVolume().
+  uint8_t bookooVolume = DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL;
   bool cupProtectionEnabled = true;
   bool stopIfCupRemoved = true;
   bool requireCupToStart = false;
@@ -1119,7 +1124,7 @@ inline ConfigValidationError validateRuntimeConfig(
   if (!validExtendedPulseRate(config.buzzerSlowExtendedPulseRate)) {
     return ConfigValidationError::SLOW_EXTENDED_PULSE_RATE;
   }
-  if (config.bookooConnectBeepLevel > BOOKOO_BEEP_LEVEL_MAX) {
+  if (!validBookooVolume(config.bookooVolume)) {
     return ConfigValidationError::BOOKOO_CONNECT_BEEP_LEVEL;
   }
   if (!validNoScaleBbwMode(config.noScaleBbwMode)) {
@@ -1273,7 +1278,7 @@ inline const char *configValidationErrorName(ConfigValidationError error) {
     case ConfigValidationError::SLOW_EXTENDED_PULSE_RATE:
       return "buzzerSlowExtendedPulseRate";
     case ConfigValidationError::BOOKOO_CONNECT_BEEP_LEVEL:
-      return "bookooConnectBeepLevel";
+      return "bookooVolume";
     case ConfigValidationError::NO_SCALE_BBW_MODE:
       return "noScaleBbwMode";
     case ConfigValidationError::LAST_SHOT_COOLDOWN:

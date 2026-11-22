@@ -298,7 +298,6 @@ namespace {
 
 constexpr uint32_t kPolicyControlReadyBit = 1U << 0;
 constexpr uint32_t kPolicySoundAlertsBit = 1U << 1;
-constexpr uint32_t kPolicyBookooMuteBit = 1U << 2;
 constexpr uint32_t kPolicyAlertChannelShift = 3;
 constexpr uint32_t kPolicyAlertChannelMask = 0x3U;
 constexpr uint32_t kPolicyBookooLevelShift = 8;
@@ -314,9 +313,8 @@ static std::atomic<uint32_t> scaleWorkerPolicyBits{
 struct ScaleWorkerPolicySnapshot {
   bool controlReady = false;
   bool soundAlertsEnabled = false;
-  bool bookooMuteOnBuzzerOnly = true;
   AlertOutputChannel alertOutputChannel = AlertOutputChannel::SCALE_ONLY;
-  uint8_t bookooConnectBeepLevel = 0;
+  uint8_t bookooVolume = BOOKOO_VOLUME_KEEP;
   ScaleMacCacheMode macCacheMode = ScaleMacCacheMode::ONLY;
 };
 
@@ -325,10 +323,9 @@ ScaleWorkerPolicySnapshot currentScaleWorkerPolicy() {
   ScaleWorkerPolicySnapshot policy;
   policy.controlReady = (bits & kPolicyControlReadyBit) != 0;
   policy.soundAlertsEnabled = (bits & kPolicySoundAlertsBit) != 0;
-  policy.bookooMuteOnBuzzerOnly = (bits & kPolicyBookooMuteBit) != 0;
   policy.alertOutputChannel = static_cast<AlertOutputChannel>(
       (bits >> kPolicyAlertChannelShift) & kPolicyAlertChannelMask);
-  policy.bookooConnectBeepLevel = static_cast<uint8_t>(
+  policy.bookooVolume = static_cast<uint8_t>(
       (bits >> kPolicyBookooLevelShift) & kPolicyBookooLevelMask);
   policy.macCacheMode = static_cast<ScaleMacCacheMode>(
       (bits >> kPolicyMacCacheModeShift) & kPolicyMacCacheModeMask);
@@ -348,11 +345,8 @@ void publishScaleWorkerPolicy(const RuntimeConfig &config, bool controlReady) {
   if (!config.soundAlertsMuted) {
     bits |= kPolicySoundAlertsBit;
   }
-  if (config.bookooMuteOnBuzzerOnly) {
-    bits |= kPolicyBookooMuteBit;
-  }
   bits |= static_cast<uint32_t>(channel) << kPolicyAlertChannelShift;
-  bits |= static_cast<uint32_t>(config.bookooConnectBeepLevel)
+  bits |= static_cast<uint32_t>(config.bookooVolume)
           << kPolicyBookooLevelShift;
   bits |= static_cast<uint32_t>(cacheMode) << kPolicyMacCacheModeShift;
   scaleWorkerPolicyBits.store(bits, std::memory_order_release);
@@ -1475,8 +1469,7 @@ void applyBookooConnectBeepPolicy() {
   }
   const ScaleWorkerPolicySnapshot policy = currentScaleWorkerPolicy();
   const int8_t volume = bookooDesiredVolume(
-      policy.soundAlertsEnabled, policy.alertOutputChannel,
-      policy.bookooMuteOnBuzzerOnly, policy.bookooConnectBeepLevel);
+      policy.soundAlertsEnabled, policy.alertOutputChannel, policy.bookooVolume);
   if (volume >= 0) {
     uint32_t generation = scaleConnectionGenerationNow();
     const ScaleCommandAdmission admission{approveScaleGeneration, &generation};

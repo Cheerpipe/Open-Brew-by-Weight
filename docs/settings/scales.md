@@ -185,6 +185,33 @@ connection has fully closed. If a command times out during shutdown, the
 controller waits for the old connection to close before searching again; a
 delayed disconnect starts a fresh three-second pause.
 
+## Bookoo volume
+
+**Bookoo volume** sets the Bookoo's speaker for alerts, together with the
+alert output chosen under [Alerts](../alerts.md#choose-an-output):
+
+- **1–5**: the volume used when alerts play on the scale (**Scale only** or
+  **Scale first**). With **Buzzer only**, or with sound alerts off, the scale
+  is kept silent so it does not beep alongside the buzzer. The Themis Ultra
+  goes up to 3; a saved 4 or 5 is skipped on it with a warning in the log.
+- **Off**: the scale is always kept silent.
+- **Don't change**: the controller never sends a volume, so the scale keeps
+  whatever you set on it or in the BooKoo app.
+
+The controller sends the volume after the first valid weight on the first
+connection of that scale in each session; reconnecting does not resend it.
+Changing a setting that alters the effective volume applies it to a connected
+scale right away; saving unrelated settings sends nothing.
+
+When the chosen value does not suit the alert output, a note right below the
+setting explains why — for example **Off** with **Scale only**, where no alert
+would be heard, or a volume with **Buzzer only**, where the scale stays
+silent anyway. The value is still saved exactly as you chose it.
+
+Firmware updates keep what you hear today: a previously muted scale keeps its
+level, and a scale that was left alone in **Buzzer only** becomes
+**Don't change**.
+
 ## Keep a Bookoo awake while the machine is on
 
 A Bookoo switches itself off after the idle time set on the scale. With
@@ -256,8 +283,7 @@ drip correction; one lifted before, or a hold ended by the next shot, does not.
 | **Drip delay (s)** | 3.0 s | 0–10 s | Wait after a shot ends before capturing the final post-drip weight. `0` finalizes on the next control loop with no intentional window. |
 | **Scale timer stop delay (ms)** | 0 ms | 0–1000 ms | Pad after the scale timer catches up to circuit whole seconds, before `STOP_TIMER`. `0` stops in that same instant. Does not delay the local machine circuit beep. |
 | **Bookoo combined command** | ON | ON / OFF | Combined tare + start-timer. Requires automatic tare at shot start. Also listed under [Tare](tare.md). |
-| **Mute the Bookoo speaker** | ON | ON / OFF | Bookoo/generic: send silence (volume 0) after the first valid weight on the first connection of that scale in this Open Brew by Weight session. Reconnecting does not resend it. Applies only in **Buzzer only**. |
-| **Scale volume** | 3 | 1–5 or Disabled | Bookoo/generic: set after the first valid weight on the first connection of that scale in this Open Brew by Weight session. Mini accepts levels 1–5; Ultra accepts 1–3. **Off** sends volume 0. A previously saved 4 or 5 remains saved but is skipped with a warning on a recognized Ultra. Reconnecting does not resend it. Changes that alter the effective speaker volume also apply to a stable link; saving unrelated settings does not resend the command. Applies only in **Scale only** and **Scale first**. |
+| **Bookoo volume** | 3 | Don't change, Off, 1–5 | Bookoo/generic: set after the first valid weight on the first connection of that scale in this Open Brew by Weight session, and again when a settings change alters it. See [Bookoo volume](#bookoo-volume). |
 | **Keep the scale awake while the machine is on** | OFF | ON / OFF | Bookoo only: while a machine connection reports the machine confirmed on and no shot or rinse runs, restarts the scale's own auto-off countdown so it stays on. See [Keep a Bookoo awake](#keep-a-bookoo-awake-while-the-machine-is-on). |
 | **AtomHeart Eclair** | informational | — | Uses normal tare/timer commands. No configurable volume, beep, mode, combined command, or documented command sound. In Buzzer only and Scale priority, alerts use the local buzzer; Scale only omits unsupported sounds. |
 

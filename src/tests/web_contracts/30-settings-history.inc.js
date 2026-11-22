@@ -79,10 +79,11 @@
         field.addEventListener = (type, fn) => events[type] = fn;
         // Settings-owned helpers are module locals; the rest come from R.
         new Function('document', 'R',
-            'const {clearBrewFieldErrors, refreshBrewWarnings, renderPresetReview} = R, autosave = {};' + bindings)(
+            'const {clearBrewFieldErrors, refreshBrewWarnings, refreshBookooVolumeWarning,' +
+            ' renderPresetReview} = R, autosave = {};' + bindings)(
             {querySelectorAll: () => [field]}, {
           settingsSectionOf: () => 'brew', noteEdit() {},
-          clearBrewFieldErrors() {}, refreshBrewWarnings() {},
+          clearBrewFieldErrors() {}, refreshBrewWarnings() {}, refreshBookooVolumeWarning() {},
           updateBbwControls() {}, updateConfigGroups: refresh, renderPresetReview() {}
         });
         for (const type of ['input', 'change']) {

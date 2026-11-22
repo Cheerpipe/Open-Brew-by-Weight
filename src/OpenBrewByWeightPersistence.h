@@ -95,6 +95,10 @@ inline bool repairPersistedSettings(PersistedSettings &s) {
     r.beanconquerorEndpoint = RuntimeConfig{}.beanconquerorEndpoint;
     repaired = true;
   }
+  if (!validBookooVolume(r.bookooVolume)) {
+    r.bookooVolume = RuntimeConfig{}.bookooVolume;
+    repaired = true;
+  }
   if (validateRuntimeConfig(r) != ConfigValidationError::NONE ||
       r.timezoneSource >= 3 || r.timezoneAutomatic > 1) {
     reset(r);

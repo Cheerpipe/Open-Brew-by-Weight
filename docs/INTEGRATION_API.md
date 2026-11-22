@@ -206,7 +206,7 @@ params substituted in order (see the example above).
 | ``BULLSEYE_TEST_REQUIRES_READY`` | The Bullseye melody can be tested only while Ready. |
 | ``CLOCK_SYNC_REQUIRES_IDLE`` | Stop the cycle, switch the physical activator OFF, and wait for Ready before syncing the clock. |
 | ``CONFIG_BBW_RETARE_RELATION`` | Earliest weight stop must be at least the effective retare window + 3 s. |
-| ``CONFIG_BOOKOO_VOLUME_RANGE`` | Bookoo scale volume must be disabled (0) or 1 to 5. |
+| ``CONFIG_BOOKOO_VOLUME_RANGE`` | Bookoo volume must be 0 (off) to 5, or 255 to leave the scale's volume unchanged. |
 | ``CONFIG_COMBINED_TARE_REQUIRES_AUTOTARE`` | The Bookoo combined command requires automatic tare. |
 | ``CONFIG_FAST_BEFORE_RULES`` | The shot time window must start at least 2 s after the earliest weight stop, end at least 1 s later, and use 0.5 s steps. |
 | ``CONFIG_FAST_MARGIN_RULES`` | Extra yield for fast shots must be 0.5 to 25.5 g, at most half of the target, and keep the target plus extra within 200 g. |

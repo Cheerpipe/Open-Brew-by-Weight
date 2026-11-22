@@ -108,9 +108,9 @@ local buzzer whenever one is compiled in, including Scale only and Scale
 priority with a connected scale. The scale timer may keep running briefly
 after machine circuit opens; that does not delay the stop beep.
 
-**Mute the Bookoo speaker** and **Scale volume** live under
-[Scales](settings/scales.md). They change scale speaker behavior, not this
-Alerts group.
+**Bookoo volume** lives under [Scales](settings/scales.md#bookoo-volume). It
+follows the output you choose here: with **Buzzer only** the scale stays
+silent, and a level applies only while alerts play on the scale.
 
 ## Example
 

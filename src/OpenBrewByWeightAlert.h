@@ -46,13 +46,13 @@ struct AlertChannelContext {
 };
 
 // -1 leaves the scale's speaker untouched; 0 explicitly silences it.
+// Don't change never touches it; Off always silences it; a level applies
+// only while alerts play on the scale and silences it otherwise.
 inline int8_t bookooDesiredVolume(bool alertsEnabled,
-                                  AlertOutputChannel channel,
-                                  bool muteOnBuzzerOnly, uint8_t level) {
-  if (!alertsEnabled) return 0;
-  if (channel == AlertOutputChannel::BUZZER_ONLY)
-    return muteOnBuzzerOnly ? 0 : -1;
-  return level <= BOOKOO_BEEP_LEVEL_MAX ? static_cast<int8_t>(level) : int8_t{-1};
+                                  AlertOutputChannel channel, uint8_t volume) {
+  if (volume > BOOKOO_BEEP_LEVEL_MAX) return -1;
+  if (!alertsEnabled || channel == AlertOutputChannel::BUZZER_ONLY) return 0;
+  return static_cast<int8_t>(volume);
 }
 
 inline bool alertEventScaleCapable(AlertEvent event) {

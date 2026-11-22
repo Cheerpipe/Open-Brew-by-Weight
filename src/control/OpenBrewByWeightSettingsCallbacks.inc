@@ -28,8 +28,7 @@ const RuntimeSettingsSubscription runtimeSettingsSubscribers[] = {
     {[](const RuntimeConfig &a, const RuntimeConfig &b) {
        return a.soundAlertsMuted != b.soundAlertsMuted ||
               a.alertOutputChannel != b.alertOutputChannel ||
-              a.bookooMuteOnBuzzerOnly != b.bookooMuteOnBuzzerOnly ||
-              a.bookooConnectBeepLevel != b.bookooConnectBeepLevel ||
+              a.bookooVolume != b.bookooVolume ||
               a.scaleMacCacheMode != b.scaleMacCacheMode;
      }, [](const RuntimeConfig &, const RuntimeConfig &after) {
        publishScaleWorkerPolicy(after, firmwareInitializationComplete);
@@ -79,16 +78,13 @@ const RuntimeSettingsSubscription runtimeSettingsSubscribers[] = {
      }},
     {[](const RuntimeConfig &a, const RuntimeConfig &b) {
        return bookooDesiredVolume(!a.soundAlertsMuted,
-                 effectiveAlertOutputChannel(a.alertOutputChannel),
-                 a.bookooMuteOnBuzzerOnly, a.bookooConnectBeepLevel) !=
+                 effectiveAlertOutputChannel(a.alertOutputChannel), a.bookooVolume) !=
               bookooDesiredVolume(!b.soundAlertsMuted,
-                 effectiveAlertOutputChannel(b.alertOutputChannel),
-                 b.bookooMuteOnBuzzerOnly, b.bookooConnectBeepLevel);
+                 effectiveAlertOutputChannel(b.alertOutputChannel), b.bookooVolume);
      }, [](const RuntimeConfig &, const RuntimeConfig &after) {
        const int8_t volume = bookooDesiredVolume(
            !after.soundAlertsMuted,
-           effectiveAlertOutputChannel(after.alertOutputChannel),
-           after.bookooMuteOnBuzzerOnly, after.bookooConnectBeepLevel);
+           effectiveAlertOutputChannel(after.alertOutputChannel), after.bookooVolume);
        if (volume == 0) requestBookooSilenceIfConfigured();
        else if (volume > 0) requestBookooAlertVolumeRestore();
      }},

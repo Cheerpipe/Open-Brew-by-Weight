@@ -1602,25 +1602,21 @@ if (!html.includes('<summary>Cup detection</summary>') ||
         html.indexOf('<summary>Bookoo</summary>') ||
     html.indexOf('id="canTareStartTimer"') >
         html.indexOf('<summary>Acaia</summary>') ||
-    html.indexOf('id="bookooMuteOnBuzzerOnly"') <
+    html.indexOf('id="bookooVolume"') <
         html.indexOf('<summary>Bookoo</summary>') ||
-    html.indexOf('id="bookooMuteOnBuzzerOnly"') >
+    html.indexOf('id="bookooVolume"') >
         html.indexOf('<summary>Acaia</summary>') ||
-    html.indexOf('id="bookooConnectBeepLevel"') <
+    html.indexOf('id="bookooKeepAwakeWhileMachineOn"') <
         html.indexOf('<summary>Bookoo</summary>') ||
-    html.indexOf('id="bookooConnectBeepLevel"') >
+    html.indexOf('id="bookooKeepAwakeWhileMachineOn"') >
         html.indexOf('<summary>Acaia</summary>') ||
     html.indexOf('<strong>Needs tare at shot start.</strong>') <
         html.indexOf('<summary>Bookoo</summary>') ||
     html.indexOf('<strong>Needs tare at shot start.</strong>') >
         html.indexOf('<summary>Acaia</summary>') ||
-    html.indexOf('Applies when <strong>Buzzer only</strong> is selected.') <
+    html.indexOf('How loud the Bookoo plays alerts') <
         html.indexOf('<summary>Bookoo</summary>') ||
-    html.indexOf('Applies when <strong>Buzzer only</strong> is selected.') >
-        html.indexOf('<summary>Acaia</summary>') ||
-    html.indexOf('<strong>Scale first or Scale only</strong>') <
-        html.indexOf('<summary>Bookoo</summary>') ||
-    html.indexOf('<strong>Scale first or Scale only</strong>') >
+    html.indexOf('How loud the Bookoo plays alerts') >
         html.indexOf('<summary>Acaia</summary>') ||
     html.indexOf('<summary>Acaia</summary>') <
         html.indexOf('<summary>Bookoo</summary>') ||

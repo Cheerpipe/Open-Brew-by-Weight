@@ -312,8 +312,7 @@ function machinePayload() {
     shotReactTimeoutS: $("shotReactTimeoutS") ? R.number("shotReactTimeoutS") || 0 : undefined,
     beanconquerorEndpoint: $("beanconquerorEndpoint").value,
     canTareStartTimer: $("canTareStartTimer").checked,
-    bookooMuteOnBuzzerOnly: $("bookooMuteOnBuzzerOnly").checked,
-    bookooConnectBeepLevel: Number($("bookooConnectBeepLevel").value),
+    bookooVolume: Number($("bookooVolume").value),
     bookooKeepAwakeWhileMachineOn: $("bookooKeepAwakeWhileMachineOn").checked,
     scaleTimerStopExtraDelayMs: R.number("scaleTimerStopExtraDelayMs"),
     dripDelayMs: R.sToMs("dripDelayS"),
@@ -659,6 +658,37 @@ function loadBullseyeConfig(c) {
   $("bullseyeRtttl").value = typeof c.bullseyeRtttl === "string" ? c.bullseyeRtttl : "";
   R.updateBullseyeControls();
 }
+// Explains, below the volume, a value that does not suit the alert output;
+// the value itself is always kept.
+function refreshBookooVolumeWarning() {
+  const volume = +$("bookooVolume").value,
+    channel = $("alertOutputChannel").closest(".buzzerOpt.hidden")
+      ? "scale_only"
+      : $("alertOutputChannel").value,
+    key =
+      !$("soundAlertsEnabled").checked || volume === 255
+        ? ""
+        : volume === 0
+          ? { scale_only: "scaleOnly", scale_priority: "scaleFirst" }[channel] || ""
+          : channel === "buzzer_only"
+            ? "buzzer"
+            : volume > 3 && R.uiState.bookooModel === "bookoo_ultra"
+              ? "ultra"
+              : "",
+    text =
+      {
+        scaleOnly: __WEBUI_TEXT__("settings.bookoo_volume_warn_scale_only"),
+        scaleFirst: __WEBUI_TEXT__("settings.bookoo_volume_warn_scale_first"),
+        buzzer: __WEBUI_TEXT__("settings.bookoo_volume_warn_buzzer"),
+        ultra: __WEBUI_TEXT__("settings.bookoo_volume_warn_ultra"),
+      }[key] || "",
+    warning = $("bookooVolumeWarning");
+  if (warning.textContent === text) return;
+  warning.textContent = text;
+  warning.hidden = !text;
+  if (text) $("bookooVolume").setAttribute("aria-describedby", warning.id);
+  else $("bookooVolume").removeAttribute("aria-describedby");
+}
 function applySettingsStatus(s) {
   R.uiState.bbwReadback = { ...s.config, ...s.config.bbwDrip };
   updatePreferredScaleSelect(s);
@@ -672,6 +702,8 @@ function applySettingsStatus(s) {
   $("bookooKeepAwakeWrap").classList.toggle("fieldOff", !powerKnown);
   $("bookooKeepAwakeWhileMachineOn").disabled = !R.controlsMutable || !powerKnown;
   $("bookooKeepAwakeUnavailable").hidden = powerKnown;
+  R.uiState.bookooModel = s.scale?.model;
+  refreshBookooVolumeWarning();
   R.updateBbwControls();
   const sl = s.scaleLoss,
     active = R.presetState.items.find((x) => x.id === R.presetState.activeId);
@@ -2187,9 +2219,11 @@ const GROUP_SUMMARIES = {
       : OFF,
   scale: () => picked("scalePreference"),
   bookoo: () =>
-    $("bookooConnectBeepLevel").value === "0"
-      ? __WEBUI_TEXT__("settings.sum_silent")
-      : R.sub(__WEBUI_TEXT__("settings.sum_volume"), [$("bookooConnectBeepLevel").value]),
+    ({
+      255: __WEBUI_TEXT__("settings.bookoo_volume_keep"),
+      0: __WEBUI_TEXT__("settings.sum_silent"),
+    })[$("bookooVolume").value] ||
+    R.sub(__WEBUI_TEXT__("settings.sum_volume"), [$("bookooVolume").value]),
   tare: () => {
     const cup = on("autoTareOutsideBrew"),
       start = on("autoTare");
@@ -2411,6 +2445,7 @@ export function init() {
         // preview, which re-runs over the pending set as a whole.
         clearBrewFieldErrors();
         refreshBrewWarnings();
+        refreshBookooVolumeWarning();
         renderPresetReview();
       };
       el.addEventListener("input", fn);

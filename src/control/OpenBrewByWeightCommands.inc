@@ -266,8 +266,7 @@ void processWebCommand(const WebCommand &command) {
       candidate.buzzerSlowExtendedPulseRate =
           command.config.buzzerSlowExtendedPulseRate;
       candidate.alertOutputChannel = command.config.alertOutputChannel;
-      candidate.bookooMuteOnBuzzerOnly = command.config.bookooMuteOnBuzzerOnly;
-      candidate.bookooConnectBeepLevel = command.config.bookooConnectBeepLevel;
+      candidate.bookooVolume = command.config.bookooVolume;
       candidate.bookooKeepAwakeWhileMachineOn =
           command.config.bookooKeepAwakeWhileMachineOn;
       candidate.autoRetare = command.config.autoRetare;

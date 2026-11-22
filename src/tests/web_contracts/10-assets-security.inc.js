@@ -598,20 +598,19 @@ if (!/lang="en"/.test(html) || !codeIncludes(ui, 'role="switch"') ||
     !codeIncludes(ui, 'scale_priority') ||
     !codeIncludes(ui, 'Buzzer only') ||
     !codeIncludes(ui, 'class="fieldHint"') ||
-    !codeIncludes(ui, 'id="bookooMuteOnBuzzerOnly"') ||
-    !codeIncludes(ui, 'id="bookooConnectBeepLevel"') ||
-    !html.includes('id="bookooMuteOnBuzzerOnly" type="checkbox" checked') ||
+    !codeIncludes(ui, 'id="bookooVolume"') ||
+    !codeIncludes(ui, 'id="bookooVolumeWarning"') ||
+    html.includes('bookooMuteOnBuzzerOnly') ||
     !html.includes('id="buzzerScaleConnectedBeep" type="checkbox" checked') ||
     !html.includes('id="scaleConnectedLed" type="checkbox" checked') ||
     !html.includes('Blue light while connected') ||
     !html.includes('</div><label><input id="scaleConnectedLed"') ||
     !html.includes('class="buzzerOpt scaleIncapableOpt"><input id="buzzerScaleConnectedBeep"') ||
     html.includes('buzzerOnlyOpt') ||
-    !html.includes('option value="4" selected') ||
-    !html.includes('Keeps the Bookoo silent so alerts play on the buzzer') ||
-    !html.includes('Alert volume on the Bookoo speaker (<strong>Scale first or Scale only</strong>).') ||
-    !html.includes('<strong>Needs tare at shot start.</strong>') ||
-    !html.includes('Applies when <strong>Buzzer only</strong> is selected.')) {
+    !html.includes('<option value="255">') ||
+    !html.includes('<option value="3" selected>3</option>') ||
+    !html.includes('How loud the Bookoo plays alerts when they use the scale.') ||
+    !html.includes('<strong>Needs tare at shot start.</strong>')) {
   throw new Error('Web UI must show paddle state, scale beep options, and buzzer alerts');
 }
 if (!codeIncludes(ui, 'id="operationalWallS" type="number" min="5" max="60"') ||
@@ -650,8 +649,8 @@ if (!network.includes('"firstDropBeep"') ||
     !network.includes('"buzzerExtendedPulseRate"') ||
     !network.includes('"buzzerSlowExtendedPulseRate"') ||
     !network.includes('"alertOutputChannel"') ||
-    !network.includes('"bookooMuteOnBuzzerOnly"') ||
-    !network.includes('"bookooConnectBeepLevel"') ||
+    !network.includes('"bookooVolume"') ||
+    network.includes('"bookooMuteOnBuzzerOnly"') ||
     !network.includes('"baseRevision"') ||
     !network.includes('jsonFieldPresent') ||
     !network.includes('CONFIG_REVISION_STALE') ||

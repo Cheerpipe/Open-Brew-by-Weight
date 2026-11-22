@@ -147,12 +147,10 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("config.scaleLossFixedS", config.scaleLossFixedMs / 1000.0f);
   fields.field("config.touchStopFallbackEnabled", bool(config.touchStopFallbackEnabled));
   fields.field("config.cupRemovedWeightG", static_cast<float>(config.cupRemovedWeightG));
-  fields.field("config.bookooMuteOnBuzzerOnly", bool(config.bookooMuteOnBuzzerOnly));
   fields.field("config.bookooKeepAwakeWhileMachineOn",
                bool(config.bookooKeepAwakeWhileMachineOn));
   fields.field("machinePowerKnown", machinePowerKnown);
-  fields.field("config.bookooConnectBeepLevel",
-               static_cast<unsigned long>(config.bookooConnectBeepLevel));
+  fields.field("config.bookooVolume", static_cast<unsigned long>(config.bookooVolume));
   fields.field("config.noScaleAllowRinseWhileArmed",
                bool(noScaleAllowRinseWhileArmed(config.noScaleBbwMode)));
   fields.field("config.lastShotCooldownMs", static_cast<unsigned long>(config.lastShotCooldownMs));

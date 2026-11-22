@@ -1466,20 +1466,22 @@ bool soundAlertsEnabled() {
 
 // These policy decisions execute only on the control task. The worker receives
 // a concrete volume command and never reads runtimeConfig.
+int8_t configuredBookooVolume() {
+  return bookooDesiredVolume(soundAlertsEnabled(), currentAlertOutputChannel(),
+                             runtimeConfig.bookooVolume);
+}
+
 void requestBookooSilenceIfConfigured() {
-  if (bookooDesiredVolume(soundAlertsEnabled(), currentAlertOutputChannel(),
-                          runtimeConfig.bookooMuteOnBuzzerOnly,
-                          runtimeConfig.bookooConnectBeepLevel) == 0) {
+  if (configuredBookooVolume() == 0) {
     (void)enqueueScaleDebugCommand(BookooDebugAction::VOLUME, 0);
   }
 }
 
 void requestBookooAlertVolumeRestore() {
-  if (bookooDesiredVolume(soundAlertsEnabled(), currentAlertOutputChannel(),
-                          runtimeConfig.bookooMuteOnBuzzerOnly,
-                          runtimeConfig.bookooConnectBeepLevel) > 0) {
+  const int8_t volume = configuredBookooVolume();
+  if (volume > 0) {
     (void)enqueueScaleDebugCommand(BookooDebugAction::VOLUME,
-                                   runtimeConfig.bookooConnectBeepLevel);
+                                   static_cast<uint8_t>(volume));
   }
 }
 

@@ -19,6 +19,7 @@
 #include <cmath>
 
 #include "../openBrewByWeight.cpp"
+#include "../OpenBrewByWeightSettingsCodec.h"
 #include "../OpenBrewByWeightNetworkSetup.h"
 #include "shot_curve_test_helpers.h"
 #include "shot_trace_test_decoder.h"
@@ -2902,8 +2903,7 @@ void w01_default_runtime_configuration_is_valid() {
   CHECK(DEFAULT_ALERT_OUTPUT_CHANNEL ==
         (BUZZER_SUPPORT_ENABLED ? AlertOutputChannel::BUZZER_ONLY
                                 : AlertOutputChannel::SCALE_ONLY));
-  CHECK(config.bookooMuteOnBuzzerOnly);
-  CHECK(config.bookooConnectBeepLevel == DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL);
+  CHECK(config.bookooVolume == DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL);
   CHECK(config.fastSideEnabled);
   CHECK(config.slowSideEnabled);
   CHECK(config.slowMarginDg == DEFAULT_SLOW_MARGIN_DG);
@@ -3031,9 +3031,28 @@ void w03_runtime_timing_relations_are_transactional() {
   CHECK(validateRuntimeConfig(config) ==
         ConfigValidationError::SCALE_TIMER_STOP_EXTRA_DELAY);
   config = RuntimeConfig{};
-  config.bookooConnectBeepLevel = BOOKOO_BEEP_LEVEL_MAX + 1;
+  config.bookooVolume = BOOKOO_BEEP_LEVEL_MAX + 1;
   CHECK(validateRuntimeConfig(config) ==
         ConfigValidationError::BOOKOO_CONNECT_BEEP_LEVEL);
+  config.bookooVolume = BOOKOO_VOLUME_KEEP;
+  CHECK(validateRuntimeConfig(config) == ConfigValidationError::NONE);
+  // Don't change never touches the speaker; Off always silences it; a level
+  // plays only when alerts use the scale.
+  for (const AlertOutputChannel channel :
+       {AlertOutputChannel::SCALE_ONLY, AlertOutputChannel::BUZZER_ONLY,
+        AlertOutputChannel::SCALE_PRIORITY}) {
+    const bool scaleChannel = channel != AlertOutputChannel::BUZZER_ONLY;
+    CHECK(bookooDesiredVolume(true, channel, BOOKOO_VOLUME_KEEP) == -1);
+    CHECK(bookooDesiredVolume(false, channel, BOOKOO_VOLUME_KEEP) == -1);
+    CHECK(bookooDesiredVolume(true, channel, 0) == 0);
+    CHECK(bookooDesiredVolume(true, channel, 3) == (scaleChannel ? 3 : 0));
+    CHECK(bookooDesiredVolume(false, channel, 3) == 0);
+  }
+  CHECK(migratedBookooVolume({false, 4},
+                             static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY)) ==
+        (BUZZER_SUPPORT_ENABLED ? BOOKOO_VOLUME_KEEP : 4));
+  CHECK(migratedBookooVolume({true, 4},
+                             static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY)) == 4);
   config = RuntimeConfig{};
   config.buzzerExtendedPulseRate = 9;
   CHECK(validateRuntimeConfig(config) ==
@@ -5435,7 +5454,6 @@ void w69_web_bookoo_debug_rejected_when_not_generic() {
 void w70_bookoo_connect_mutes_in_buzzer_only() {
   resetHarness(false, true);
   reachReadyFromBoot();
-  runtimeConfig.bookooMuteOnBuzzerOnly = true;
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
   publishTestScaleWorkerPolicy();
@@ -5448,8 +5466,7 @@ void w70_bookoo_connect_mutes_in_buzzer_only() {
 void w71_bookoo_connect_sets_volume_in_scale_priority() {
   resetHarness(false, true);
   reachReadyFromBoot();
-  runtimeConfig.bookooMuteOnBuzzerOnly = true;
-  runtimeConfig.bookooConnectBeepLevel = DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL;
+  runtimeConfig.bookooVolume = DEFAULT_BOOKOO_CONNECT_BEEP_LEVEL;
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::SCALE_PRIORITY);
   publishTestScaleWorkerPolicy();
@@ -5462,7 +5479,7 @@ void w71_bookoo_connect_sets_volume_in_scale_priority() {
 void w72_bookoo_connect_mutes_disabled_volume_and_skips_non_bookoo() {
   resetHarness(false, true);
   reachReadyFromBoot();
-  runtimeConfig.bookooConnectBeepLevel = 0;
+  runtimeConfig.bookooVolume = 0;
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::SCALE_PRIORITY);
   publishTestScaleWorkerPolicy();
@@ -5472,7 +5489,7 @@ void w72_bookoo_connect_mutes_disabled_volume_and_skips_non_bookoo() {
   CHECK(scale.commandLog[0] == "setBeepLevel:0");
 
   scale.commandLog.clear();
-  runtimeConfig.bookooConnectBeepLevel = 4;
+  runtimeConfig.bookooVolume = 4;
   std::strncpy(scale.connectedProtocol, "acaia",
                sizeof(scale.connectedProtocol) - 1);
   scale.independentBeepSupported = false;
@@ -5484,7 +5501,6 @@ void w72_bookoo_connect_mutes_disabled_volume_and_skips_non_bookoo() {
 void w73_apply_config_buzzer_only_sends_bookoo_silence() {
   resetHarness(false, true);
   reachReadyFromBoot();
-  runtimeConfig.bookooMuteOnBuzzerOnly = true;
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::SCALE_PRIORITY);
   scale.commandLog.clear();
@@ -5500,17 +5516,19 @@ void w73_apply_config_buzzer_only_sends_bookoo_silence() {
   CHECK(scale.commandLog[0] == "setBeepLevel:0");
 }
 
-void w74_apply_config_enabling_mute_sends_silence_only_in_buzzer_only() {
+// Leaving Don't change for a level silences the scale in Buzzer only; going
+// back to Don't change never sends a volume.
+void w74_apply_config_dont_change_never_sends_volume() {
   resetHarness(false, true);
   reachReadyFromBoot();
-  runtimeConfig.bookooMuteOnBuzzerOnly = false;
+  runtimeConfig.bookooVolume = BOOKOO_VOLUME_KEEP;
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
   scale.commandLog.clear();
   WebCommand update;
   update.type = WebCommandType::APPLY_CONFIG;
   update.config = runtimeConfig;
-  update.config.bookooMuteOnBuzzerOnly = true;
+  update.config.bookooVolume = 3;
   processWebCommand(update);
   CHECK(scaleDebugPending);
   CHECK(executePendingScaleDebugCommand());
@@ -5519,14 +5537,14 @@ void w74_apply_config_enabling_mute_sends_silence_only_in_buzzer_only() {
 
   resetHarness(false, true);
   reachReadyFromBoot();
-  runtimeConfig.bookooMuteOnBuzzerOnly = false;
+  runtimeConfig.bookooVolume = 3;
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::SCALE_PRIORITY);
   scale.commandLog.clear();
   update = WebCommand{};
   update.type = WebCommandType::APPLY_CONFIG;
   update.config = runtimeConfig;
-  update.config.bookooMuteOnBuzzerOnly = true;
+  update.config.bookooVolume = BOOKOO_VOLUME_KEEP;
   processWebCommand(update);
   CHECK(!scaleDebugPending);
   CHECK(scale.commandLog.empty());
@@ -5588,7 +5606,7 @@ void w74c_unrelated_config_save_does_not_repeat_live_effects() {
   CHECK(idleTareSettingsGeneration == idleGeneration);
 
   update.config = runtimeConfig;
-  update.config.bookooConnectBeepLevel = 2;
+  update.config.bookooVolume = 2;
   processWebCommand(update);
   CHECK(scaleDebugPending);
   CHECK(executePendingScaleDebugCommand());
@@ -5618,7 +5636,7 @@ void w74d_settings_dispatches_each_matching_subscriber_once() {
          return a.serialLogLevel != b.serialLogLevel;
        }, [](const RuntimeConfig &, const RuntimeConfig &) { ++logCalls; }},
       {[](const RuntimeConfig &a, const RuntimeConfig &b) {
-         return a.bookooConnectBeepLevel != b.bookooConnectBeepLevel;
+         return a.bookooVolume != b.bookooVolume;
        }, [](const RuntimeConfig &, const RuntimeConfig &) { ++volumeCalls; }},
   };
   const RuntimeConfig before;
@@ -5626,7 +5644,7 @@ void w74d_settings_dispatches_each_matching_subscriber_once() {
   dispatchRuntimeSettingsChanges(before, after, subscribers);
   CHECK(logCalls == 0 && volumeCalls == 0);
   after.serialLogLevel = static_cast<uint8_t>(LogLevel::DEBUG);
-  after.bookooConnectBeepLevel = 2;
+  after.bookooVolume = 2;
   dispatchRuntimeSettingsChanges(before, after, subscribers);
   CHECK(logCalls == 1 && volumeCalls == 1);
   dispatchRuntimeSettingsChanges(after, after, subscribers);
@@ -5636,7 +5654,6 @@ void w74d_settings_dispatches_each_matching_subscriber_once() {
 void w75_bookoo_discovery_connect_applies_beep_policy() {
   resetHarness(false, true);
   reachReadyFromBoot();
-  runtimeConfig.bookooMuteOnBuzzerOnly = true;
   runtimeConfig.alertOutputChannel =
       static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
   publishTestScaleWorkerPolicy();
@@ -6255,10 +6272,10 @@ void d13e_ultra_volume_rejection_preserves_saved_level() {
   setScaleConnected(true);
   CHECK(getScaleLinkSnapshot().model == ScaleModel::BookooUltra);
   CHECK(scale.features().volumeMax == 3);
-  runtimeConfig.bookooConnectBeepLevel = 5;
+  runtimeConfig.bookooVolume = 5;
   publishTestScaleWorkerPolicy();
   applyBookooConnectBeepPolicy();
-  CHECK(runtimeConfig.bookooConnectBeepLevel == 5);
+  CHECK(runtimeConfig.bookooVolume == 5);
   CHECK(scale.commandLog.empty());
   CHECK(scaleWarningContains("Connection volume 5 not sent"));
   executeScaleDebugCommand(BookooDebugAction::VOLUME, 4);
@@ -27215,7 +27232,7 @@ const TestCase testCases[] = {
     {"W71", w71_bookoo_connect_sets_volume_in_scale_priority},
     {"W72", w72_bookoo_connect_mutes_disabled_volume_and_skips_non_bookoo},
     {"W73", w73_apply_config_buzzer_only_sends_bookoo_silence},
-    {"W74", w74_apply_config_enabling_mute_sends_silence_only_in_buzzer_only},
+    {"W74", w74_apply_config_dont_change_never_sends_volume},
     {"W74b", w74b_sound_alert_master_mutes_and_cancels_all_routes},
     {"W74c", w74c_unrelated_config_save_does_not_repeat_live_effects},
     {"W74d", w74d_settings_dispatches_each_matching_subscriber_once},
