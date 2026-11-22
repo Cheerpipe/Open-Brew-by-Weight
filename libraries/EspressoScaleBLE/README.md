@@ -122,8 +122,8 @@ tones today, shared by the Themis Mini and Ultra.
 ## Requirements
 
 Release 5.0.0 uses the native NimBLE C APIs from ESP-IDF 6.1.x. The supported
-integration is the IDF component in this repository, pinned to ESP-IDF 6.1
-and Arduino-ESP32 3.3.12. It targets ESP32-S3 n16r8 boards; standalone
+integration is the IDF component in this repository, pinned to ESP-IDF 6.1.1
+and Arduino-ESP32 4.0.0. It targets ESP32-S3 n16r8 boards; standalone
 Arduino Library Manager and SAMD builds are no longer supported.
 
 The BLE lifecycle is asynchronous and deadline-bounded. The runtime owns the

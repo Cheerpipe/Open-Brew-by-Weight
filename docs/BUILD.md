@@ -142,7 +142,8 @@ source its `export.sh`. Otherwise they discover `$HOME/esp/esp-idf-v6.1.1`.
 Every path rejects versions other than 6.1.1.
 
 `idf/main/idf_component.yml` and `idf/dependencies.lock` define the component
-graph, including mDNS 1.14.1 and ESP WebSocket client 1.8.0. The WebSocket
+graph, including Arduino-ESP32 4.0.0, mDNS 1.14.1 and ESP WebSocket client
+1.8.0. The WebSocket
 component supplies selectable Micra WebSocket observation; authentication and
 commands remain HTTP. The build fails if dependency resolution changes
 the lockfile; review and commit such updates separately. First firmware builds
@@ -158,6 +159,19 @@ files.
 An ESP-IDF upgrade must change the local version guard and the generated
 component lock together; regenerate the lock with the intended
 SDK version, then run the full build gate. Do not hand-edit lockfiles.
+With that SDK active, a scratch build directory keeps the regeneration out of
+the project tree:
+
+```sh
+idf.py -C idf -B /tmp/obbw-lock -D SDKCONFIG=/tmp/obbw-lock/sdkconfig \
+  -D IDF_TARGET=esp32s3 update-dependencies
+```
+
+An Arduino-ESP32 upgrade also needs a review of the components its manifest
+adds. Dependencies the firmware never uses (Modbus, RainMaker, Insights,
+speech recognition) are replaced in `idf/main/idf_component.yml` with empty
+stubs in `idf/third_party/`; give a new unused dependency the same treatment
+before accepting the lock.
 
 ## 4. Validate before installation
 
