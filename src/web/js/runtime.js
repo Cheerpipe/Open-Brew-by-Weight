@@ -4441,18 +4441,11 @@ function renderHomePresetAccordion() {
     if (heads[focusIdx]) heads[focusIdx].focus();
   }
 }
-function updateActiveBrewProfileHint() {
-  const el = $("activeBrewProfileHint");
-  if (!el) return;
-  const p = presetState.items.find((x) => x.id === presetState.activeId);
-  el.textContent = __WEBUI_TEXT__("runtime.current_preset") + (p && p.name ? p.name : "—");
-}
 function renderAllPresetUi() {
   renderPresetCards("presetCards");
   settingsForm.renderPresetReview();
   renderHomePresetAccordion();
   updatePresetActionButtons();
-  updateActiveBrewProfileHint();
 }
 // Home writes reuse the Settings brew form: its pending autosave goes first,
 // and a form that cannot be saved drops the Home change.

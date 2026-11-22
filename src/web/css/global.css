@@ -153,10 +153,6 @@ textarea,
   .topBar .brand small {
     font-size: 0.76rem;
   }
-
-  .configSaveBar {
-    padding-bottom: 0.65rem;
-  }
 }
 
 @media (width <= 340px) {

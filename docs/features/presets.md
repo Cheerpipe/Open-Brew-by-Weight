@@ -26,8 +26,7 @@ level and **Down to 33 g** under its low one. The editor groups its settings:
 | **Time limits** | Earliest weight stop (s), Max shot time (s), Backup stop time (s) |
 | **Drip compensation** | Drip correction with its recent-shots chart, Learning speed, each applied with its **Set** key |
 
-Each change is saved to the preset in use as soon as you make it; the line
-below the recipe reads **Current preset:** followed by that preset. Everything
+Each change is saved to the preset in use as soon as you make it. Everything
 under **Shared settings** further down applies to every preset and is saved the
 same way.
 

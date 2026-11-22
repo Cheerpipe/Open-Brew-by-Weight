@@ -192,13 +192,6 @@ if (!codeIncludes(ui, '<legend>Presets</legend>') ||
     !html.includes('<span class="g" aria-hidden="true">✓</span>') ||
     codeIncludes(ui, '💾') || codeIncludes(ui, '⚡') ||
     codeIncludes(ui, 'Save preset') ||
-    !codeIncludes(ui, 'id="activeBrewProfileHint"') ||
-    !codeIncludes(ui, 'Current preset: ') ||
-    !codeIncludes(ui, 'function updateActiveBrewProfileHint(') ||
-    html.indexOf('id="activeBrewProfileHint"') <
-        html.indexOf('id="resetCalibrationButton"') ||
-    html.indexOf('id="activeBrewProfileHint"') >
-        html.indexOf('<legend>Shared settings</legend>') ||
     !codeIncludes(ui, 'id="presetResetBtn"') ||
     !codeIncludes(ui, 'id="presetDeleteBtn"') ||
     !codeIncludes(ui, 'id="presetRenameDialog"') ||
