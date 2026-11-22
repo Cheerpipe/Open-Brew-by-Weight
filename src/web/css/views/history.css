@@ -1463,7 +1463,7 @@
   text-transform: uppercase;
 }
 
-/* "Untested" in the Mahlkönig note (Settings) and beside its switch (Admin). */
+/* Mahlkönig untested warning: after the Settings note, beside the Admin switch. */
 .gbsBadge {
   margin-left: 0.35rem;
   color: var(--dn);

@@ -1,5 +1,5 @@
 // Mahlkönig Grind-by-Sync: Settings' section (collapsed groups, the legend's
-// states, the Untested badge, the cadence for the four models the controller
+// states, the untested warning, the cadence for the four models the controller
 // must ask), the E64 WS address rule shared with Beanconqueror (D11), and
 // Admin's Integrations switches with their note and the companion switch.
 (async () => {
@@ -13,7 +13,7 @@
   assert.match(section, /<details data-g="mahlkonigGrinder" class="cfgGroup">/);
   assert.match(section, /<details id="gbsSync" data-g="mahlkonigSync" class="cfgGroup" hidden>/);
   assert.ok(!/<details[^>]*\bopen\b/.test(section), 'no group is forced open');
-  assert.ok(section.includes('class="presetCardBadge gbsBadge">Untested</span>'), 'Untested badge');
+  assert.ok(section.includes('class="gbsBadge">Not tested with a real grinder yet.</span>'), 'untested warning');
   for (const model of ['e64ws', 'e65w', 'e65t', 'e80w', 'e80t'])
     assert.ok(section.includes(`name="gbsModel" value="${model}"`), model + ' is listed');
   assert.ok(!section.includes('name="gbsModel" value="none"'), 'off lives in Admin, not here');

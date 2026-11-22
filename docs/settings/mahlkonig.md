@@ -8,7 +8,7 @@ guesses.
 
 > **Not tested with a real grinder yet.** This integration follows what is
 > known about Grind-by-Sync, but nobody has confirmed it on a Mahlkönig
-> grinder. Settings marks it **Untested** until it has been. If you try it,
+> grinder. Settings and Admin say so until it has been. If you try it,
 > please tell us how it went (see [reporting a problem](#if-something-goes-wrong)).
 
 ## Turn it on

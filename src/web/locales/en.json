@@ -2325,6 +2325,7 @@
     "settings.gbs_unreach_note": "The grinder isn’t answering at {0}. Make sure it’s on and on your Wi-Fi; if its address changed, pair again with the new one.",
     "settings.gbs_unreachable": "Not answering",
     "settings.gbs_untested": "Untested",
+    "settings.gbs_untested_note": "Not tested with a real grinder yet.",
     "settings.gbs_use_pairing": "Use this pairing",
     "settings.gbs_waiting_checkin": "Waiting for the grinder to check in. Leave it on: this page moves on by itself.",
     "settings.grind_hints": "Grind hints",
