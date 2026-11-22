@@ -148,7 +148,7 @@ constexpr uint16_t MIN_DRIP_SETTLE_MS = 1000;
 constexpr uint16_t MAX_DRIP_SETTLE_MS = 10000;
 constexpr uint16_t DEFAULT_DRIP_MAX_WAIT_MS = 20000;
 constexpr uint16_t MIN_DRIP_MAX_WAIT_MS = 5000;
-constexpr uint16_t MAX_DRIP_MAX_WAIT_MS = 30000;
+constexpr uint16_t MAX_DRIP_MAX_WAIT_MS = 25000;  // the shot log's wait byte
 // A median rise this large is still dripping; half of a 0.1 g scale step.
 constexpr float DRIP_SETTLE_RISE_G = 0.05f;
 constexpr uint32_t MAX_SCALE_TIMER_STOP_CATCHUP_MS = 2000;

@@ -294,7 +294,8 @@ void finishCupWeight(uint32_t requestId, bool succeeded, bool uncertain,
                          false, -cupPresence.emptyAnchorG);
       scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, millis(),
                             {.connectionGeneration = mass.connectionGeneration,
-                             .weightG = preTareWeightG, .arg1 = cupPresencePlacementId()});
+                             .weightG = preTareWeightG, .arg1 = cupPresencePlacementId(),
+                             .arg2 = 1});
       serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
                            "Cup detected from the tare: %.1f g on the pan",
                            static_cast<double>(preTareWeightG));

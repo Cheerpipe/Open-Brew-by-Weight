@@ -48,7 +48,7 @@ uint32_t composeScaleProfileContext(char *text, size_t capacity) {
     used += snprintf(
         text + used, capacity - used,
         "settings=goalG:%.1f offsetG:%.2f autoTare:%d autoRetare:%d cupProt:%d "
-        "stopIfRemoved:%d requireCup:%d touch:%d graceMs:%lu\n",
+        "stopIfRemoved:%d requireCup:%d touch:%d graceMs:%lu dripMs:%lu/%u/%u\n",
         static_cast<double>(goalWeightDgToGrams(control->config.goalWeightDg)),
         static_cast<double>(control->config.weightOffsetG),
         control->config.autoTare ? 1 : 0, control->config.autoRetare ? 1 : 0,
@@ -56,7 +56,10 @@ uint32_t composeScaleProfileContext(char *text, size_t capacity) {
         control->config.stopIfCupRemoved ? 1 : 0,
         control->config.requireCupToStart ? 1 : 0,
         control->config.avoidAccidentalTouchEnabled ? 1 : 0,
-        static_cast<unsigned long>(control->config.postTareBaselineGraceMs));
+        static_cast<unsigned long>(control->config.postTareBaselineGraceMs),
+        static_cast<unsigned long>(control->config.dripDelayMs),
+        static_cast<unsigned>(control->config.dripSettleMs),
+        static_cast<unsigned>(control->config.dripMaxWaitMs));
   }
   if (used > 0 && static_cast<size_t>(used) < capacity) {
     snprintf(text + used, capacity - used,

@@ -64,6 +64,9 @@ void attachShotTraceStart(const ScaleLinkSnapshot &link) {
   snapshot.freePsramBytes = psramFreeBytes;
   snapshot.postTareGraceMs = session.config.postTareBaselineGraceMs;
   snapshot.retareWindowMs = session.config.retareWindowMs;
+  snapshot.dripMinWaitMs = static_cast<uint16_t>(session.config.dripDelayMs);
+  snapshot.dripSettleMs = session.config.dripSettleMs;
+  snapshot.dripMaxWaitMs = session.config.dripMaxWaitMs;
   snapshot.stabilityDurationMs = runtimeConfig.retareStabilityMinDurationMs;
   snapshot.stabilityGapMs = runtimeConfig.retareStabilityMaxGapMs;
   snapshot.stabilitySamples = runtimeConfig.retareStabilitySamples;

@@ -166,6 +166,11 @@ struct ShotTraceSnapshot {
   int8_t wifiRssi;
   char scaleName[32];
   char scaleProtocol[20];
+  // Drip hold: minimum wait, settle time and maximum wait.
+  uint16_t dripMinWaitMs;
+  uint16_t dripSettleMs;
+  uint16_t dripMaxWaitMs;
+  uint16_t reserved;
 };
 
 struct ShotTraceCounters {
@@ -204,7 +209,7 @@ struct ShotTraceBuffer {
 };
 static_assert(sizeof(ShotTraceRecord) == 8 && sizeof(ShotTracePreShot) == 16 &&
                   sizeof(ShotTraceHeader) == 88 && offsetof(ShotTraceHeader, eventsCheck) == 64 &&
-                  sizeof(ShotTraceSnapshot) == 108 &&
+                  sizeof(ShotTraceSnapshot) == 116 &&
                   sizeof(ShotTraceCounters) == 84,
               "Shot trace wire layout");
 static_assert(sizeof(ShotTraceBuffer) == SHOT_TRACE_BUFFER_BYTES &&
@@ -793,6 +798,7 @@ class ShotTrace {
       case ScaleProfileEvent::CUP_RESET:
       case ScaleProfileEvent::REFERENCE_CHANGED:
       case ScaleProfileEvent::FINALIZE_CANCELLED:
+      case ScaleProfileEvent::DRIP_HOLD_END:
         return true;
       default:
         return false;

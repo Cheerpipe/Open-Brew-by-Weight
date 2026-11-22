@@ -1643,7 +1643,7 @@ if (!html.includes('id="postTareBaselineGraceS" type="number" min="0.5" max="10"
 }
 if (!codeIncludes(ui, "rangeCheck('dripDelayS',0,10,'Minimum drip wait',{unit:'s',}") ||
     !codeIncludes(ui, "rangeCheck('dripSettleS',1,10,'Settle time',{unit:'s',}") ||
-    !codeIncludes(ui, "rangeCheck('dripMaxWaitS',Math.max(5,number('dripDelayS')||0),30,'Maximum drip wait',{unit:'s'},)") ||
+    !codeIncludes(ui, "rangeCheck('dripMaxWaitS',Math.max(5,number('dripDelayS')||0),25,'Maximum drip wait',{unit:'s'},)") ||
     !codeIncludes(ui, "dripDelayMs:sToMs('dripDelayS')") ||
     !codeIncludes(ui, "dripSettleMs:sToMs('dripSettleS')") ||
     !codeIncludes(ui, "dripMaxWaitMs:sToMs('dripMaxWaitS')") ||
@@ -1652,7 +1652,7 @@ if (!codeIncludes(ui, "rangeCheck('dripDelayS',0,10,'Minimum drip wait',{unit:'s
     !codeIncludes(ui, "$('dripMaxWaitS').value=String((c.dripMaxWaitMs??20000)/1000)") ||
     !codeIncludes(ui, 'The yield is never recorded sooner than this after the stop.') ||
     !codeIncludes(ui, 'id="dripSettleS" type="number" min="1" max="10" step="0.1"') ||
-    !codeIncludes(ui, 'id="dripMaxWaitS" type="number" min="5" max="30" step="1"') ||
+    !codeIncludes(ui, 'id="dripMaxWaitS" type="number" min="5" max="25" step="1"') ||
     !network.includes('fields.field("config.dripDelayMs",') ||
     !network.includes('fields.field("config.dripSettleMs",') ||
     !network.includes('fields.field("config.dripMaxWaitMs",') ||

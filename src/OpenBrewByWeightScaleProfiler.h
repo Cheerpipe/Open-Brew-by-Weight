@@ -122,11 +122,19 @@ enum class ScaleProfileEvent : uint8_t {
   FINALIZE_CANCELLED,
   FIRST_DROP_SEEKING_FA,
   CUP_ANCHOR_REJECTED,
+  DRIP_HOLD_END,
 };
 // Kinds in use; a kind appended above must move this (the shot trace
 // vocabulary lists exactly these; asserted after scaleProfileEventName).
 constexpr size_t SCALE_PROFILE_EVENT_COUNT =
-    static_cast<size_t>(ScaleProfileEvent::CUP_ANCHOR_REJECTED) + 1U;
+    static_cast<size_t>(ScaleProfileEvent::DRIP_HOLD_END) + 1U;
+
+// Why a post-shot drip hold ended (DRIP_HOLD_END arg2); append only.
+enum class DripHoldEnd : uint8_t { WAITING, IMMEDIATE, SETTLED, MAX_WAIT, NO_READING };
+constexpr const char *dripHoldEndName(uint32_t end) {
+  constexpr const char *names[] = {"waiting", "immediate", "settled", "max_wait", "no_reading"};
+  return end < sizeof(names) / sizeof(names[0]) ? names[end] : "unknown";
+}
 
 // Append-only signal IDs. Values are scalars, not another control state machine.
 #define SCALE_PROFILE_SIGNALS(X) \
@@ -312,6 +320,7 @@ constexpr const char *scaleProfileEventName(ScaleProfileEvent kind) {
     case ScaleProfileEvent::FINALIZE_CANCELLED: return "FINALIZE_CANCELLED";
     case ScaleProfileEvent::FIRST_DROP_SEEKING_FA: return "FIRST_DROP_SEEKING_FA";
     case ScaleProfileEvent::CUP_ANCHOR_REJECTED: return "CUP_ANCHOR_REJECTED";
+    case ScaleProfileEvent::DRIP_HOLD_END: return "DRIP_HOLD_END";
   }
   return "UNKNOWN";
 }
@@ -1938,9 +1947,15 @@ inline size_t formatScaleProfileRow(char *out, size_t capacity,
       break;
     case ScaleProfileEvent::CUP_PLACED:
     case ScaleProfileEvent::CUP_REMOVED:
-      snprintf(suffix, sizeof(suffix), " placement=%lu pkt=%lu",
+      // arg2 1: a placement the shot-start tare proved.
+      snprintf(suffix, sizeof(suffix), " placement=%lu pkt=%lu%s",
                static_cast<unsigned long>(record.arg1),
-               static_cast<unsigned long>(record.sequence));
+               static_cast<unsigned long>(record.sequence),
+               record.arg2 == 1 ? " source=tare" : "");
+      break;
+    case ScaleProfileEvent::DRIP_HOLD_END:
+      snprintf(suffix, sizeof(suffix), " held_ms=%lu reason=%s",
+               static_cast<unsigned long>(record.arg1), dripHoldEndName(record.arg2));
       break;
     case ScaleProfileEvent::CUP_ANCHOR_CHANGED:
       snprintf(suffix, sizeof(suffix), " placement=%lu anchorCg=%ld",

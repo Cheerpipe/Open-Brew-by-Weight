@@ -277,6 +277,8 @@ all use. The wait adapts to each shot:
 
 Lifting the cup ends the wait at any point, and the shot keeps the weight it
 had already settled at (see below). Starting the next shot also ends it.
+History and Stats show how long each shot actually waited (**Drip wait**),
+and the Web UI log says why the wait ended.
 
 The final weight is the weight the cup settles at during that wait, not simply
 the last reading. If you bump the cup, press on it, or rest something on the
@@ -298,7 +300,7 @@ drip correction; one lifted before, or a hold ended by the next shot, does not.
 | **My scale** | First detected | First detected, No preferred, or a BLE-seen scale | **First detected** is shown only while no preferred MAC is saved and **My scale first** or **Only my scale** is active. The controller scans by compatible name and adopts the first scale that completes a successful connection; advertisements and failed connections are not enough. **Any scale** instead shows **None saved** because that mode never locks a scale. The dropdown's **Forget** key removes the scale from the saved list, rename included, and pauses discovery for 30 s; the Scale preference mode stays. |
 | **Minimum drip wait (s)** | 3.0 s | 0–10 s | The yield is never recorded sooner than this after the stop. `0` records it right away, without waiting for the weight to settle. |
 | **Settle time (s)** | 3.0 s | 1–10 s | After the minimum wait, the yield is recorded once the weight has stopped rising for this long. Normal scale flicker of a tenth of a gram does not restart it. |
-| **Maximum drip wait (s)** | 20 s | 5–30 s, at least the minimum | The yield is recorded at this point even if the weight is still changing. |
+| **Maximum drip wait (s)** | 20 s | 5–25 s, at least the minimum | The yield is recorded at this point even if the weight is still changing. |
 | **Scale timer stop delay (ms)** | 0 ms | 0–1000 ms | Pad after the scale timer catches up to circuit whole seconds, before `STOP_TIMER`. `0` stops in that same instant. Does not delay the local machine circuit beep. |
 | **Bookoo combined command** | ON | ON / OFF | Combined tare + start-timer. Requires automatic tare at shot start. Also listed under [Tare](tare.md). |
 | **Bookoo volume** | 3 | Don't change, Off, 1–5 | Bookoo/generic: set after the first valid weight on the first connection of that scale in this Open Brew by Weight session, and again when a settings change alters it. See [Bookoo volume](#bookoo-volume). |

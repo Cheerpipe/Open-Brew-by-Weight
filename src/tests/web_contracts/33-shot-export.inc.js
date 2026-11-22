@@ -131,7 +131,7 @@
   const vocab = {version: 1, profile: [], debug: [], signals: [], endReasons: [],
     weightSources: ['none', 'post_drip', 'last_known']};
   Object.assign(vocab.profile, {16: 'CUP_PLACED', 17: 'CUP_REMOVED', 21: 'FIRST_DROP',
-    31: 'STATE_CHANGED'});
+    31: 'STATE_CHANGED', 39: 'DRIP_HOLD_END'});
   Object.assign(vocab.debug, {2: 'machine circuit closed'});
   Object.assign(vocab.signals, {12: 'IDLE_ELIGIBILITY', 19: 'WEIGHT_CONTROL'});
   Object.assign(vocab.endReasons, {3: 'scale threshold'});
@@ -153,12 +153,22 @@
     trace.snapshot.scaleName, trace.snapshot.stabilitySamples, trace.snapshot.flags.autoTare,
     trace.snapshot.flags.cupPresent, trace.snapshot.flags.cupTared], [50, null, 'Lunar', 5, true,
     true, false]);
+  assert.deepEqual([trace.snapshot.dripMinWaitMs, trace.snapshot.dripSettleMs,
+    trace.snapshot.dripMaxWaitMs], [3000, 3000, 20000]);
+  // A record saved before the drip waits joined the snapshot still decodes.
+  const olderHex = fs.readFileSync(path.join(sketchDir, 'tests', 'fixtures',
+      'shot_trace_v1_snapshot108_hex.txt'), 'utf8').replace(/\s/g, '');
+  const older = JSON.parse(JSON.stringify(context.decodeShotTrace(
+      new Uint8Array(olderHex.match(/../g).map((h) => parseInt(h, 16))).buffer, vocab)));
+  check(schema.$defs.trace, older, 'trace');
+  assert.deepEqual([older.snapshot.scaleName, older.snapshot.dripMinWaitMs,
+    older.snapshot.dripSettleMs, older.snapshot.dripMaxWaitMs], ['Lunar', null, null, null]);
   // A pre-shot argument wider than 16 bits keeps its high half.
   assert.deepEqual(trace.preShot.sort((x, y) => x.code - y.code), [{beforeMs: 900, type: 'profile',
     code: 16, name: 'CUP_PLACED', a: 800, b: 3, arg1: 3, arg2: 0, repeats: 1},
   {beforeMs: 500, type: 'profile', code: 17, name: 'CUP_REMOVED', a: 5, b: 70001 & 0xffff,
     arg1: 70001, arg2: 9, repeats: 0}]);
-  assert.equal(trace.events.length, 11, 'Continuations merge into their record');
+  assert.equal(trace.events.length, 12, 'Continuations merge into their record');
   const byName = (n) => trace.events.find((e) => e.name === n);
   assert.deepEqual(byName('FIRST_DROP'), {atMs: 6000, type: 'profile', code: 21,
     name: 'FIRST_DROP', a: 12, b: 70000 & 0xffff, ext: [1, 5, 0]});
@@ -166,9 +176,10 @@
     name: 'machine circuit closed', a: (100000 << 16) >> 16, b: 7, ext: [0, 1, 0]});
   assert.deepEqual(trace.events.filter((e) => e.signal === 'WEIGHT_CONTROL')
       .map((e) => [e.a, e.initial]), [[1, true]]);
-  assert.deepEqual(trace.events.slice(-4).map((e) => [e.type, e.name, e.atMs]),
+  assert.deepEqual(trace.events.slice(-5).map((e) => [e.type, e.name, e.atMs]),
       [['trace', 'SLOW_WINDOW_END', 35000], ['trace', 'OVER_LINE', 36000],
-        ['trace', 'STOP_REQUESTED', 40000], ['trace', 'FINAL_WEIGHT', 42000]]);
+        ['trace', 'STOP_REQUESTED', 40000], ['profile', 'DRIP_HOLD_END', 41900],
+        ['trace', 'FINAL_WEIGHT', 42000]]);
   // Readable names and details for each namespace; unknown ones stay generic.
   const detail = (e) => context.traceDetail(e, vocab);
   assert.equal(context.traceName('FIRST_DROP'), 'First drop');
@@ -185,10 +196,11 @@
       '8 · after 2.5 s', 'Without a name the end reason stays a number');
   assert.equal(detail(byName('STOP_REQUESTED')), 'Scale threshold · from the Web UI');
   assert.equal(detail(byName('FINAL_WEIGHT')), '36.2 g · Last known');
+  assert.equal(detail(byName('DRIP_HOLD_END')), '36.2 g · drip wait 6.4 s · Settled');
   const generic = JSON.parse(JSON.stringify(context.decodeShotTrace(fixture, {...vocab, version: 2})));
   assert.deepEqual(generic.events.slice(0, 2).map((e) => e.name), ['profile_21', 'profile_31']);
   assert.ok(!('signal' in generic.events[1]), 'Signals come from the matching vocabulary');
-  assert.equal(context.traceDetail(generic.events.at(-2), null), '3 · from the Web UI',
+  assert.equal(context.traceDetail(generic.events.at(-3), null), '3 · from the Web UI',
       'Another vocabulary never names its end reasons');
   assert.throws(() => context.decodeShotTrace(fixture.slice(0, 200), vocab), /could not be read/);
   const torn = new Uint8Array(fixture.slice(0));
@@ -226,14 +238,14 @@
   const rows = dom.shotTraceEvents.children;
   // Opening the view focuses the dialog, never a control with a focus ring.
   assert.ok(dom.shotTraceDialog.open && dom.shotTraceDialog.focused &&
-      dom.shotTraceDialog.tabIndex === -1 && rows.length === 11);
+      dom.shotTraceDialog.tabIndex === -1 && rows.length === 12);
   assert.deepEqual(rows.map((li) => li.children[0].textContent).slice(0, 2), ['6.00 s', '7.00 s']);
   assert.equal(rowText(rows.find((li) => li.dataset.type === 'debug')),
       '8.00 s Machine circuit closed 100000 · 7');
   assert.ok(/restarted during this shot/.test(dom.shotTraceFlags.textContent) &&
       /\(0 scale events, 4 decisions\)/.test(dom.shotTraceFlags.textContent) &&
       !dom.shotTraceFlags.hidden);
-  assert.match(dom.shotTraceMeta.textContent, /^today · .+ · 11 events$/);
+  assert.match(dom.shotTraceMeta.textContent, /^today · .+ · 12 events$/);
   dom.shotTraceType.value = 'trace';
   dom.shotTraceType.onchange();
   assert.equal(rows.filter((li) => !li.hidden).length, 4);

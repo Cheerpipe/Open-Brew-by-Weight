@@ -409,7 +409,7 @@ struct ShotLogRecord {
   uint8_t fastMarginDg;   // Relative to the target; meaningful with the side on.
   uint8_t slowMarginDg;
   uint8_t cutRampDs;      // Fast ramp length D (0 = step).
-  // Drip delay + 1 ds; 0 = unknown.
+  // Drip wait the shot held + 1 ds; 0 = unknown.
   uint8_t dripDelayCode;
   // Machine integration's live coffee target at the shot's end; 0 = the
   // integration reported none.

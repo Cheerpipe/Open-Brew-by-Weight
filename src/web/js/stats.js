@@ -1523,7 +1523,7 @@ function renderShots() {
       __WEBUI_TEXT__("runtime.preset"),
       __WEBUI_TEXT__("runtime.scale"),
       __WEBUI_TEXT__("runtime.cut_at"),
-      __WEBUI_TEXT__("runtime.drip_delay"),
+      __WEBUI_TEXT__("stats.drip_delay"),
     ];
     const G = __WEBUI_TEXT__("runtime.g"),
       S = __WEBUI_TEXT__("runtime.s");
@@ -2625,6 +2625,10 @@ function decodeShotTrace(buffer, vocab) {
       wifiRssi: snapFlags & 0x4000 ? v.getInt8(snap + 55) : null,
       scaleName: text(snap + 56, 32),
       scaleProtocol: text(snap + 88, 20),
+      // Appended in a later firmware: an older record's snapshot is shorter.
+      dripMinWaitMs: u16(80) >= 116 ? u16(snap + 108) : null,
+      dripSettleMs: u16(80) >= 116 ? u16(snap + 110) : null,
+      dripMaxWaitMs: u16(80) >= 116 ? u16(snap + 112) : null,
       flags: Object.fromEntries(TRACE_SNAPSHOT_FLAGS.map((k, i) => [k, !!(snapFlags & (1 << i))])),
     },
     counters: counted,
@@ -2695,6 +2699,13 @@ function traceDetail(e, vocab) {
     return `${traceName(e.signal)} = ${e.a}${e.initial ? " · " + __WEBUI_TEXT__("stats.trace_initial") : ""}`;
   const arg1 = e.arg1 ?? ((x0 << 16) | e.b) >>> 0,
     arg2 = e.arg2 ?? (e.ext ? ((x2 << 16) | (x1 & 0xffff)) >>> 0 : 0);
+  // The drip wait and why it ended (firmware dripHoldEndName order).
+  if (e.name === "DRIP_HOLD_END")
+    return [
+      g(e.a),
+      R.sub(__WEBUI_TEXT__("stats.trace_drip_wait"), [(arg1 / 1000).toFixed(1)]),
+      traceName(["waiting", "immediate", "settled", "max_wait", "no_reading"][arg2] || arg2),
+    ].join(" · ");
   return [e.a !== -32768 && g(e.a), (arg1 || arg2) && arg1 + " · " + arg2]
     .filter(Boolean)
     .join(" · ");

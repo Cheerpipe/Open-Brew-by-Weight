@@ -516,7 +516,8 @@
               "type": [
                 "number",
                 "null"
-              ]
+              ],
+              "description": "Seconds the shot waited for its drips before the yield was recorded; with a fixed drip delay, that delay."
             }
           }
         },
@@ -946,6 +947,18 @@
             },
             "scaleProtocol": {
               "type": "string"
+            },
+            "dripMinWaitMs": {
+              "type": ["integer", "null"],
+              "description": "Minimum drip wait; null in a record saved before it was captured."
+            },
+            "dripSettleMs": {
+              "type": ["integer", "null"],
+              "description": "Drip settle time; null in a record saved before it was captured."
+            },
+            "dripMaxWaitMs": {
+              "type": ["integer", "null"],
+              "description": "Maximum drip wait; null in a record saved before it was captured."
             },
             "flags": {
               "type": "object",

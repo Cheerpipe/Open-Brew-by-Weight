@@ -219,7 +219,7 @@ function validateMachineClient() {
     rangeCheck(
       "dripMaxWaitS",
       Math.max(5, R.number("dripDelayS") || 0),
-      30,
+      25,
       __WEBUI_TEXT__("runtime.drip_max_wait"),
       { unit: __WEBUI_TEXT__("runtime.s") },
     ) ||

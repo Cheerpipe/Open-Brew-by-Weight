@@ -78,12 +78,12 @@ padding. One buffer holds a whole record and is `SHOT_TRACE_BUFFER_BYTES`
 | Offset | Section | Bytes |
 | --- | --- | --- |
 | 0 | Header | 88 |
-| 88 | Start snapshot | `snapshotBytes` (108) |
-| 196 | End counters | `countersBytes` (84) |
-| 280 | Pre-shot entries | `preShotCapacity` × 16 (32 × 16) |
-| 792 | Events | `eventCount` × 8, at most 1,949 |
+| 88 | Start snapshot | `snapshotBytes` (116; 108 before the drip waits) |
+| 204 | End counters | `countersBytes` (84) |
+| 288 | Pre-shot entries | `preShotCapacity` × 16 (32 × 16) |
+| 800 | Events | `eventCount` × 8, at most 1,948 |
 
-A record is therefore 792 to 16,384 bytes. Decoders must take section sizes
+A record is therefore 800 to 16,384 bytes. Decoders must take section sizes
 from the header, not from this table.
 
 ### Header
@@ -132,6 +132,7 @@ are signed centigrams; `INT32_MIN` means unknown.
 | `idleEligibility`, `idleLastReason` | `IdleTareReason` values |
 | `wifiRssi` | dBm, valid with flag bit 14 |
 | `scaleName`, `scaleProtocol` | NUL-terminated |
+| `dripMinWaitMs`, `dripSettleMs`, `dripMaxWaitMs` | u16 each, then a zero u16; absent (null when decoded) in a 108-byte snapshot |
 
 ### End counters
 

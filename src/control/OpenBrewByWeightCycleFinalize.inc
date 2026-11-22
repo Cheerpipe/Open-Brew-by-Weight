@@ -485,7 +485,10 @@ uint32_t commitPendingShotLog(const PendingShotFinalize &snapshot, float finalWe
   record.slowRampCode = static_cast<uint16_t>(snapshot.slowRampMs / 100U + 1U);
   record.fastCurve = snapshot.fastCurve;
   record.slowCurve = snapshot.slowCurve;
-  record.dripDelayCode = static_cast<uint8_t>(snapshot.dripDelayMs / 100U + 1U);
+  // The wait the shot actually held; under fixed drip delays it was the delay.
+  static_assert(MAX_DRIP_MAX_WAIT_MS / 100U + 1U <= UINT8_MAX, "dripDelayCode holds the wait");
+  record.dripDelayCode = static_cast<uint8_t>(
+      std::min<uint32_t>(elapsedMs(snapshot.endedAtMs), MAX_DRIP_MAX_WAIT_MS) / 100U + 1U);
   record.targetTempDeciC = snapshot.targetTempDeciC;
   record.doseDg = snapshot.activePresetDoseDg;
   record.arrivalDs = SHOT_LOG_METRIC_MISSING;
@@ -754,19 +757,23 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
 // Drip delay is the minimum hold (0 finalizes at once). The shot then waits
 // until its tail median has stopped rising for the settle time, up to the
 // maximum wait; without a fresh scale reading there is nothing to wait for.
-bool dripHoldComplete(const PendingShotFinalize &pending) {
+DripHoldEnd dripHoldEnd(const PendingShotFinalize &pending) {
   const uint32_t heldMs = elapsedMs(pending.endedAtMs);
-  if (heldMs < pending.dripDelayMs) return false;
-  if (pending.dripDelayMs == 0 || heldMs >= pending.dripMaxWaitMs ||
-      !pending.startedWithScale || !scaleAvailable() || !currentWeightIsFresh()) {
-    return true;
-  }
+  if (heldMs < pending.dripDelayMs) return DripHoldEnd::WAITING;
+  if (pending.dripDelayMs == 0) return DripHoldEnd::IMMEDIATE;
+  if (heldMs >= pending.dripMaxWaitMs) return DripHoldEnd::MAX_WAIT;
+  if (!pending.startedWithScale || !scaleAvailable() || !currentWeightIsFresh())
+    return DripHoldEnd::NO_READING;
   return std::isfinite(pending.tailPlateauG) &&
-         elapsedMs(pending.tailPlateauAtMs) >= pending.dripSettleMs;
+                 elapsedMs(pending.tailPlateauAtMs) >= pending.dripSettleMs
+             ? DripHoldEnd::SETTLED
+             : DripHoldEnd::WAITING;
 }
 
 void pendingShotFinalizeTask() {
-  if (!pendingFinalize.pending || !dripHoldComplete(pendingFinalize)) return;
+  if (!pendingFinalize.pending) return;
+  const DripHoldEnd holdEnd = dripHoldEnd(pendingFinalize);
+  if (holdEnd == DripHoldEnd::WAITING) return;
 
   captureLateTareCompletion();
   const ProfileControlObservation profile;
@@ -808,6 +815,16 @@ void pendingShotFinalizeTask() {
     logWeightG = snapshot.lastKnownWeightG;
   }
 
+  const uint32_t heldMs = elapsedMs(snapshot.endedAtMs);
+  scaleProfileNoteEvent(ScaleProfileEvent::DRIP_HOLD_END, millis(),
+                        {.connectionGeneration = snapshot.scaleConnectionGeneration,
+                         .weightG = logWeightValid ? logWeightG : NAN, .arg1 = heldMs,
+                         .arg2 = static_cast<uint32_t>(holdEnd)});
+  char yieldText[16] = "no final weight";
+  if (logWeightValid) snprintf(yieldText, sizeof(yieldText), "%.1fg", static_cast<double>(logWeightG));
+  serialTracef(LogLevel::INFO, "Drip wait ended after %.1f s (%s): %s",
+               static_cast<double>(heldMs) / 1000.0,
+               dripHoldEndName(static_cast<uint32_t>(holdEnd)), yieldText);
   // Keep the cutoff time and settled-yield annotation separate from observations.
   if (logWeightValid) {
     (void)settleShotCurveEndWeight(snapshot.curve, logWeightG);

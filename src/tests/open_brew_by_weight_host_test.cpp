@@ -17561,6 +17561,7 @@ void s11_shot_log_record_includes_preset_snapshot() {
   snapshot.protectionMs = 12000;
   snapshot.wallMs = 50000;
   snapshot.dripDelayMs = 0;
+  snapshot.endedAtMs = hostMillis;  // Committed at once: a 0 s drip wait.
   snapshot.rateAtStopX100 = 2108;  // 2.108 g/s at the stop command.
   commitPendingShotLog(snapshot, 39.0f, true, ActualWeightSource::POST_DRIP);
   ShotLogRecord stored[1] = {};
@@ -17570,7 +17571,7 @@ void s11_shot_log_record_includes_preset_snapshot() {
   CHECK(r.fastBeforeDs == 270 && r.slowAfterDs == 340 && r.delayDs == 120);
   CHECK(r.wallDs == 500 && r.fastMarginDg == 40 && r.slowMarginDg == 30);
   CHECK(r.cutRampDs == 0 && shotLogFastGuardEnabled(r.sideFlags));
-  CHECK(r.dripDelayCode == 1);  // A 0 s drip delay stays distinct from "not recorded".
+  CHECK(r.dripDelayCode == 1);  // A 0 s drip wait stays distinct from "not recorded".
   CHECK(corridor::verdictOf(r.verdict) == corridor::Verdict::FAST);
   CHECK(r.arrivalDs == 226);  // 24.5 s - 4 g / 2.108 g/s.
   CHECK(shotLogFastExtended(r.extractionExtended) && !shotLogSlowExtended(r.extractionExtended));
@@ -22618,6 +22619,18 @@ void startDripHold(bool bullseyeEligible) {
   pendingFinalize.lastKnownWeightG = 34.8f;
   pendingFinalize.lastKnownWeightValid = true;
   pendingFinalize.endedAtMs = hostMillis;
+  CHECK(scaleProfiler().hostStartNoFlash(hostMillis));
+}
+
+// The drip hold end the profiler recorded, and the wait the record stored.
+void checkDripHoldEnd(DripHoldEnd reason) {
+  uint32_t recorded = 0;
+  CHECK(profileEventCount(ScaleProfileEvent::DRIP_HOLD_END, &recorded) == 1);
+  CHECK(recorded == static_cast<uint32_t>(reason));
+  ShotLogRecord record[1] = {};
+  CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+  CHECK(record[0].dripDelayCode == elapsedMs(pendingFinalize.endedAtMs) / 100U + 1U);
+  scaleProfiler().hostStop(ScaleProfilerStopReason::USER, hostMillis);
 }
 
 // Feeds one post-stop reading 300 ms after the previous one and services the hold.
@@ -22647,6 +22660,7 @@ void cd03_drip_hold_waits_for_the_tail_to_settle() {
   CHECK(elapsedMs(plateauAtMs) >= DEFAULT_DRIP_SETTLE_MS);
   CHECK(elapsedMs(plateauAtMs) < DEFAULT_DRIP_SETTLE_MS + 300);
   CHECK(elapsedMs(pendingFinalize.endedAtMs) < DEFAULT_DRIP_MAX_WAIT_MS);
+  checkDripHoldEnd(DripHoldEnd::SETTLED);
   ShotLogRecord record[1] = {};
   CHECK(shotLog.copyNewestFirst(record, 1) == 1);
   CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::POST_DRIP);
@@ -22667,6 +22681,7 @@ void cd03_drip_hold_waits_for_the_tail_to_settle() {
   markScaleWorkerProgress();
   pendingShotFinalizeTask();
   CHECK(!pendingFinalize.pending);
+  checkDripHoldEnd(DripHoldEnd::MAX_WAIT);
 
   // Without a fresh reading there is nothing to wait for past the minimum.
   startDripHold(false);
@@ -22678,6 +22693,7 @@ void cd03_drip_hold_waits_for_the_tail_to_settle() {
   markScaleWorkerProgress();
   pendingShotFinalizeTask();
   CHECK(!pendingFinalize.pending);
+  checkDripHoldEnd(DripHoldEnd::NO_READING);
 }
 
 void cd04_bullseye_is_judged_on_the_recorded_yield() {
@@ -25610,6 +25626,9 @@ void trc25_the_web_ui_trace_fixture_is_a_real_trace() {
     snapshot.emptyReferenceCg = INT32_MIN;
     snapshot.flags = SHOT_TRACE_SNAP_AUTO_TARE | SHOT_TRACE_SNAP_CUP_PRESENT;
     copyCString(snapshot.scaleName, sizeof(snapshot.scaleName), "Lunar");
+    snapshot.dripMinWaitMs = 3000;
+    snapshot.dripSettleMs = 3000;
+    snapshot.dripMaxWaitMs = 20000;
     shotTrace().attachStart(snapshot, 7);
     shotTrace().noteProfile({.weightG = 1.2f, .arg1 = 70000, .arg2 = 5,
                              .kind = static_cast<uint16_t>(ScaleProfileEvent::FIRST_DROP)},
@@ -25622,6 +25641,10 @@ void trc25_the_web_ui_trace_fixture_is_a_real_trace() {
                      SHOT_TRACE_SLOW_REACHED);
     shotTrace().note(ShotTraceKind::OVER_LINE, 46000, 352, 340, true, 18, 2);
     shotTrace().note(ShotTraceKind::STOP_REQUESTED, 50000, 3, SHOT_TRACE_STOP_WEB);
+    shotTrace().noteProfile({.weightG = 36.2f, .arg1 = 6400,
+                             .arg2 = static_cast<uint32_t>(DripHoldEnd::SETTLED),
+                             .kind = static_cast<uint16_t>(ScaleProfileEvent::DRIP_HOLD_END)},
+                            51900);
     shotTrace().note(ShotTraceKind::FINAL_WEIGHT, 52000, 362, 2);
     shotTrace().complete(12, 7, 52000, 3);
     bytes = shot_trace_test::exportBytes();
@@ -25648,6 +25671,12 @@ void trc25_the_web_ui_trace_fixture_is_a_real_trace() {
         removed->event.b == (70001 & 0xFFFF) && removed->arg2 == 9);
   CHECK(t.snapshot.minimumCupCg == 5000 && t.snapshot.emptyReferenceCg == INT32_MIN &&
         strcmp(t.snapshot.scaleName, "Lunar") == 0);
+  CHECK(t.snapshot.dripMinWaitMs == 3000 && t.snapshot.dripSettleMs == 3000 &&
+        t.snapshot.dripMaxWaitMs == 20000);
+  const shot_trace_test::Event *hold = shot_trace_test::find(t, ScaleProfileEvent::DRIP_HOLD_END);
+  CHECK(hold != nullptr && hold->ms == 41900 && hold->a == 362 &&
+        hold->profileArg1() == 6400 &&
+        hold->profileArg2() == static_cast<uint32_t>(DripHoldEnd::SETTLED));
   const shot_trace_test::Event *drop = shot_trace_test::find(t, ScaleProfileEvent::FIRST_DROP);
   CHECK(drop != nullptr && drop->ms == 6000 && drop->a == 12 && drop->more &&
         drop->profileArg1() == 70000 && drop->profileArg2() == 5);
@@ -25658,7 +25687,7 @@ void trc25_the_web_ui_trace_fixture_is_a_real_trace() {
   CHECK(control != nullptr && control->a == 1 && (control->b & SHOT_TRACE_STATE_INITIAL) != 0);
   const shot_trace_test::Event *slow = shot_trace_test::find(t, ShotTraceKind::SLOW_WINDOW_END);
   CHECK(slow != nullptr && slow->ms == 35000 && slow->a == 351 && slow->more && slow->moreA == 18);
-  CHECK(t.events.size() == 11);  // 5 initial states, a drop, a relay, 4 trace kinds.
+  CHECK(t.events.size() == 12);  // 5 initial states, a drop, a relay, a drip hold, 4 trace kinds.
 }
 
 void trc11_idle_placement_evidence_reaches_the_next_trace() {
@@ -26052,7 +26081,7 @@ void tpw07_power_loss_while_saving_loses_only_that_trace() {
       ShotTracePoolStatus status = ShotTracePoolStatus::OK;
       const std::vector<uint8_t> lost = poolTraceBytes(2, 7, 200000, &status);
       CHECK(status == ShotTracePoolStatus::NOT_FOUND || (status == ShotTracePoolStatus::OK &&
-                                                         lost.size() == 792U + 900U * 8U));
+                                                         lost.size() == SHOT_TRACE_FIXED_BYTES + 900U * 8U));
       completePoolTestTrace(3, 7, 300000);
       serviceShotTracePool();
       hostRebootShotTracePool();

@@ -212,7 +212,7 @@ params substituted in order (see the example above).
 | ``CONFIG_FAST_MARGIN_RULES`` | Extra yield for fast shots must be 0.5 to 25.5 g, at most half of the target, and keep the target plus extra within 200 g. |
 | ``CONFIG_FAST_RAMP_STEPS`` | Fast transition must be from 0 to 25.5 s in 0.5 s steps. |
 | ``CONFIG_FIELDS_INVALID`` | Config must be a JSON object with known fields and correct types. |
-| ``CONFIG_DRIP_WAIT_RELATION`` | Maximum drip wait must be from 5 to 30 s and at least the minimum drip wait. |
+| ``CONFIG_DRIP_WAIT_RELATION`` | Maximum drip wait must be from 5 to 25 s and at least the minimum drip wait. |
 | ``CONFIG_INVALID`` | Invalid configuration. |
 | ``CONFIG_LOCKED_DURING_ACTIVE_CYCLE`` | Configuration is locked while a cycle is active. |
 | ``CONFIG_NTP_CUSTOM_INVALID`` | Custom NTP hostname is invalid (letters, digits, '.', '-'; max 63 chars). |
@@ -991,8 +991,12 @@ pan, 1 for cup placement, and 2 for accessory settling. Their `pkt` is the
 control packet sequence. `CUP_ANCHOR_REJECTED` marks one steady empty-pan
 plateau rejected as off the empty reference, with its `placement` and signed
 `offset_cg`. `CUP_RESET` is a logical reset, not proof of physical
-removal. `FINALIZE_CANCELLED` distinguishes cup continuity, a new cycle, and
-rinse. Existing shot-end reasons continue to describe guard stop outcomes.
+removal. `CUP_PLACED` with `source=tare` is a cup the shot-start tare proved
+before it had time to qualify. `FINALIZE_CANCELLED` distinguishes cup
+continuity, a new cycle, and rinse. `DRIP_HOLD_END` closes every other drip
+hold with the recorded yield as its weight, `held_ms` since the stop and a
+`reason`: `immediate` (minimum wait 0), `settled`, `max_wait` or `no_reading`.
+The `settings=` header line ends with `dripMs:` minimum/settle/maximum waits. Existing shot-end reasons continue to describe guard stop outcomes.
 
 For correlation, follow `IDLE_REQUEST_ID`/`IDLE_PLACEMENT_ID`/`IDLE_ORIGIN` for
 idle tare, and `SHOT_TARE_REQUEST_ID`/`RETARE_REQUEST_ID`/`CYCLE_ID` for shot
@@ -1038,7 +1042,7 @@ CRC-32. Nothing is read or sent while a shot runs.
 
 | Status | Code | When |
 | --- | --- | --- |
-| `200` | — | The trace, 792 B to 16 KiB |
+| `200` | — | The trace, 800 B to 16 KiB (792 B for one saved before the drip waits) |
 | `304` | — | `If-None-Match` names the record's current ETag |
 | `404` | `NO_SHOT_TRACE` | No query: no trace since the last restart (or the recovered one failed verification). With a query: no summary with that identity, the shot has no trace (made without one, or a later shot's capture overwrote it before it was saved), or the pool recycled the record |
 | `409` | `SHOT_TRACE_BUSY` | The controller may not read storage now: a shot runs (cycle start to the end of its drip delay), or a rinse, a closed relay, a scale connecting or a maintenance lease holds the durable write gate |

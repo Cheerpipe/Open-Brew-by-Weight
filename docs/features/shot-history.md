@@ -717,7 +717,7 @@ weight columns show what the scale read, and their flow columns stay empty.
 Next come the stop details: `cut_s` is the shot time when the machine stopped,
 `cut_weight_g` the weight on the scale at that moment, `drip_g` the settled
 yield minus that weight (empty unless the yield was read after the drip
-delay), and `drip_delay_s` the minimum drip wait that shot used. All four stay empty
+delay), and `drip_delay_s` how long that shot waited for its drips. All four stay empty
 when the shot has no recorded stop; `drip_delay_s` is also empty for shots
 saved before it was recorded.
 
