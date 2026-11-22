@@ -109,8 +109,9 @@ priority with a connected scale. The scale timer may keep running briefly
 after machine circuit opens; that does not delay the stop beep.
 
 **Bookoo volume** lives under [Scales](settings/scales.md#bookoo-volume). It
-follows the output you choose here: with **Buzzer only** the scale stays
-silent, and a level applies only while alerts play on the scale.
+follows the output you choose here: a level applies only while alerts play
+on the scale, and with **Buzzer only** the scale stays silent unless the
+volume is set to **Don't change**.
 
 ## Example
 

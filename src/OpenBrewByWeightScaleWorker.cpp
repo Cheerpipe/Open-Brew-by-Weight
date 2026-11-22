@@ -2660,16 +2660,15 @@ void publishScaleKeepAwake(bool requested) {
 }
 
 // Restarts the scale's own auto-off countdown while the control task asks for
-// it. Never during connection setup, queued commands or a power-off; a
-// failure is logged once per connection and never touches link state.
+// it. Last in the worker's command order, so never ahead of a queued or
+// pending command; never during connection setup or a power-off. A failure is
+// logged once per connection and never touches link state.
 static void serviceScaleAutoOffReset() {
   const uint32_t now = millis();
   if (!scaleKeepAwakeRequested.load(std::memory_order_acquire) ||
       bookooConnectVolumePending ||
       !scale.features().has(ScaleFeatureAutoOffReset) ||
       scalePowerOffBlocksGeneration(scaleConnectionGenerationNow()) ||
-      (scaleCommandQueue != nullptr &&
-       uxQueueMessagesWaiting(scaleCommandQueue) > 0) ||
       now - autoOffResetAtMs < SCALE_AUTO_OFF_RESET_PERIOD_MS) {
     return;
   }
@@ -2720,7 +2719,6 @@ void serviceScaleWorkerLink() {
     snapshotDirty = true;
   }
   serviceBookooConnectBeepPolicy(sawWeight);
-  serviceScaleAutoOffReset();
   if (!scale.isLinkUp()) {
     cancelBookooConnectBeepPolicy();
     updateWorkerLinkState();
@@ -2962,7 +2960,10 @@ void scaleWorkerTask(void *) {
             if (takeScaleDebugCommand(debugAction, debugLevel)) {
               executeScaleDebugCommand(debugAction, debugLevel);
               finishScaleSection(ScaleWorkerPhase::COMMANDS);
-            } else if (!linked && !applyScaleDiscoveryPause()) {
+            } else if (linked) {
+              serviceScaleAutoOffReset();
+              finishScaleSection(ScaleWorkerPhase::COMMANDS);
+            } else if (!applyScaleDiscoveryPause()) {
               serviceScaleWorkerDiscovery(discovery);
               finishScaleSection(ScaleWorkerPhase::DISCOVERY);
             }

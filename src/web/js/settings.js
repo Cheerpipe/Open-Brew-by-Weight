@@ -662,14 +662,15 @@ function loadBullseyeConfig(c) {
 // the value itself is always kept.
 function refreshBookooVolumeWarning() {
   const volume = +$("bookooVolume").value,
-    channel = $("alertOutputChannel").closest(".buzzerOpt.hidden")
-      ? "scale_only"
-      : $("alertOutputChannel").value,
+    noBuzzer = !!$("alertOutputChannel").closest(".buzzerOpt.hidden"),
+    channel = noBuzzer ? "scale_only" : $("alertOutputChannel").value,
     key =
       !$("soundAlertsEnabled").checked || volume === 255
         ? ""
         : volume === 0
-          ? { scale_only: "scaleOnly", scale_priority: "scaleFirst" }[channel] || ""
+          ? noBuzzer
+            ? "noBuzzer"
+            : { scale_only: "scaleOnly", scale_priority: "scaleFirst" }[channel] || ""
           : channel === "buzzer_only"
             ? "buzzer"
             : volume > 3 && R.uiState.bookooModel === "bookoo_ultra"
@@ -680,6 +681,7 @@ function refreshBookooVolumeWarning() {
         scaleOnly: __WEBUI_TEXT__("settings.bookoo_volume_warn_scale_only"),
         scaleFirst: __WEBUI_TEXT__("settings.bookoo_volume_warn_scale_first"),
         buzzer: __WEBUI_TEXT__("settings.bookoo_volume_warn_buzzer"),
+        noBuzzer: __WEBUI_TEXT__("settings.bookoo_volume_warn_no_buzzer"),
         ultra: __WEBUI_TEXT__("settings.bookoo_volume_warn_ultra"),
       }[key] || "",
     warning = $("bookooVolumeWarning");

@@ -2130,6 +2130,7 @@
     "settings.bookoo_volume_hint": "How loud the Bookoo plays alerts when they use the scale. With Buzzer only, or with sound alerts off, the scale stays silent. Off always keeps it silent; Don't change leaves the scale's own volume alone.",
     "settings.bookoo_volume_keep": "Don't change",
     "settings.bookoo_volume_warn_buzzer": "Alerts play on the buzzer, so the scale stays silent. This volume is only used when alerts play on the scale.",
+    "settings.bookoo_volume_warn_no_buzzer": "Alerts play on the scale, but its speaker is Off, so you won't hear any alert. Choose a volume.",
     "settings.bookoo_volume_warn_scale_first": "Alerts play on the scale while it is connected, but its speaker is Off, so you won't hear them then. Choose a volume, or send alerts to the buzzer.",
     "settings.bookoo_volume_warn_scale_only": "Alerts play only on the scale, but its speaker is Off, so you won't hear any alert. Choose a volume, or send alerts to the buzzer.",
     "settings.bookoo_volume_warn_ultra": "The Themis Ultra goes up to 3, so this level won't be applied to it.",

@@ -217,6 +217,8 @@
       ';return refreshBookooVolumeWarning;')(id => els[id], R);
   const cases = [
     ['0', 'scale_only', true, false, null, "won't hear any alert"],
+    // Without a buzzer, Off never suggests sending alerts to one.
+    ['0', 'scale_priority', true, true, null, 'Choose a volume.'],
     ['0', 'scale_priority', true, false, null, 'while it is connected'],
     ['0', 'buzzer_only', true, false, null, ''],
     ['3', 'buzzer_only', true, false, null, 'the scale stays silent'],

@@ -3354,10 +3354,6 @@ void p91g_beanconqueror_endpoint_tag() {
   CHECK(strcmp(beanconquerorEndpointId(BEANCONQUEROR_GAGGIUINO), "gaggiuino") == 0);
 }
 
-// Tag 93 is additive: a blob without it (every earlier image, so every OTA
-// upgrade) reads Machine control off; a blob with it round-trips, and an
-// image that does not know the tag (an OTA downgrade) skips it like any
-// unknown field, so the rest of the group still loads.
 // Tag 94 is additive: an older blob, so every OTA upgrade, keeps the Bookoo
 // awake option off; a blob with it round-trips.
 void p91i_bookoo_keep_awake_tag() {
@@ -3421,6 +3417,10 @@ void p91j_bookoo_volume_migrates_retired_tags() {
         corrupt.runtime.goalWeightDg == DEFAULT_GOAL_WEIGHT_DG + 10);
 }
 
+// Tag 93 is additive: a blob without it (every earlier image, so every OTA
+// upgrade) reads Machine control off; a blob with it round-trips, and an
+// image that does not know the tag (an OTA downgrade) skips it like any
+// unknown field, so the rest of the group still loads.
 void p91h_machine_power_control_tag() {
   PersistedSettings on;
   CHECK(initializeDefaultSettings(on));
