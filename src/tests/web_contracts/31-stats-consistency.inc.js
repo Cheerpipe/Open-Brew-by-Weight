@@ -159,18 +159,18 @@
   };
   assert.deepEqual(choices(1, false, 10).shown, []);
   assert.deepEqual(choices(10, false, 10).shown, []);
-  assert.deepEqual(choices(11, false, 10).shown, [10, 50]);
-  assert.deepEqual(choices(51, false, 10).shown, [10, 50, 100]);
-  assert.deepEqual(choices(134, false, 10).shown, [10, 50, 100]);
-  assert.deepEqual(choices(134, true, 10).shown, [10, 50, 100, 500]);
-  assert.deepEqual(choices(501, true, 10).shown, [10, 50, 100, 500, 1000]);
-  assert.deepEqual(choices(50, false, 10).shown, [10, 50]);
-  assert.deepEqual(choices(50, true, 10).shown, [10, 50]);
-  assert.deepEqual(choices(500, true, 10).shown, [10, 50, 100, 500]);
-  assert.deepEqual(choices(501, false, 10).shown, [10, 50, 100]);
+  assert.deepEqual(choices(11, false, 10).shown, [10, 25]);
+  assert.deepEqual(choices(51, false, 10).shown, [10, 25, 50, 100]);
+  assert.deepEqual(choices(134, false, 10).shown, [10, 25, 50, 100]);
+  assert.deepEqual(choices(134, true, 10).shown, [10, 25, 50, 100, 500]);
+  assert.deepEqual(choices(501, true, 10).shown, [10, 25, 50, 100, 500, 1000]);
+  assert.deepEqual(choices(50, false, 10).shown, [10, 25, 50]);
+  assert.deepEqual(choices(50, true, 10).shown, [10, 25, 50]);
+  assert.deepEqual(choices(500, true, 10).shown, [10, 25, 50, 100, 500]);
+  assert.deepEqual(choices(501, false, 10).shown, [10, 25, 50, 100]);
   for (const n of [1, 10]) assert.deepEqual(choices(n, true, 10).shown, []);
-  assert.deepEqual(choices(11, true, 10).shown, [10, 50]);
-  assert.deepEqual(choices(51, true, 10).shown, [10, 50, 100]);
+  assert.deepEqual(choices(11, true, 10).shown, [10, 25]);
+  assert.deepEqual(choices(51, true, 10).shown, [10, 25, 50, 100]);
   const fallen = choices(30, true, 500);
   assert.deepEqual([fallen.selected, fallen.sent], [50, [50]], 'a hidden window falls to the largest shown');
   // 1000 -> 500 leaves the controller's window at 100 (the stub records the
@@ -183,12 +183,12 @@
   // kept for when the merged header returns.
   const fallback = choices(134, false, 500);
   assert.deepEqual([fallback.shown, fallback.pressed, fallback.selected, fallback.sent],
-      [[10, 50, 100], [100], 500, []]);
+      [[10, 25, 50, 100], [100], 500, []]);
   assert.deepEqual(choices(134, true, 500).pressed, [500]);
   // A controller holding few shots (after a factory reset) presses the largest
   // window shown and keeps the 500 for when the merged header returns.
   const few = choices(30, false, 500, true);
-  assert.deepEqual([few.shown, few.pressed, few.selected, few.sent], [[10, 50], [50], 500, []]);
+  assert.deepEqual([few.shown, few.pressed, few.selected, few.sent], [[10, 25, 50], [50], 500, []]);
 }
 // The companion archive merge (S9, S12): one comparator over both sources, a
 // cut at the first row a source still has to send, a record both hold shown

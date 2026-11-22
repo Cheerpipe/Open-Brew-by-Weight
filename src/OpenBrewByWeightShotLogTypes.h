@@ -27,7 +27,7 @@ constexpr size_t SHOT_LOG_PAGE_DEFAULT = 10;
 // Maximum number of records in each independent read-time Stats window.
 constexpr size_t SHOT_LOG_STATS_WINDOW = 10;
 // Windows the Web UI Stats panel can select; the first is the default.
-constexpr size_t SHOT_LOG_STATS_WINDOWS[] = {SHOT_LOG_STATS_WINDOW, 50, 100};
+constexpr size_t SHOT_LOG_STATS_WINDOWS[] = {SHOT_LOG_STATS_WINDOW, 25, 50, 100};
 constexpr size_t SHOT_LOG_STATS_WINDOW_MAX = 100;
 // Options per Shots-list filter group, and the facets the Stats header lists.
 constexpr size_t SHOT_LIST_FILTER_MAX = 8;

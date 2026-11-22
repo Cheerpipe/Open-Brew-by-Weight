@@ -1412,7 +1412,7 @@ const statsWindowState = { shown: [], pressed: 10, merged: false };
 function statsWindowChoices() {
   const merged = !!statsMerged,
     n = merged ? (statsMergedGood ?? statsGood) : statsGood,
-    sizes = merged ? [10, 50, 100, 500, 1000] : [10, 50, 100],
+    sizes = merged ? [10, 25, 50, 100, 500, 1000] : [10, 25, 50, 100],
     shown = sizes.filter((v, i) => i === 0 || sizes[i - 1] < n),
     chosen = merged ? R.uiState.statsWindow : Math.min(R.uiState.statsWindow, 100),
     standIn = !merged && (R.archiveView || archiveStatsReady()),
@@ -3205,7 +3205,7 @@ export function init() {
   if (ready) return;
   ready = true;
   const saved = statsChartsStored();
-  if ([10, 50, 100, 500, 1000].includes(saved.window)) R.uiState.statsWindow = saved.window;
+  if ([10, 25, 50, 100, 500, 1000].includes(saved.window)) R.uiState.statsWindow = saved.window;
   if (Number.isInteger(saved.preset) && saved.preset >= 0) R.uiState.statsPreset = saved.preset;
   if (saved.band === "ewma") R.uiState.statsBand = "ewma";
   R.setStatsRenderers({
