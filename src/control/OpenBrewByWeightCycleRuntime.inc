@@ -281,11 +281,28 @@ void finishCupWeight(uint32_t requestId, bool succeeded, bool uncertain,
   auto &mass = cupPresence.weight;
   if (requestId == 0 || requestId != mass.pendingId) return;
   if (succeeded) {
-    cupPresence.emptyAnchorG = mass.pendingPlacementId == cupPresencePlacementId()
-        ? mass.pendingEmptyAnchorG - preTareWeightG : NAN;
-    mass.valid = mass.pendingValid && std::isfinite(preTareWeightG) &&
-        cupPresenceState() == CupPresenceState::PRESENT &&
-        mass.pendingPlacementId == cupPresencePlacementId();
+    const bool samePlacement = mass.pendingPlacementId == cupPresencePlacementId();
+    // A tare that zeroed a minimum cup above every plausible empty pan proves
+    // a cup set down too late to qualify as a placement.
+    const bool inferCup = samePlacement && cupPresenceState() == CupPresenceState::ABSENT &&
+        !cupPresence.referenceUncertain && std::isfinite(preTareWeightG) &&
+        preTareWeightG >= cupLoadFloorG(mass.pendingEmptyAnchorG, false);
+    cupPresence.emptyAnchorG = samePlacement ? mass.pendingEmptyAnchorG - preTareWeightG : NAN;
+    if (inferCup) {
+      commitCupPlacement(0.0f, 0.0f, 0.0f,
+                         cupPresence.emptyAnchorG + runtimeConfig.minimumCupWeightG, millis(),
+                         false, -cupPresence.emptyAnchorG);
+      scaleProfileNoteEvent(ScaleProfileEvent::CUP_PLACED, millis(),
+                            {.connectionGeneration = mass.connectionGeneration,
+                             .weightG = preTareWeightG, .arg1 = cupPresencePlacementId()});
+      serialTraceCategoryf(LogLevel::INFO, DebugCategory::SCALE,
+                           "Cup detected from the tare: %.1f g on the pan",
+                           static_cast<double>(preTareWeightG));
+    } else {
+      mass.valid = mass.pendingValid && std::isfinite(preTareWeightG) &&
+          cupPresenceState() == CupPresenceState::PRESENT && samePlacement;
+    }
+    mass.absent.valid = false;  // An empty plateau read before the new zero.
     if (std::isfinite(cupPresence.emptyAnchorG)) {
       scaleProfileNoteEvent(ScaleProfileEvent::CUP_ANCHOR_CHANGED, millis(),
                             {.arg1 = mass.pendingPlacementId,
@@ -748,6 +765,12 @@ void notePostStopTailSample(PendingShotFinalize &pending, float weightG,
   pending.tailMedianG = sorted[POST_STOP_TAIL_SAMPLE_COUNT / 2U];
   // fmaxf ignores the NAN the highest median starts from.
   pending.tailSettledG = fmaxf(pending.tailSettledG, pending.tailMedianG);
+  // A median that rises by a drip restarts the settle time; a dip does not.
+  if (!std::isfinite(pending.tailPlateauG) ||
+      pending.tailMedianG >= pending.tailPlateauG + DRIP_SETTLE_RISE_G) {
+    pending.tailPlateauG = pending.tailMedianG;
+    pending.tailPlateauAtMs = atMs;
+  }
 }
 
 // Settled weight of the plausible post-stop tail: its last median. Early
@@ -958,7 +981,6 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
     if (cupSampleValid) observeIdleAccessory(weight, receivedAtMs);
   }
   if (cupEvent == CupPresenceEvent::REMOVED) {
-    bullseyeTracker.clear();
     // Momentary-only IDLE_UNCONFIRMED run-state settle — independent of cut.
     pendingCupRemovedSettle = true;
     if (session.active && stopperState == StopperState::BREW &&

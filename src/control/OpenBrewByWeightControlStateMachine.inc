@@ -3,7 +3,6 @@
 
 void resetSessionForNewCycle(ControlSource source) {
   backflushStopReason = "none";
-  bullseyeTracker.clear();
   session = CycleSession{};
   session.id = nextCycleId++;
   setScaleCommandCycle(session.id);
@@ -380,27 +379,17 @@ bool finalizeCycle(EndReason reason, StopperState nextState,
   }
   scheduleScaleTimerStopAfterCycle(durationMs);
 
-  // Bullseye celebrates an On recipe weight cut only.
-  if (!rinseEnd && corridor::weightCutReason(static_cast<uint8_t>(reason)) &&
+  // Bullseye celebrates an On recipe weight cut only; finalize judges its yield.
+  const bool bullseyeEligible =
+      !rinseEnd && corridor::weightCutReason(static_cast<uint8_t>(reason)) &&
       corridor::extendedVerdict(
           corridor::arrivalVerdict(session.cut.params,
                                    {static_cast<int32_t>(durationMs),
                                     session.cut.rate.valid ? session.cut.rate.rateX100 : 0}),
           session.extractionExtended, session.slowExtractionExtended)
-              .verdict == corridor::Verdict::ON_RECIPE &&
-      bullseyeMelodyConfig.enabled && soundAlertsEnabled() &&
-      currentAlertOutputChannel() == AlertOutputChannel::BUZZER_ONLY &&
-      localBuzzer.ready) {
-    bullseyeTracker.arm({.targetWeightDg = session.config.goalWeightDg,
-                         .endedAtMs = millis(),
-                         .dripDelayMs = session.config.dripDelayMs,
-                         .endedWeightSequence = currentWeightSequence,
-                         .cupPlacementId = cupPresencePlacementId()});
-  } else {
-    bullseyeTracker.clear();
-  }
-
+              .verdict == corridor::Verdict::ON_RECIPE;
   schedulePendingShotFinalize(reason, durationMs, cycleEndTime);
+  pendingFinalize.bullseyeEligible = pendingFinalize.pending && bullseyeEligible;
   appendActivationHistory(reason, rinseEnd, durationMs, cycleEndTime);
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
   {

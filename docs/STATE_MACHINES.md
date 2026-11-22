@@ -153,7 +153,11 @@ reset the estimator. Safety trips, hard/operational walls, physical stop, cup
 removal and A→M keep their existing authority; nothing in the smooth cut can
 suspend the wall or the circuit limit.
 
-After drip delay, history records captured values and whether learning applied.
+After the drip hold, history records captured values and whether learning
+applied. The hold lasts at least `dripDelayMs` (0 finalizes at once), then ends
+once the tail median has not risen by 0.05 g for `dripSettleMs`, at
+`dripMaxWaitMs`, on a cup event, on the next cycle, or when no fresh reading
+remains. Bullseye is decided at that moment, on the recorded yield.
 The settled yield is the median of a ring of the last five post-stop readings
 taken at least 250 ms apart (a full ring spans 1 s). If that median is more
 than 2 g below the highest median the ring reached, the highest is used:

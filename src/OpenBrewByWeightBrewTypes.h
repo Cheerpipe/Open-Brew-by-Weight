@@ -141,6 +141,16 @@ constexpr uint32_t DEFAULT_SCALE_TIMER_STOP_EXTRA_DELAY_MS = 0;
 constexpr uint32_t MAX_SCALE_TIMER_STOP_EXTRA_DELAY_MS = 1000;
 constexpr uint32_t DEFAULT_DRIP_DELAY_MS = 3000;
 constexpr uint32_t MAX_DRIP_DELAY_MS = 10000;
+// Drip delay is the minimum hold; the shot then closes once its tail median
+// has stopped rising for the settle time, or at the maximum wait.
+constexpr uint16_t DEFAULT_DRIP_SETTLE_MS = 3000;
+constexpr uint16_t MIN_DRIP_SETTLE_MS = 1000;
+constexpr uint16_t MAX_DRIP_SETTLE_MS = 10000;
+constexpr uint16_t DEFAULT_DRIP_MAX_WAIT_MS = 20000;
+constexpr uint16_t MIN_DRIP_MAX_WAIT_MS = 5000;
+constexpr uint16_t MAX_DRIP_MAX_WAIT_MS = 30000;
+// A median rise this large is still dripping; half of a 0.1 g scale step.
+constexpr float DRIP_SETTLE_RISE_G = 0.05f;
 constexpr uint32_t MAX_SCALE_TIMER_STOP_CATCHUP_MS = 2000;
 constexpr float MAX_OFFSET_G = 5.0f;
 // The drip correction a new or restored preset starts from: the residual on

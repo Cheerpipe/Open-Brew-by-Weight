@@ -2241,6 +2241,7 @@ const errorReasonTexts = {
   CONFIG_PATCH_EMPTY: __WEBUI_TEXT__("err.config_patch_empty"),
   CONFIG_RETARE_STABILITY_RELATION: __WEBUI_TEXT__("err.config_retare_stability_relation"),
   CONFIG_REVISION_STALE: __WEBUI_TEXT__("err.config_revision_stale"),
+  CONFIG_DRIP_WAIT_RELATION: __WEBUI_TEXT__("err.config_drip_wait_relation"),
   CONFIG_SCALE_LOSS_WINDOW: __WEBUI_TEXT__("err.config_scale_loss_window"),
   CONFIG_SHOT_REACT_TIMEOUT_RANGE: __WEBUI_TEXT__("err.config_shot_react_timeout_range"),
   CONFIG_SLOW_AFTER_RULES: __WEBUI_TEXT__("err.config_slow_after_rules"),
@@ -8070,6 +8071,8 @@ function loadSettingsConfig({ config: c, quickRevert }) {
     ["scaleTimerStopExtraDelayMs", 0],
   ].forEach(([k, d]) => ($(k).value = String(c[k] ?? d)));
   $("dripDelayS").value = String((c.dripDelayMs ?? 3000) / 1000);
+  $("dripSettleS").value = String((c.dripSettleMs ?? 3000) / 1000);
+  $("dripMaxWaitS").value = String((c.dripMaxWaitMs ?? 20000) / 1000);
   [
     "autoTare",
     "autoTareOutsideBrew",

@@ -348,7 +348,10 @@ struct PendingShotFinalize {
   uint32_t endedAtUtcSec = 0;
   int16_t endedAtOffsetMinutes = 0;
   bool endedAtHasWallTime = false;
-  uint32_t dripDelayMs = DEFAULT_DRIP_DELAY_MS;
+  uint32_t dripDelayMs = DEFAULT_DRIP_DELAY_MS;  // minimum hold
+  bool bullseyeEligible = false;  // an On recipe weight cut
+  uint16_t dripSettleMs = DEFAULT_DRIP_SETTLE_MS;
+  uint16_t dripMaxWaitMs = DEFAULT_DRIP_MAX_WAIT_MS;
   uint32_t endedWeightSequence = 0;
   uint32_t cycleStartedAtMs = 0;
   uint32_t bootId = 0;
@@ -393,6 +396,8 @@ struct PendingShotFinalize {
   float tailMaxG = 0.0f;
   float tailMedianG = NAN;   // the ring's median; NAN until it first fills
   float tailSettledG = NAN;  // the highest of those medians
+  float tailPlateauG = NAN;  // the median the drip last rose to
+  uint32_t tailPlateauAtMs = 0;
   uint32_t tailRefAtMs = 0;  // when the cup held lastKnownWeightG
   int32_t tailRateX100 = 0;  // rate the drip ceiling trusts; 0 = no ceiling
   bool tailRefusalLogged = false;
@@ -465,7 +470,6 @@ OPEN_BREW_BY_WEIGHT_PSRAM_BSS BullseyeMelodyConfig bullseyeMelodyConfig;
 OPEN_BREW_BY_WEIGHT_PSRAM_BSS BullseyeMelodyConfig stagedBullseyeMelodyConfig;
 uint32_t stagedBullseyeRequestId = 0;
 TaskMutex bullseyeConfigMux;
-BullseyeTracker bullseyeTracker;
 LocalBuzzer localBuzzer;
 ShotPresetBank presetBank;
 // All-zero defaults; touched at shot start/finalize and once per publish.

@@ -504,7 +504,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     uint8_t id = 0;
     static const char *const fields[] = {"id"};
     const bool parsed = root != nullptr &&
-        jsonHasOnlyUniqueFields(root, fields, 1) && jsonUint8(root, "id", id) &&
+        jsonHasOnlyUniqueFields(root, fields, 1) && jsonUnsigned(root, "id", id) &&
         id != 0;
     if (root != nullptr) cJSON_Delete(root);
     self.unlockJsonBody();

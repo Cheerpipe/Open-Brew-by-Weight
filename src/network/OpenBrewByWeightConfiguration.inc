@@ -163,7 +163,8 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
       "baseRevision", "goalWeightG", "rinseEnabled", "rinseGestureMs", "rinseDurationMs",
       "operationalWallMs", "autoTare", "autoTareOutsideBrew", "retareAccessoryOutsideBrew", "postTareBaselineGraceMs",
       "canTareStartTimer",
-      "scaleTimerStopExtraDelayMs",       "dripDelayMs", "soundAlertsEnabled",
+      "scaleTimerStopExtraDelayMs",       "dripDelayMs", "dripSettleMs", "dripMaxWaitMs",
+      "soundAlertsEnabled",
       "firstDropBeep", "scaleConnectedLed",
       "paddleReturnReminderBeep",
       "paddleReturnReminderIntervalMs", "paddleReturnReminderMaxDurationMs",
@@ -221,15 +222,11 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "rinseEnabled") &&
              !jsonBoolean(root, "rinseEnabled", candidate.rinseEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "rinseEnabled");
-  } else if (jsonFieldPresent(root, "rinseGestureMs") &&
-             !jsonUint32(root, "rinseGestureMs", candidate.rinseGestureMs)) {
+  } else if (!jsonOptionalUnsigned(root, "rinseGestureMs", candidate.rinseGestureMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "rinseGestureMs");
-  } else if (jsonFieldPresent(root, "rinseDurationMs") &&
-             !jsonUint32(root, "rinseDurationMs", candidate.rinseDurationMs)) {
+  } else if (!jsonOptionalUnsigned(root, "rinseDurationMs", candidate.rinseDurationMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "rinseDurationMs");
-  } else if (jsonFieldPresent(root, "operationalWallMs") &&
-             !jsonUint32(root, "operationalWallMs",
-                         candidate.operationalWallMs)) {
+  } else if (!jsonOptionalUnsigned(root, "operationalWallMs", candidate.operationalWallMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "operationalWallMs");
   } else if (jsonFieldPresent(root, "autoTare") &&
              !jsonBoolean(root, "autoTare", candidate.autoTare)) {
@@ -240,20 +237,21 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "retareAccessoryOutsideBrew") &&
              !jsonBoolean(root, "retareAccessoryOutsideBrew", parsedAccessoryRetare)) {
     parseError = validationFailure("FIELD_BOOLEAN", "retareAccessoryOutsideBrew");
-  } else if (jsonFieldPresent(root, "postTareBaselineGraceMs") &&
-             !jsonUint32(root, "postTareBaselineGraceMs",
-                         candidate.postTareBaselineGraceMs)) {
+  } else if (!jsonOptionalUnsigned(root, "postTareBaselineGraceMs",
+                                   candidate.postTareBaselineGraceMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "postTareBaselineGraceMs");
   } else if (jsonFieldPresent(root, "canTareStartTimer") &&
              !jsonBoolean(root, "canTareStartTimer", candidate.canTareStartTimer)) {
     parseError = validationFailure("FIELD_BOOLEAN", "canTareStartTimer");
-  } else if (jsonFieldPresent(root, "scaleTimerStopExtraDelayMs") &&
-             !jsonUint32(root, "scaleTimerStopExtraDelayMs",
-                         candidate.scaleTimerStopExtraDelayMs)) {
+  } else if (!jsonOptionalUnsigned(root, "scaleTimerStopExtraDelayMs",
+                                   candidate.scaleTimerStopExtraDelayMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "scaleTimerStopExtraDelayMs");
-  } else if (jsonFieldPresent(root, "dripDelayMs") &&
-             !jsonUint32(root, "dripDelayMs", candidate.dripDelayMs)) {
+  } else if (!jsonOptionalUnsigned(root, "dripDelayMs", candidate.dripDelayMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "dripDelayMs");
+  } else if (!jsonOptionalUnsigned(root, "dripSettleMs", candidate.dripSettleMs)) {
+    parseError = validationFailure("FIELD_INTEGER_MS", "dripSettleMs");
+  } else if (!jsonOptionalUnsigned(root, "dripMaxWaitMs", candidate.dripMaxWaitMs)) {
+    parseError = validationFailure("FIELD_INTEGER_MS", "dripMaxWaitMs");
   } else if (jsonFieldPresent(root, "soundAlertsEnabled") &&
              !jsonBoolean(root, "soundAlertsEnabled", soundAlertsEnabled)) {
     parseError = validationFailure("FIELD_BOOLEAN", "soundAlertsEnabled");
@@ -279,13 +277,11 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "paddleReturnReminderBeep") &&
              !jsonBoolean(root, "paddleReturnReminderBeep", candidate.paddleReturnReminderBeep)) {
     parseError = validationFailure("FIELD_BOOLEAN", "paddleReturnReminderBeep");
-  } else if (jsonFieldPresent(root, "paddleReturnReminderIntervalMs") &&
-             !jsonUint32(root, "paddleReturnReminderIntervalMs",
-                         candidate.paddleReturnReminderIntervalMs)) {
+  } else if (!jsonOptionalUnsigned(root, "paddleReturnReminderIntervalMs",
+                                   candidate.paddleReturnReminderIntervalMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "paddleReturnReminderIntervalMs");
-  } else if (jsonFieldPresent(root, "paddleReturnReminderMaxDurationMs") &&
-             !jsonUint32(root, "paddleReturnReminderMaxDurationMs",
-                         candidate.paddleReturnReminderMaxDurationMs)) {
+  } else if (!jsonOptionalUnsigned(root, "paddleReturnReminderMaxDurationMs",
+                                   candidate.paddleReturnReminderMaxDurationMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "paddleReturnReminderMaxDurationMs");
   } else if (jsonFieldPresent(root, "paddleMode") &&
              !jsonPaddleMode(root, "paddleMode", candidate.paddleMode)) {
@@ -347,8 +343,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
   } else if (jsonFieldPresent(root, "autoRetare") &&
              !jsonBoolean(root, "autoRetare", candidate.autoRetare)) {
     parseError = validationFailure("FIELD_BOOLEAN", "autoRetare");
-  } else if (jsonFieldPresent(root, "retareWindowMs") &&
-             !jsonUint32(root, "retareWindowMs", candidate.retareWindowMs)) {
+  } else if (!jsonOptionalUnsigned(root, "retareWindowMs", candidate.retareWindowMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "retareWindowMs");
   } else if (jsonFieldPresent(root, "minimumCupWeightG") &&
              !jsonFloat(root, "minimumCupWeightG",
@@ -359,23 +354,20 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
                         candidate.cupRemovedWeightG)) {
     parseError = validationFailure("FIELD_NUMBER", "cupRemovedWeightG");
   } else if (jsonFieldPresent(root, "retareStabilitySamples") &&
-             !jsonUint8(root, "retareStabilitySamples",
+             !jsonUnsigned(root, "retareStabilitySamples",
                         candidate.retareStabilitySamples)) {
     parseError = validationFailure("FIELD_RANGE_INT", "retareStabilitySamples", "2", "10");
   } else if (jsonFieldPresent(root, "retareStabilityToleranceG") &&
              !jsonFloat(root, "retareStabilityToleranceG",
                         candidate.retareStabilityToleranceG)) {
     parseError = validationFailure("FIELD_NUMBER", "retareStabilityToleranceG");
-  } else if (jsonFieldPresent(root, "retareStabilityMaxGapMs") &&
-             !jsonUint32(root, "retareStabilityMaxGapMs",
-                         candidate.retareStabilityMaxGapMs)) {
+  } else if (!jsonOptionalUnsigned(root, "retareStabilityMaxGapMs",
+                                   candidate.retareStabilityMaxGapMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "retareStabilityMaxGapMs");
-  } else if (jsonFieldPresent(root, "retareStabilityMinDurationMs") &&
-             !jsonUint32(root, "retareStabilityMinDurationMs",
-                         candidate.retareStabilityMinDurationMs)) {
+  } else if (!jsonOptionalUnsigned(root, "retareStabilityMinDurationMs",
+                                   candidate.retareStabilityMinDurationMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "retareStabilityMinDurationMs");
-  } else if (jsonFieldPresent(root, "bbwProtectionMs") &&
-             !jsonUint32(root, "bbwProtectionMs", candidate.bbwProtectionMs)) {
+  } else if (!jsonOptionalUnsigned(root, "bbwProtectionMs", candidate.bbwProtectionMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "bbwProtectionMs");
   } else if (jsonFieldPresent(root, "fastExtractionGuardEnabled") &&
              !jsonBoolean(root, "fastExtractionGuardEnabled", candidate.fastSideEnabled)) {
@@ -492,7 +484,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
                                   candidate.bookooKeepAwakeWhileMachineOn)) {
     parseError = validationFailure("FIELD_BOOLEAN", "bookooKeepAwakeWhileMachineOn");
   } else if (jsonFieldPresent(root, "bookooVolume") &&
-             (!jsonUint8(root, "bookooVolume", candidate.bookooVolume) ||
+             (!jsonUnsigned(root, "bookooVolume", candidate.bookooVolume) ||
               !validBookooVolume(candidate.bookooVolume))) {
     parseError = validationFailure("CONFIG_BOOKOO_VOLUME_RANGE");
   } else if (jsonFieldPresent(root, "noScaleBbwMode") &&
@@ -503,9 +495,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
              !jsonBoolean(root, "noScaleAllowRinseWhileArmed",
                           parsedAllowRinseWhileArmed)) {
     parseError = validationFailure("FIELD_BOOLEAN", "noScaleAllowRinseWhileArmed");
-  } else if (jsonFieldPresent(root, "lastShotCooldownMs") &&
-             !jsonUint32(root, "lastShotCooldownMs",
-                         candidate.lastShotCooldownMs)) {
+  } else if (!jsonOptionalUnsigned(root, "lastShotCooldownMs", candidate.lastShotCooldownMs)) {
     parseError = validationFailure("FIELD_INTEGER_MS", "lastShotCooldownMs");
   } else if (jsonFieldPresent(root, "serialLogLevel") &&
              !jsonLogLevel(root, "serialLogLevel", candidate.serialLogLevel)) {
@@ -530,7 +520,7 @@ esp_err_t OpenBrewByWeightNetwork::configHandler(httpd_req_t *request) {
              !jsonEnumId(root, "mahlkonigModel", GBS_MODEL_COUNT, gbsModelId, candidate.mahlkonigModel)) {
     parseError = validationFailure("FIELD_ENUM", "mahlkonigModel", "none, e64ws, e65w, e65t, e80w, or e80t");
   } else if (jsonFieldPresent(root, "mahlkonigPushCadenceS") &&
-             !(jsonUint8(root, "mahlkonigPushCadenceS", candidate.mahlkonigPushCadenceS) && gbsCadenceValid(candidate.mahlkonigPushCadenceS))) {
+             !(jsonUnsigned(root, "mahlkonigPushCadenceS", candidate.mahlkonigPushCadenceS) && gbsCadenceValid(candidate.mahlkonigPushCadenceS))) {
     parseError = validationFailure("FIELD_ENUM", "mahlkonigPushCadenceS", "15, 20, or 25");
   } else if (jsonFieldPresent(root, "ringRetainLogLevel") &&
              !jsonLogLevel(root, "ringRetainLogLevel",
@@ -960,24 +950,24 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
     parseError = validationFailure("FIELD_REQUIRED", "action");
   } else if (strcmp(action, "apply") == 0 || strcmp(action, "load") == 0) {
     presetAction = PresetAction::APPLY;
-    if (!jsonUint8(root, "id", presetId) || presetId == 0) {
+    if (!jsonUnsigned(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "create") == 0 || strcmp(action, "new") == 0) {
     presetAction = PresetAction::CREATE;
   } else if (strcmp(action, "delete") == 0) {
     presetAction = PresetAction::DELETE;
-    if (!jsonUint8(root, "id", presetId) || presetId == 0) {
+    if (!jsonUnsigned(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "duplicate") == 0) {
     presetAction = PresetAction::DUPLICATE;
-    if (!jsonUint8(root, "id", presetId) || presetId == 0) {
+    if (!jsonUnsigned(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "rename") == 0) {
     presetAction = PresetAction::RENAME;
-    if (!jsonUint8(root, "id", presetId) || presetId == 0) {
+    if (!jsonUnsigned(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     } else if (!jsonString(root, "name", presetName, sizeof(presetName),
                            false)) {
@@ -988,17 +978,17 @@ esp_err_t OpenBrewByWeightNetwork::presetsHandler(httpd_req_t *request) {
     presetAction = strcmp(action, "restore_factory_recipe") == 0
                        ? PresetAction::RESTORE_FACTORY_RECIPE
                        : PresetAction::RESTORE_FACTORY_VALUES;
-    if (!jsonUint8(root, "id", presetId) || presetId == 0) {
+    if (!jsonUnsigned(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "new_coffee") == 0) {
     presetAction = PresetAction::NEW_COFFEE;
-    if (!jsonUint8(root, "id", presetId) || presetId == 0) {
+    if (!jsonUnsigned(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     }
   } else if (strcmp(action, "save") == 0 || strcmp(action, "update") == 0) {
     presetAction = PresetAction::SAVE;
-    if (!jsonUint8(root, "id", presetId) || presetId == 0) {
+    if (!jsonUnsigned(root, "id", presetId) || presetId == 0) {
       parseError = validationFailure("FIELD_NONZERO_INTEGER", "id");
     } else {
       // A save is a patch: absent fields keep the stored preset value. Keys follow PresetRecipeField.
@@ -1474,7 +1464,7 @@ static ValidationFailure parseSetupBrew(const cJSON *root, SetupBrew &brew,
     return validationFailure("SETUP_BREW_SETUP_ONLY");
   }
   if (!jsonBoolean(root, "brewByWeight", byWeight) || byWeight != hasPreset ||
-      (hasPreset && (!jsonUint8(root, "presetId", presetId) || presetId == 0))) {
+      (hasPreset && (!jsonUnsigned(root, "presetId", presetId) || presetId == 0))) {
     return validationFailure("SETUP_BREW_FIELDS_INVALID");
   }
   brew = byWeight ? SetupBrew::BY_WEIGHT : SetupBrew::USUAL;

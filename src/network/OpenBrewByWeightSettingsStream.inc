@@ -138,6 +138,8 @@ bool OpenBrewByWeightNetwork::sendSettingsStream(UiStreamSession &session,
   fields.field("config.scaleTimerStopExtraDelayMs",
                static_cast<unsigned long>(config.scaleTimerStopExtraDelayMs));
   fields.field("config.dripDelayMs", static_cast<unsigned long>(config.dripDelayMs));
+  fields.field("config.dripSettleMs", static_cast<unsigned long>(config.dripSettleMs));
+  fields.field("config.dripMaxWaitMs", static_cast<unsigned long>(config.dripMaxWaitMs));
   fields.field("config.firstDropBeep", bool(config.firstDropBeep));
   fields.field("config.paddleReturnReminderBeep", bool(config.paddleReturnReminderBeep));
   fields.field("config.paddleReturnReminderIntervalMs",

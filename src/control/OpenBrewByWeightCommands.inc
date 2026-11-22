@@ -245,6 +245,8 @@ void processWebCommand(const WebCommand &command) {
       candidate.scaleTimerStopExtraDelayMs =
           command.config.scaleTimerStopExtraDelayMs;
       candidate.dripDelayMs = command.config.dripDelayMs;
+      candidate.dripSettleMs = command.config.dripSettleMs;
+      candidate.dripMaxWaitMs = command.config.dripMaxWaitMs;
       candidate.soundAlertsMuted = command.config.soundAlertsMuted;
       candidate.firstDropBeep = command.config.firstDropBeep;
       copyDeviceProtectionFromConfig(command.config, candidate);
@@ -362,6 +364,8 @@ void processWebCommand(const WebCommand &command) {
       ensureShotPresetBank(presetBank, composed.retareWindowMs,
                            composed.autoRetare);
       if (candidate.dripDelayMs != runtimeConfig.dripDelayMs ||
+          candidate.dripSettleMs != runtimeConfig.dripSettleMs ||
+          candidate.dripMaxWaitMs != runtimeConfig.dripMaxWaitMs ||
           candidate.autoTare != runtimeConfig.autoTare ||
           candidate.autoRetare != runtimeConfig.autoRetare ||
           candidate.retareWindowMs != runtimeConfig.retareWindowMs ||

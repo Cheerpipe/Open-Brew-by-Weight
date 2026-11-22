@@ -213,6 +213,16 @@ function validateMachineClient() {
     rangeCheck("dripDelayS", 0, 10, __WEBUI_TEXT__("runtime.drip_delay"), {
       unit: __WEBUI_TEXT__("runtime.s"),
     }) ||
+    rangeCheck("dripSettleS", 1, 10, __WEBUI_TEXT__("runtime.drip_settle"), {
+      unit: __WEBUI_TEXT__("runtime.s"),
+    }) ||
+    rangeCheck(
+      "dripMaxWaitS",
+      Math.max(5, R.number("dripDelayS") || 0),
+      30,
+      __WEBUI_TEXT__("runtime.drip_max_wait"),
+      { unit: __WEBUI_TEXT__("runtime.s") },
+    ) ||
     rangeCheck("lastShotCooldownMin", 5, 240, __WEBUI_TEXT__("runtime.last_shot_cooldown"), {
       int: 1,
       unit: __WEBUI_TEXT__("runtime.min"),
@@ -317,6 +327,8 @@ function machinePayload() {
     bookooKeepAwakeWhileMachineOn: $("bookooKeepAwakeWhileMachineOn").checked,
     scaleTimerStopExtraDelayMs: R.number("scaleTimerStopExtraDelayMs"),
     dripDelayMs: R.sToMs("dripDelayS"),
+    dripSettleMs: R.sToMs("dripSettleS"),
+    dripMaxWaitMs: R.sToMs("dripMaxWaitS"),
     soundAlertsEnabled: $("soundAlertsEnabled").checked,
     firstDropBeep: $("firstDropBeep").checked,
     scaleConnectedLed: $("scaleConnectedLed").checked,

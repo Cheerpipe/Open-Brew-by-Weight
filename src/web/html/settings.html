@@ -1223,19 +1223,43 @@
         /><small class="fieldHint"
           >{{webui:settings.extra_wait_for_the_scale_timer_to}}</small
         ></label
-      ><label
-        >{{webui:settings.drip_delay_s}}<input
-          id="dripDelayS"
-          type="number"
-          min="0"
-          max="10"
-          step="0.1"
-          required
-          data-unit="s"
-        /><small class="fieldHint"
-          >{{webui:settings.wait_for_drips_before_saving_final_weight}}</small
-        ></label
-      ><label
+      >
+      <div class="row">
+        <label
+          >{{webui:settings.drip_delay_s}}<input
+            id="dripDelayS"
+            type="number"
+            min="0"
+            max="10"
+            step="0.1"
+            required
+            data-unit="s"
+          /><small class="fieldHint"
+            >{{webui:settings.wait_for_drips_before_saving_final_weight}}</small
+          ></label
+        ><label
+          >{{webui:settings.drip_settle_s}}<input
+            id="dripSettleS"
+            type="number"
+            min="1"
+            max="10"
+            step="0.1"
+            required
+            data-unit="s"
+          /><small class="fieldHint">{{webui:settings.drip_settle_hint}}</small></label
+        ><label
+          >{{webui:settings.drip_max_wait_s}}<input
+            id="dripMaxWaitS"
+            type="number"
+            min="5"
+            max="30"
+            step="1"
+            required
+            data-unit="s"
+          /><small class="fieldHint">{{webui:settings.drip_max_wait_hint}}</small></label
+        >
+      </div>
+      <label
         >{{webui:settings.scale_preference}}
         <span class="selBox"
           ><select id="scalePreference">

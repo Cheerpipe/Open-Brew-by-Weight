@@ -212,6 +212,7 @@ params substituted in order (see the example above).
 | ``CONFIG_FAST_MARGIN_RULES`` | Extra yield for fast shots must be 0.5 to 25.5 g, at most half of the target, and keep the target plus extra within 200 g. |
 | ``CONFIG_FAST_RAMP_STEPS`` | Fast transition must be from 0 to 25.5 s in 0.5 s steps. |
 | ``CONFIG_FIELDS_INVALID`` | Config must be a JSON object with known fields and correct types. |
+| ``CONFIG_DRIP_WAIT_RELATION`` | Maximum drip wait must be from 5 to 30 s and at least the minimum drip wait. |
 | ``CONFIG_INVALID`` | Invalid configuration. |
 | ``CONFIG_LOCKED_DURING_ACTIVE_CYCLE`` | Configuration is locked while a cycle is active. |
 | ``CONFIG_NTP_CUSTOM_INVALID`` | Custom NTP hostname is invalid (letters, digits, '.', '-'; max 63 chars). |

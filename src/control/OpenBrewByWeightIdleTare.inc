@@ -383,7 +383,10 @@ void handleIdleCupEvent(CupPresenceEvent event, bool accessory = false) {
     idleTare.absentObserved = cupPresence.weight.emptyValid || cupPresence.weight.unloadQualified;
   }
   if (event != CupPresenceEvent::PLACED && !accessory) return;
-  const bool placedInIdle = accessory || idleTare.absentObserved;
+  // A cup clearing both a provisional zero and the last qualified empty pan
+  // was placed on an observed empty pan too.
+  const bool placedInIdle = accessory || idleTare.absentObserved ||
+      cupPresence.occupiedReferenceG >= cupLoadFloorG(cupPresence.emptyAnchorG, true);
   idleTare.absentObserved = false;
   const IdleTareReason previousReason = idleTare.lastReason;
   if (!placedInIdle || idleTare.requestId != 0 ||

@@ -79,8 +79,18 @@ readings can establish that new reference. A larger negative offset first seen a
 connection or a reading gap cannot establish it. A return near the original
 zero restores readiness after settling, but cannot identify an equal-weight
 replacement; tare the empty pan on the scale, reconnect it, and let zero settle before
-placing a cup. Weight alone cannot distinguish every sustained external force
-from a real cup.
+placing a cup. A cup that sits at least **Minimum cup weight** above both that
+zero and the negative empty reading still counts as placed, and is tared, even
+if the reading near zero never had time to settle. Weight alone cannot
+distinguish every sustained external force from a real cup.
+
+If you set the cup down and start the shot before the controller has had time
+to recognize it, the shot-start tare still does. When that tare zeroes at least
+**Minimum cup weight** above the empty pan the controller last saw, the cup
+counts as present and already tared, so **Stop if cup is removed** protects
+that shot as usual. If the controller has not seen the empty pan since the
+scale connected, it cannot tell a cup from the pan, and the shot runs as if no
+cup were detected.
 
 ## Fast replacement outside a shot
 

@@ -957,7 +957,6 @@ void loop() {
   finishLoopPhase(LoopPhase::ALERTS_AUDIO);
   servicePendingScaleTimerStop();
   serviceRemoteTimerStopRetry();
-  serviceBullseyeMelody();
   finishLoopPhase(LoopPhase::ALERTS_TIMERS);
   pendingShotFinalizeTask();
   finishLoopPhase(LoopPhase::SHOT_FINALIZE);

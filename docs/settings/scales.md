@@ -264,8 +264,19 @@ saying goodbye, is given up after two seconds, so the controller starts
 searching for the scale again promptly while a brief radio hiccup still
 leaves the link, and your tare, untouched.
 
-**Drip delay** runs after machine circuit opens. It is used for Last Shot, history,
-drip learning, and the scale-loss backup's recent shots.
+After the machine stops, the controller waits for the last drips before it
+records the yield. That one settled weight is what Last Shot, history, Stats,
+drip learning, the Bullseye melody and the scale-loss backup's recent shots
+all use. The wait adapts to each shot:
+
+1. It always lasts at least the **Minimum drip wait**.
+2. After that, the yield is recorded once the weight has stopped rising for
+   the **Settle time**. A slow drip simply takes a little longer.
+3. If the weight is still changing at the **Maximum drip wait**, the yield is
+   recorded then.
+
+Lifting the cup ends the wait at any point, and the shot keeps the weight it
+had already settled at (see below). Starting the next shot also ends it.
 
 The final weight is the weight the cup settles at during that wait, not simply
 the last reading. If you bump the cup, press on it, or rest something on the
@@ -285,7 +296,9 @@ drip correction; one lifted before, or a hold ended by the next shot, does not.
 | --- | --- | --- | --- |
 | **Which scale** | My scale first | Any scale / My scale first / Only my scale | **Any scale** connects whichever compatible scale appears first and never locks it. **My scale first** waits briefly for the preferred scale, then accepts another. **Only my scale** connects only to the saved preferred scale. If either selected mode has no saved scale yet, it uses the bootstrap flow below. |
 | **My scale** | First detected | First detected, No preferred, or a BLE-seen scale | **First detected** is shown only while no preferred MAC is saved and **My scale first** or **Only my scale** is active. The controller scans by compatible name and adopts the first scale that completes a successful connection; advertisements and failed connections are not enough. **Any scale** instead shows **None saved** because that mode never locks a scale. The dropdown's **Forget** key removes the scale from the saved list, rename included, and pauses discovery for 30 s; the Scale preference mode stays. |
-| **Drip delay (s)** | 3.0 s | 0–10 s | Wait after a shot ends before capturing the final post-drip weight. `0` finalizes on the next control loop with no intentional window. |
+| **Minimum drip wait (s)** | 3.0 s | 0–10 s | The yield is never recorded sooner than this after the stop. `0` records it right away, without waiting for the weight to settle. |
+| **Settle time (s)** | 3.0 s | 1–10 s | After the minimum wait, the yield is recorded once the weight has stopped rising for this long. Normal scale flicker of a tenth of a gram does not restart it. |
+| **Maximum drip wait (s)** | 20 s | 5–30 s, at least the minimum | The yield is recorded at this point even if the weight is still changing. |
 | **Scale timer stop delay (ms)** | 0 ms | 0–1000 ms | Pad after the scale timer catches up to circuit whole seconds, before `STOP_TIMER`. `0` stops in that same instant. Does not delay the local machine circuit beep. |
 | **Bookoo combined command** | ON | ON / OFF | Combined tare + start-timer. Requires automatic tare at shot start. Also listed under [Tare](tare.md). |
 | **Bookoo volume** | 3 | Don't change, Off, 1–5 | Bookoo/generic: set after the first valid weight on the first connection of that scale in this Open Brew by Weight session, and again when a settings change alters it. See [Bookoo volume](#bookoo-volume). |

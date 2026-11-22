@@ -150,7 +150,6 @@ void resetHarness(bool initialPaddleOn, bool scaleConnected) {
   pendingFinalize = PendingShotFinalize{};
   homeCycleResult = PersistedLastShot{};
   homeCycleResolvedAtMs = 0;
-  bullseyeTracker.clear();
   bullseyeMelodyConfig = BullseyeMelodyConfig{};
   stagedBullseyeMelodyConfig = BullseyeMelodyConfig{};
   stagedBullseyeRequestId = 0;
@@ -7175,74 +7174,6 @@ void w99i_bullseye_test_never_queues_mutable_custom_notes() {
   CHECK(localBuzzer.rtttlCount == 3);
 }
 
-void w99g_bullseye_requires_one_second_of_exact_fresh_samples() {
-  BullseyeTracker tracker;
-  tracker.arm({360, 1000, 3000, 10});
-  CHECK(!tracker.accept({36.0f, 3999, 11}, 1000));
-  CHECK(!tracker.accept({36.0f, 4000, 12}, 1000));
-  CHECK(!tracker.accept({35.99f, 4500, 13}, 1000));
-  CHECK(!tracker.accept({36.0f, 5000, 14}, 1000));
-  CHECK(tracker.accept({36.0f, 6000, 15}, 1000));
-  CHECK(!tracker.pending);
-
-  tracker.arm({360, 1000, 3000, 20});
-  CHECK(!tracker.accept({36.0f, 60000, 21}, 1000));
-  CHECK(tracker.accept({36.0f, 61000, 22}, 1000));
-
-  tracker.arm({360, 1000, 3000, 30});
-  CHECK(!tracker.accept({36.0f, 4000, 31}, 1000));
-  CHECK(!tracker.accept({36.0f, 5001, 32}, 1000));
-  CHECK(tracker.targetSampleCount == 1);
-  CHECK(tracker.pending);
-}
-
-void w99h_bullseye_service_runs_only_in_buzzer_only_mode() {
-  resetHarness(false, true);
-  bullseyeMelodyConfig.enabled = true;
-  copyCString(bullseyeMelodyConfig.rtttl,
-              sizeof(bullseyeMelodyConfig.rtttl),
-              "bullseye:d=16,o=5,b=180:c,e,g,c6");
-  CHECK(localBuzzer.configureBullseyeRtttl(bullseyeMelodyConfig.rtttl));
-  runtimeConfig.alertOutputChannel =
-      static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
-  hostMillis = 1000;
-  markScaleWorkerProgress();
-  cupPresence.state = CupPresenceState::PRESENT;
-  cupPresence.placementId = 7;
-  bullseyeTracker.arm({360, hostMillis, 3000, 10, cupPresencePlacementId()});
-  currentWeight = 36.0f;
-  currentWeightSequence = 11;
-  currentWeightReceivedAtMs = 4000;
-  hostMillis = 4000;
-  markScaleWorkerProgress();
-  serviceBullseyeMelody();
-  CHECK(bullseyeTracker.pending);
-  currentWeightSequence = 12;
-  currentWeightReceivedAtMs = 5000;
-  hostMillis = 5000;
-  markScaleWorkerProgress();
-  serviceBullseyeMelody();
-  CHECK(!bullseyeTracker.pending);
-  CHECK(localBuzzer.activeCue == BuzzerCue::BULLSEYE);
-
-  localBuzzer.stopAll();
-  bullseyeTracker.arm({360, hostMillis, 0, currentWeightSequence, cupPresencePlacementId()});
-  ++cupPresence.placementId;
-  serviceBullseyeMelody();
-  CHECK(!bullseyeTracker.pending);
-  CHECK(localBuzzer.activeCue == BuzzerCue::NONE);
-
-  runtimeConfig.alertOutputChannel =
-      static_cast<uint8_t>(AlertOutputChannel::SCALE_PRIORITY);
-  bullseyeTracker.arm({360, hostMillis, 3000, currentWeightSequence, cupPresencePlacementId()});
-  ++currentWeightSequence;
-  currentWeightReceivedAtMs = hostMillis + 100;
-  hostMillis += 100;
-  serviceBullseyeMelody();
-  CHECK(!bullseyeTracker.pending);
-  CHECK(localBuzzer.activeCue == BuzzerCue::NONE);
-}
-
 void w99b_passive_cue_drives_ledc_note_frequency() {
   resetHarness(false, false);
   const BuzzerToneCommand cmd =
@@ -10120,6 +10051,7 @@ void cw28_observed_unload_preserves_previous_shot() {
       for (int i = 1; i <= 36; ++i) idleWeight(static_cast<float>(i), 300);
       CHECK(finalizeCycle(EndReason::SCALE_THRESHOLD, StopperState::REQUIRES_OFF));
       CHECK(pendingFinalize.pending);
+      pendingFinalize.dripMaxWaitMs = pendingFinalize.dripDelayMs;  // Fixed hold: pins the filter.
       const uint32_t endedAt = pendingFinalize.endedAtMs;
       const uint32_t dripDelay = pendingFinalize.dripDelayMs;
       const float offset = runtimeConfig.weightOffsetG;
@@ -11773,6 +11705,51 @@ void it70_equal_weight_swap_at_zero_shows_absent() {
   idleCup(3.0f);
   CHECK(cupPresenceState() == CupPresenceState::PRESENT);
   CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 1);
+}
+
+void cd01_cup_after_unsettled_return_to_zero_is_placed() {
+  // Shot 91: a zeroed 64.6 g load is lifted and the empty pan qualifies at
+  // -64.6 g; the reading returns to 0 g and is handled before it settles,
+  // then a 380 g cup lands. It clears both plausible empty pans by the
+  // minimum cup weight, so it is a cup, and idle tare zeroes it.
+  prepareIdleTare();
+  idleCup(-64.6f);
+  idleCup(-64.6f);
+  CHECK(cupPresence.weight.emptyValid && cupPresence.emptyAnchorG == -64.6f);
+  for (float weight : {-10.2f, 0.0f, 10.4f, 20.7f, -0.5f, -6.8f, -0.5f, 29.1f, 87.8f,
+                       206.9f, 376.0f, 436.7f, 395.8f, 379.0f})
+    idleWeight(weight, 100);
+  CHECK(cupPresence.emptyAnchorG == 0.0f && !cupPresence.weight.emptyValid);
+  CHECK(cupPresenceState() == CupPresenceState::ABSENT);
+  for (int i = 0; i < 3; ++i) idleWeight(380.2f, 100);
+  CHECK(cupPresenceState() == CupPresenceState::PRESENT);
+  CHECK(cupPresencePlacementId() == 1);
+  CHECK(commandCount(ScaleCommandType::TARE_ONLY) == 1);
+}
+
+void cd02_cup_set_down_at_the_start_is_inferred_from_the_tare() {
+  // A cup set down just before the shot starts has no time to qualify; the
+  // shot-start tare zeroing a minimum cup above the empty pan proves it, so
+  // lifting it mid-shot still stops the shot.
+  for (float cupG : {380.0f, 60.0f, 40.0f}) {
+    prepareIdleTare();
+    idleWeight(cupG, 100);
+    CHECK(cupPresenceState() == CupPresenceState::ABSENT);
+    startCycle();
+    while (executeNextScaleCommand()) {}
+    const bool cup = cupG >= runtimeConfig.minimumCupWeightG;
+    CHECK((cupPresenceState() == CupPresenceState::PRESENT) == cup);
+    if (!cup) continue;
+    CHECK(cupPresenceIsTared());
+    CHECK(captureCupTareDiagnostics().weightValid);
+    CHECK(captureCupTareDiagnostics().weightG == cupG);
+    establishPostTareBaseline();
+    advanceToBrew();
+    publishWeight(-cupG, hostMillis + 100, 1, 70);
+    publishWeight(-cupG, hostMillis + 100, 1, 71);
+    runLoopAfter(1);
+    CHECK(session.endReason == EndReason::CUP_REMOVED);
+  }
 }
 
 void it71_tare_with_coffee_then_lift_recovers() {
@@ -20917,6 +20894,7 @@ void lt05_late_start_zero_keeps_the_coffee_already_weighed() {
   CHECK(session.endReason == EndReason::SCALE_THRESHOLD);
   CHECK(fabsf(homeCycleResult.currentWeightG - (threshold + 0.2f)) < 0.01f);
   CHECK(pendingFinalize.pending && pendingFinalize.tailCount == 0);
+  pendingFinalize.dripMaxWaitMs = pendingFinalize.dripDelayMs;  // Fixed hold: pins the filter.
   hostMillis += pendingFinalize.dripDelayMs + 100U;
   markScaleWorkerProgress();
   currentWeight = 250.0f + threshold + 0.4f;
@@ -21537,6 +21515,7 @@ void fw01_median_final_weight_filters_dip() {
   schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
   session.active = false;
   pendingFinalize.dripDelayMs = 2500;
+  pendingFinalize.dripMaxWaitMs = pendingFinalize.dripDelayMs;  // Fixed hold: pins the filter.
   pendingFinalize.lastKnownWeightG = 30.0f;
   pendingFinalize.lastKnownWeightValid = true;
   pendingFinalize.endedAtMs = hostMillis;
@@ -21577,6 +21556,7 @@ void fw01_median_final_weight_filters_dip() {
   schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
   session.active = false;
   pendingFinalize.dripDelayMs = 2500;
+  pendingFinalize.dripMaxWaitMs = pendingFinalize.dripDelayMs;  // Fixed hold: pins the filter.
   pendingFinalize.lastKnownWeightG = 34.0f;
   pendingFinalize.lastKnownWeightValid = true;
   pendingFinalize.endedAtMs = hostMillis;
@@ -21611,6 +21591,7 @@ void fw01_median_final_weight_filters_dip() {
   schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
   session.active = false;
   pendingFinalize.dripDelayMs = 800;
+  pendingFinalize.dripMaxWaitMs = pendingFinalize.dripDelayMs;  // Fixed hold: pins the filter.
   pendingFinalize.lastKnownWeightG = 30.0f;
   pendingFinalize.lastKnownWeightValid = true;
   pendingFinalize.endedAtMs = hostMillis;
@@ -22370,6 +22351,7 @@ void fw03_dense_tail_decimates_to_reachable_median() {
   schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
   session.active = false;
   pendingFinalize.dripDelayMs = 1800;
+  pendingFinalize.dripMaxWaitMs = pendingFinalize.dripDelayMs;  // Fixed hold: pins the filter.
   pendingFinalize.lastKnownWeightG = 34.5f;
   pendingFinalize.lastKnownWeightValid = true;
   pendingFinalize.endedAtMs = hostMillis;
@@ -22554,6 +22536,7 @@ void fw04_post_stop_ceiling_ignores_touches() {
     schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
     session.active = false;
     pendingFinalize.dripDelayMs = dripDelayMs;
+    pendingFinalize.dripMaxWaitMs = pendingFinalize.dripDelayMs;  // Fixed hold: pins the filter.
     pendingFinalize.lastKnownWeightG = 34.7f;
     pendingFinalize.lastKnownWeightValid = true;
     pendingFinalize.tailRateX100 = 1900;
@@ -22616,6 +22599,107 @@ void fw04_post_stop_ceiling_ignores_touches() {
     CHECK(shotLogDripLearnNote(record[0]) ==
           static_cast<uint8_t>(settled ? DripLearnNote::NONE : DripLearnNote::CUT_SHORT));
     CHECK(!settled || pendingFinalize.curve.ended.weightCg == 3570);
+  }
+}
+
+// A shot cut at 34.8 g whose drip settles at 36.0 g after the minimum hold.
+void startDripHold(bool bullseyeEligible) {
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  advanceToBrew();
+  session.startedWithScale = true;
+  session.scaleBaselineReady = true;
+  endBbwProtectionForTests();
+  publishControlRamp(1.0f, 30.0f, 0.5f, 100, 10);
+  schedulePendingShotFinalize(EndReason::SCALE_THRESHOLD, 30000);
+  session.active = false;
+  pendingFinalize.bullseyeEligible = bullseyeEligible;
+  pendingFinalize.lastKnownWeightG = 34.8f;
+  pendingFinalize.lastKnownWeightValid = true;
+  pendingFinalize.endedAtMs = hostMillis;
+}
+
+// Feeds one post-stop reading 300 ms after the previous one and services the hold.
+void feedDripHold(float weight) {
+  static uint32_t sequence = 0;
+  if (pendingFinalize.curveLastSequence >= sequence) sequence = pendingFinalize.curveLastSequence;
+  hostMillis += 300;
+  markScaleWorkerProgress();
+  publishWeight(weight, hostMillis, pendingFinalize.scaleConnectionGeneration, ++sequence);
+  pendingShotFinalizeTask();
+}
+
+void cd03_drip_hold_waits_for_the_tail_to_settle() {
+  startDripHold(false);
+  CHECK(pendingFinalize.dripDelayMs == DEFAULT_DRIP_DELAY_MS);
+  for (int i = 0; i <= 12; ++i) feedDripHold(34.8f + 0.1f * static_cast<float>(i));
+  // 3.9 s after the stop: past the minimum hold, still dripping.
+  CHECK(pendingFinalize.pending);
+  // Scale noise around the settled weight neither restarts nor ends the wait.
+  const float noise[] = {35.9f, 36.0f, 36.2f, 36.0f, 35.9f, 36.0f, 36.1f};
+  uint32_t plateauAtMs = 0;
+  for (size_t i = 0; i < 40 && pendingFinalize.pending; ++i) {
+    plateauAtMs = pendingFinalize.tailPlateauAtMs;
+    feedDripHold(noise[i % 7]);
+  }
+  CHECK(!pendingFinalize.pending);
+  CHECK(elapsedMs(plateauAtMs) >= DEFAULT_DRIP_SETTLE_MS);
+  CHECK(elapsedMs(plateauAtMs) < DEFAULT_DRIP_SETTLE_MS + 300);
+  CHECK(elapsedMs(pendingFinalize.endedAtMs) < DEFAULT_DRIP_MAX_WAIT_MS);
+  ShotLogRecord record[1] = {};
+  CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+  CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::POST_DRIP);
+  CHECK(record[0].actualWeightCg == 3600);
+
+  // A tail that never settles closes at the maximum wait.
+  startDripHold(false);
+  while (elapsedMs(pendingFinalize.endedAtMs) < DEFAULT_DRIP_MAX_WAIT_MS - 300) {
+    currentWeight = 35.0f;
+    currentWeightReceivedAtMs = hostMillis += 300;
+    ++currentWeightSequence;
+    markScaleWorkerProgress();
+    pendingShotFinalizeTask();
+    CHECK(pendingFinalize.pending);
+  }
+  currentWeightReceivedAtMs = hostMillis += 300;
+  ++currentWeightSequence;
+  markScaleWorkerProgress();
+  pendingShotFinalizeTask();
+  CHECK(!pendingFinalize.pending);
+
+  // Without a fresh reading there is nothing to wait for past the minimum.
+  startDripHold(false);
+  hostMillis = pendingFinalize.endedAtMs + DEFAULT_DRIP_DELAY_MS - 1;
+  markScaleWorkerProgress();
+  pendingShotFinalizeTask();
+  CHECK(pendingFinalize.pending);
+  hostMillis += MAX_AUTOMATION_WEIGHT_AGE_MS + 1;
+  markScaleWorkerProgress();
+  pendingShotFinalizeTask();
+  CHECK(!pendingFinalize.pending);
+}
+
+void cd04_bullseye_is_judged_on_the_recorded_yield() {
+  for (const float settledG : {36.0f, 35.9f}) {
+    for (const bool eligible : {true, false}) {
+      for (const bool buzzerOnly : {true, false}) {
+        startDripHold(eligible);
+        bullseyeMelodyConfig.enabled = true;
+        copyCString(bullseyeMelodyConfig.rtttl, sizeof(bullseyeMelodyConfig.rtttl),
+                    "bullseye:d=16,o=5,b=180:c,e,g,c6");
+        CHECK(localBuzzer.configureBullseyeRtttl(bullseyeMelodyConfig.rtttl));
+        runtimeConfig.alertOutputChannel = static_cast<uint8_t>(
+            buzzerOnly ? AlertOutputChannel::BUZZER_ONLY : AlertOutputChannel::SCALE_PRIORITY);
+        localBuzzer.stopAll();
+        // The drip reaches the target only after the minimum hold.
+        for (int i = 0; i <= 12; ++i) feedDripHold(34.8f + 0.1f * static_cast<float>(i));
+        for (int i = 0; i < 20 && pendingFinalize.pending; ++i) feedDripHold(settledG);
+        CHECK(!pendingFinalize.pending);
+        const bool plays = settledG == 36.0f && eligible && buzzerOnly;
+        CHECK((localBuzzer.activeCue == BuzzerCue::BULLSEYE) == plays);
+      }
+    }
   }
 }
 
@@ -26897,6 +26981,8 @@ const TestCase testCases[] = {
     {"FW02", fw02_offset_learns_below_sensor_lag},
     {"FW03", fw03_dense_tail_decimates_to_reachable_median},
     {"FW04", fw04_post_stop_ceiling_ignores_touches},
+    {"CD03", cd03_drip_hold_waits_for_the_tail_to_settle},
+    {"CD04", cd04_bullseye_is_judged_on_the_recorded_yield},
     {"FW12", fw12_settled_tail_trains_after_a_cup_lift},
     {"FF13", ff13_rinse_first_drop_goes_through_stopper},
     {"FF14", ff14_no_scale_first_drop_does_not_skip_stopper},
@@ -27055,6 +27141,8 @@ const TestCase testCases[] = {
     {"IT68", it68_plateau_above_anchor_plus_mincup_still_waits},
     {"IT69", it69_button_zero_on_empty_pan_rearms_idle_tare},
     {"IT70", it70_equal_weight_swap_at_zero_shows_absent},
+    {"CD01", cd01_cup_after_unsettled_return_to_zero_is_placed},
+    {"CD02", cd02_cup_set_down_at_the_start_is_inferred_from_the_tare},
     {"IT71", it71_tare_with_coffee_then_lift_recovers},
     {"IT72", it72_accessory_ramp_is_not_tared},
     {"IT73", it73_off_anchor_wait_age_and_profiler_event},
@@ -27226,8 +27314,6 @@ const TestCase testCases[] = {
     {"W99d", w99d_pending_rtttl_starts_from_preparsed_catalog},
     {"W99e", w99e_recovery_cue_bypasses_mute_via_pipeline},
     {"W99f", w99f_bullseye_rtttl_is_bounded_and_plays_without_allocation},
-    {"W99g", w99g_bullseye_requires_one_second_of_exact_fresh_samples},
-    {"W99h", w99h_bullseye_service_runs_only_in_buzzer_only_mode},
     {"W99i", w99i_bullseye_test_never_queues_mutable_custom_notes},
     {"W63", w63_scale_priority_paddle_uses_scale_when_connected},
     {"W64", w64_buzzer_only_first_drop_uses_local_buzzer},

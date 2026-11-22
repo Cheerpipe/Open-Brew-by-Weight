@@ -73,7 +73,7 @@ event, controller, boot, cycle, event uptime, wall-clock time, and send time.
 | --- | --- | --- |
 | `brew_state` | Extraction entered `brewing` or returned to `idle` | `state`, duration, target, preset ID/name, stop detail |
 | `first_drop` | First qualifying flow was confirmed | first-drop time, weight, target, preset ID/name |
-| `end` | Settled final result after drip delay | duration, target, preset ID/name, type, stop detail, optional first drop/weight/flow |
+| `end` | Settled final result once the drips settle | duration, target, preset ID/name, type, stop detail, optional first drop/weight/flow |
 | `presets_changed` | Persisted preset inventory changed | active ID, revision, full bounded item list |
 | `quick_settings_changed` | How shots stop changed: a temporary change from the header panel or Home Assistant, a saved setting, or a preset change | revision, active preset ID, mode, and all six boolean values |
 | `controller_started` | Network-ready controller boot asks a client to reconcile | boot ID and current configuration revision |

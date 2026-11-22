@@ -1641,14 +1641,28 @@ if (!html.includes('id="postTareBaselineGraceS" type="number" min="0.5" max="10"
     !firmware.includes('session.config.postTareBaselineGraceMs')) {
   throw new Error('Post-tare grace must be wired through Tare settings, the Settings stream, and firmware');
 }
-if (!codeIncludes(ui, "rangeCheck('dripDelayS',0,10,'Drip delay',{unit:'s',}") ||
+if (!codeIncludes(ui, "rangeCheck('dripDelayS',0,10,'Minimum drip wait',{unit:'s',}") ||
+    !codeIncludes(ui, "rangeCheck('dripSettleS',1,10,'Settle time',{unit:'s',}") ||
+    !codeIncludes(ui, "rangeCheck('dripMaxWaitS',Math.max(5,number('dripDelayS')||0),30,'Maximum drip wait',{unit:'s'},)") ||
     !codeIncludes(ui, "dripDelayMs:sToMs('dripDelayS')") ||
+    !codeIncludes(ui, "dripSettleMs:sToMs('dripSettleS')") ||
+    !codeIncludes(ui, "dripMaxWaitMs:sToMs('dripMaxWaitS')") ||
     !codeIncludes(ui, "$('dripDelayS').value=String((c.dripDelayMs??3000)/1000)") ||
-    !codeIncludes(ui, 'The yield is recorded this long after the stop.') ||
+    !codeIncludes(ui, "$('dripSettleS').value=String((c.dripSettleMs??3000)/1000)") ||
+    !codeIncludes(ui, "$('dripMaxWaitS').value=String((c.dripMaxWaitMs??20000)/1000)") ||
+    !codeIncludes(ui, 'The yield is never recorded sooner than this after the stop.') ||
+    !codeIncludes(ui, 'id="dripSettleS" type="number" min="1" max="10" step="0.1"') ||
+    !codeIncludes(ui, 'id="dripMaxWaitS" type="number" min="5" max="30" step="1"') ||
     !network.includes('fields.field("config.dripDelayMs",') ||
-    !validationHeader.includes('validationFailure("FIELD_RANGE", "Drip delay", "0", "10 s")') ||
-    !network.includes('candidate.dripDelayMs')) {
-  throw new Error('Drip delay must be wired through Settings, the Settings stream, and config validation');
+    !network.includes('fields.field("config.dripSettleMs",') ||
+    !network.includes('fields.field("config.dripMaxWaitMs",') ||
+    !validationHeader.includes('validationFailure("FIELD_RANGE", "Minimum drip wait", "0", "10 s")') ||
+    !validationHeader.includes('validationFailure("FIELD_RANGE", "Drip settle time", "1", "10 s")') ||
+    !validationHeader.includes('validationFailure("CONFIG_DRIP_WAIT_RELATION")') ||
+    !network.includes('candidate.dripDelayMs') ||
+    !network.includes('candidate.dripSettleMs') ||
+    !network.includes('candidate.dripMaxWaitMs')) {
+  throw new Error('Drip waits must be wired through Settings, the Settings stream, and config validation');
 }
 if (!html.includes('<summary>AtomHeart Eclair</summary>') ||
     !html.includes('Eclair uses the regular tare and timer workflow') ||

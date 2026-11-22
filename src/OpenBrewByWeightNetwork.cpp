@@ -47,6 +47,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <limits>
 #include <float.h>
 #include <new>
 #include <numeric>
@@ -400,13 +401,21 @@ bool jsonUint32(const cJSON *object, const char *name, uint32_t &output) {
   return true;
 }
 
-bool jsonUint8(const cJSON *object, const char *name, uint8_t &output) {
+// A narrower unsigned field: the whole number must fit its type.
+template <typename T>
+bool jsonUnsigned(const cJSON *object, const char *name, T &output) {
   uint32_t value = 0;
-  if (!jsonUint32(object, name, value) || value > UINT8_MAX) {
+  if (!jsonUint32(object, name, value) || value > std::numeric_limits<T>::max()) {
     return false;
   }
-  output = static_cast<uint8_t>(value);
+  output = static_cast<T>(value);
   return true;
+}
+
+// An absent field keeps the candidate's value.
+template <typename T>
+bool jsonOptionalUnsigned(const cJSON *object, const char *name, T &output) {
+  return !jsonFieldPresent(object, name) || jsonUnsigned(object, name, output);
 }
 
 bool jsonFloat(const cJSON *object, const char *name, float &output) {
@@ -701,7 +710,7 @@ bool jsonAssumeIdleWhenScaleConnects(const cJSON *object, RuntimeConfig &config)
 
 bool jsonShotReactTimeoutS(const cJSON *object, RuntimeConfig &config) {
   uint8_t seconds = 0;
-  if (!jsonUint8(object, "shotReactTimeoutS", seconds)) {
+  if (!jsonUnsigned(object, "shotReactTimeoutS", seconds)) {
     return false;
   }
   if (seconds != 0 && (seconds < MIN_SHOT_REACT_TIMEOUT_S ||

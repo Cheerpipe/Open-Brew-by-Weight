@@ -16,7 +16,7 @@ ValidationFailure parseLaMarzoccoPresetSettings(const cJSON *root, WebCommand &c
        !laMarzoccoBrewTargetSettable(machineIntegrationStatus(), rounded)))
     return validationFailure("LA_MARZOCCO_PRESET_TARGET_RANGE");
   if ((steamSent && !jsonBoolean(root, "laMarzoccoSteamEnabled", steamEnabled)) ||
-      (levelSent && (!jsonUint8(root, "laMarzoccoSteamLevel", steamLevel) || steamLevel < 1 ||
+      (levelSent && (!jsonUnsigned(root, "laMarzoccoSteamLevel", steamLevel) || steamLevel < 1 ||
                      steamLevel > LA_MARZOCCO_STEAM_LEVEL_MAX)))
     return validationFailure("LA_MARZOCCO_PRESET_STEAM_INVALID");
   command.laMarzoccoBrewTargetSpecified = target != nullptr;

@@ -110,7 +110,11 @@ inline ValidationFailure configValidationFailure(ConfigValidationError error) {
     case ConfigValidationError::LAST_SHOT_COOLDOWN:
       return validationFailure("FIELD_RANGE", "Last shot cooldown", "5", "240 min");
     case ConfigValidationError::DRIP_DELAY:
-      return validationFailure("FIELD_RANGE", "Drip delay", "0", "10 s");
+      return validationFailure("FIELD_RANGE", "Minimum drip wait", "0", "10 s");
+    case ConfigValidationError::DRIP_SETTLE:
+      return validationFailure("FIELD_RANGE", "Drip settle time", "1", "10 s");
+    case ConfigValidationError::DRIP_MAX_WAIT:
+      return validationFailure("CONFIG_DRIP_WAIT_RELATION");
     case ConfigValidationError::SERIAL_LOG_LEVEL:
       return validationFailure("FIELD_ENUM", "Serial log level",
                                "none, critical, error, warning, info, or debug");

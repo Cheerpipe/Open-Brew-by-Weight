@@ -325,8 +325,9 @@ mode, and Quick rinse off:
    may finish a little above or below it.
    To finish early in Natural mode, move the paddle OFF.
 4. After automatic stop, return the paddle to OFF before starting again.
-5. Leave the cup on the scale through the drip delay (default 3 s). The final
-   weight then updates Last Shot and, if eligible, history.
+5. Leave the cup on the scale until the last drips settle: at least 3 s, a
+   little longer while the weight still rises. The final weight then updates
+   Last Shot and, if eligible, history.
 
 While brewing, a card just below the machine's name follows the shot live —
 weight against the goal, elapsed time, flow, and the first drop. After the stop it

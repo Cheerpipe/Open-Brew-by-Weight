@@ -325,7 +325,6 @@ void commitLiveBullseyeConfig(const BullseyeMelodyConfig &config) {
   bullseyeConfigMux.unlock();
   if (!changed) return;
   (void)localBuzzer.configureBullseyeRtttl(bullseyeMelodyConfig.rtttl);
-  if (!bullseyeMelodyConfig.enabled) bullseyeTracker.clear();
 #ifndef OPEN_BREW_BY_WEIGHT_HOST_TEST
   networkManager.syncLiveBullseye(bullseyeMelodyConfig);
 #endif

@@ -103,6 +103,7 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            "\"autoTare\":%s,\"postTareBaselineGraceMs\":%lu,"
            "\"timerOnly\":%s,\"brewByWeight\":%s,\"canTareStartTimer\":%s,"
            "\"scaleTimerStopExtraDelayMs\":%lu,\"dripDelayMs\":%lu,"
+           "\"dripSettleMs\":%lu,\"dripMaxWaitMs\":%lu,"
            "\"soundAlertsMuted\":%s,\"firstDropBeep\":%s,"
            "\"paddleReturnReminderBeep\":%s,"
            "\"paddleReturnReminderIntervalMs\":%lu,"
@@ -138,6 +139,8 @@ esp_err_t OpenBrewByWeightNetwork::debugExportHandler(httpd_req_t *request) {
            c.config.canTareStartTimer ? "true" : "false",
            static_cast<unsigned long>(c.config.scaleTimerStopExtraDelayMs),
            static_cast<unsigned long>(c.config.dripDelayMs),
+           static_cast<unsigned long>(c.config.dripSettleMs),
+           static_cast<unsigned long>(c.config.dripMaxWaitMs),
            c.config.soundAlertsMuted ? "true" : "false",
            c.config.firstDropBeep ? "true" : "false",
            c.config.paddleReturnReminderBeep ? "true" : "false",
@@ -1047,7 +1050,7 @@ esp_err_t OpenBrewByWeightNetwork::shotsRateHandler(httpd_req_t *request) {
   const bool hasLastShot = jsonFieldPresent(root, "lastShot");
   const bool parsed =
       root != nullptr && jsonHasOnlyUniqueFields(root, fields, 3) &&
-      jsonUint8(root, "rating", rating) && rating <= SHOT_LOG_RATING_MAX &&
+      jsonUnsigned(root, "rating", rating) && rating <= SHOT_LOG_RATING_MAX &&
       hasId != hasLastShot &&
       (!hasId || (jsonUint32(root, "id", shotId) && shotId != 0)) &&
       (!hasLastShot || (jsonBoolean(root, "lastShot", lastShot) && lastShot));

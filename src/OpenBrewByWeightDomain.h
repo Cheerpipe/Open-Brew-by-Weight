@@ -623,9 +623,12 @@ struct RuntimeConfig {
   uint32_t rinseGestureMs = DEFAULT_RINSE_GESTURE_MS;  // machine-owned detection
   uint32_t rinseDurationMs = DEFAULT_RINSE_DURATION_MS;  // rinse clock
   bool autoRetare = true;
+  // Drip settle time and maximum wait (see dripDelayMs); fill padding.
+  uint16_t dripSettleMs = DEFAULT_DRIP_SETTLE_MS;
   uint32_t retareWindowMs = DEFAULT_RETARE_WINDOW_MS;
   float minimumCupWeightG = DEFAULT_MINIMUM_CUP_WEIGHT_G;
   uint8_t retareStabilitySamples = DEFAULT_RETARE_STABILITY_SAMPLES;
+  uint16_t dripMaxWaitMs = DEFAULT_DRIP_MAX_WAIT_MS;
   float retareStabilityToleranceG = DEFAULT_RETARE_STABILITY_TOLERANCE_G;
   uint32_t retareStabilityMaxGapMs = DEFAULT_RETARE_STABILITY_MAX_GAP_MS;
   uint32_t retareStabilityMinDurationMs = DEFAULT_RETARE_STABILITY_MIN_DURATION_MS;
@@ -692,7 +695,7 @@ struct RuntimeConfig {
       static_cast<uint8_t>((OPEN_BREW_BY_WEIGHT_STOP_PULSE_MS + 5) / 10);
   uint8_t maxSinglePressHundredMs =
       static_cast<uint8_t>((OPEN_BREW_BY_WEIGHT_MAX_SINGLE_PRESS_MS + 50) / 100);
-  // Wait after shot end before capturing the post-drip weight.
+  // Minimum wait after shot end before capturing the post-drip weight.
   uint32_t dripDelayMs = DEFAULT_DRIP_DELAY_MS;
   // Start/stop on press (default) vs release. Reed confirm window.
   bool momentaryStartOnPress = OPEN_BREW_BY_WEIGHT_DEFAULT_MOMENTARY_START_ON_PRESS;
@@ -815,9 +818,12 @@ struct CycleConfigSnapshot {
   uint32_t rinseDurationMs = DEFAULT_RINSE_DURATION_MS;
   bool rinseEnabled = false;
   bool autoRetare = true;
+  // Drip settle time and maximum wait (see dripDelayMs); fill padding.
+  uint16_t dripSettleMs = DEFAULT_DRIP_SETTLE_MS;
   uint32_t retareWindowMs = DEFAULT_RETARE_WINDOW_MS;
   float minimumCupWeightG = DEFAULT_MINIMUM_CUP_WEIGHT_G;
   uint8_t retareStabilitySamples = DEFAULT_RETARE_STABILITY_SAMPLES;
+  uint16_t dripMaxWaitMs = DEFAULT_DRIP_MAX_WAIT_MS;
   float retareStabilityToleranceG = DEFAULT_RETARE_STABILITY_TOLERANCE_G;
   uint32_t retareStabilityMaxGapMs = DEFAULT_RETARE_STABILITY_MAX_GAP_MS;
   uint32_t retareStabilityMinDurationMs = DEFAULT_RETARE_STABILITY_MIN_DURATION_MS;
@@ -857,6 +863,8 @@ inline CycleConfigSnapshot snapshotConfig(const RuntimeConfig &config) {
   snapshot.canTareStartTimer = config.canTareStartTimer;
   snapshot.scaleTimerStopExtraDelayMs = config.scaleTimerStopExtraDelayMs;
   snapshot.dripDelayMs = config.dripDelayMs;
+  snapshot.dripSettleMs = config.dripSettleMs;
+  snapshot.dripMaxWaitMs = config.dripMaxWaitMs;
   snapshot.firstDropBeep = config.firstDropBeep;
   snapshot.paddleReturnReminderBeep = config.paddleReturnReminderBeep;
   snapshot.paddleReturnReminderIntervalMs =
@@ -951,7 +959,9 @@ enum class ConfigValidationError : uint8_t {
   FAST_RAMP,
   FAST_CURVE,
   SLOW_RAMP,
-  SLOW_CURVE
+  SLOW_CURVE,
+  DRIP_SETTLE,
+  DRIP_MAX_WAIT
 };
 
 constexpr size_t MAX_SHOT_PRESETS = 8;
@@ -1163,6 +1173,13 @@ inline ConfigValidationError validateRuntimeConfig(
   if (config.dripDelayMs > MAX_DRIP_DELAY_MS) {
     return ConfigValidationError::DRIP_DELAY;
   }
+  if (config.dripSettleMs < MIN_DRIP_SETTLE_MS || config.dripSettleMs > MAX_DRIP_SETTLE_MS) {
+    return ConfigValidationError::DRIP_SETTLE;
+  }
+  if (config.dripMaxWaitMs < MIN_DRIP_MAX_WAIT_MS || config.dripMaxWaitMs > MAX_DRIP_MAX_WAIT_MS ||
+      config.dripMaxWaitMs < config.dripDelayMs) {
+    return ConfigValidationError::DRIP_MAX_WAIT;
+  }
   if (config.stopPulseTenMs != 0 &&
       (config.stopPulseTenMs < 5 || config.stopPulseTenMs > 100)) {
     return ConfigValidationError::STOP_PULSE;
@@ -1311,6 +1328,10 @@ inline const char *configValidationErrorName(ConfigValidationError error) {
       return "lastShotCooldownMs";
     case ConfigValidationError::DRIP_DELAY:
       return "dripDelayMs";
+    case ConfigValidationError::DRIP_SETTLE:
+      return "dripSettleMs";
+    case ConfigValidationError::DRIP_MAX_WAIT:
+      return "dripMaxWaitMs";
     case ConfigValidationError::SERIAL_LOG_LEVEL:
       return "serialLogLevel";
     case ConfigValidationError::STOP_PULSE:

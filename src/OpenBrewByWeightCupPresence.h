@@ -135,6 +135,47 @@ bool cupWeightNearKnownEmpty(float weight) {
       cupPresence.weight.pendingId == 0 && weight <= cupPresence.emptyAnchorG + band;
 }
 
+// The lowest load that is a cup whichever plausible empty pan is real: the
+// anchor or, when one qualified since the last tare, the last empty plateau.
+// INFINITY without an anchor, or without that plateau when it is required.
+float cupLoadFloorG(float anchorG, bool requireQualifiedEmpty) {
+  const CupStableWeight &absent = cupPresence.weight.absent;
+  if (!std::isfinite(anchorG) || (requireQualifiedEmpty && !absent.valid)) return INFINITY;
+  return fmaxf(anchorG, absent.valid ? absent.absoluteG : anchorG) +
+         runtimeConfig.minimumCupWeightG;
+}
+
+// Commits a placement at weightG over [minimumG, maximumG]; cupWeightG is the
+// cup's own mass when known (NAN otherwise). A placement read below the
+// minimum cup weight is a cup already zeroed on the pan.
+void commitCupPlacement(float weightG, float minimumG, float maximumG, float thresholdG,
+                        uint32_t atMs, bool sampleValid, float cupWeightG) {
+  auto &mass = cupPresence.weight;
+  const bool weightValid = std::isfinite(cupWeightG) &&
+                           cupWeightG >= runtimeConfig.minimumCupWeightG;
+  cupPresence.state = CupPresenceState::PRESENT;
+  // Record the new occupied reading without inventing a stable-empty sample.
+  mass.present = CupStableWeight{weightG, atMs, sampleValid};
+  mass.emptyValid = false;
+  mass.unloadQualified = false;
+  mass.unloadSamples = 0;
+  mass.pendingValid = false;
+  mass.weightG = weightValid ? cupWeightG : 0.0f;
+  mass.valid = weightValid;
+  if (weightValid) cupPresence.initialZeroRecoveryAllowed = false;
+  ++cupPresence.placementId;
+  if (cupPresence.placementId == 0) ++cupPresence.placementId;
+  cupPresence.referenceUncertain = false;
+  cupPresence.occupiedReferenceG = weightG;
+  cupPresence.occupiedMinimumG = minimumG;
+  cupPresence.occupiedMaximumG = maximumG;
+  cupPresence.occupiedPlacementThresholdG = thresholdG;
+  cupPresence.taredWhilePresent = weightG < runtimeConfig.minimumCupWeightG;
+  cupPresence.inNegativeHole = false;
+  cupPresence.holeWeightG = 0.0f;
+  resetCupPlaceStabilityStreak();
+}
+
 // Ages the current rejected plateau and profiles it once when it is stable.
 void noteOffAnchorEmptyWeight(WeightSample sample, float referenceG) {
   auto &mass = cupPresence.weight;
@@ -496,8 +537,11 @@ CupPresenceEvent feedCupPresence(float weight, uint32_t receivedAtMs,
     mass.emptyValid = true;
   }
   // A brief confirmed unload can reuse the anchor; never use a lift minimum.
+  // An idle load clearing both a provisional zero and the last qualified
+  // empty pan is a cup before that zero settles.
   const bool qualifiedReference = mass.emptyValid ||
-      (allowFastReplacement && mass.unloadQualified && std::isfinite(cupPresence.emptyAnchorG));
+      (allowFastReplacement && mass.unloadQualified && std::isfinite(cupPresence.emptyAnchorG)) ||
+      (allowFastReplacement && weight >= cupLoadFloorG(cupPresence.emptyAnchorG, true));
   const bool awaitingAbsence = cupPresence.inNegativeHole &&
                                !qualifiedReference;
   const float placementThresholdG = qualifiedReference
@@ -566,34 +610,13 @@ CupPresenceEvent feedCupPresence(float weight, uint32_t receivedAtMs,
     return CupPresenceEvent::NONE;
   }
 
-  cupPresence.state = CupPresenceState::PRESENT;
-  const float placementWeightG = cupPresence.placeCandidateWeightG -
-                                cupPresence.emptyAnchorG;
   const bool placementSampleValid = cupPresence.weight.sampleSequence == packetSequence &&
       packetSequence != 0 && cupPresence.weight.sampleAtMs == receivedAtMs;
-  const bool placementWeightValid = qualifiedReference &&
-      placementSampleValid && std::isfinite(placementWeightG) && placementWeightG >= minCupG;
-  // Record the new occupied reading without inventing a stable-empty sample.
-  cupPresence.weight.present = CupStableWeight{
-      cupPresence.placeCandidateWeightG, receivedAtMs, placementSampleValid};
-  cupPresence.weight.emptyValid = false;
-  cupPresence.weight.unloadQualified = false;
-  cupPresence.weight.unloadSamples = 0;
-  cupPresence.weight.pendingValid = false;
-  cupPresence.weight.weightG = placementWeightValid ? placementWeightG : 0.0f;
-  cupPresence.weight.valid = placementWeightValid;
-  if (placementWeightValid) cupPresence.initialZeroRecoveryAllowed = false;
-  ++cupPresence.placementId;
-  if (cupPresence.placementId == 0) ++cupPresence.placementId;
-  cupPresence.referenceUncertain = false;
-  cupPresence.occupiedReferenceG = cupPresence.placeCandidateWeightG;
-  cupPresence.occupiedMinimumG = cupPresence.placeMinimumG;
-  cupPresence.occupiedMaximumG = cupPresence.placeMaximumG;
-  cupPresence.occupiedPlacementThresholdG = placementThresholdG;
-  // A relative placement may remain below the absolute minimum until tare.
-  cupPresence.taredWhilePresent = cupPresence.placeCandidateWeightG < minCupG;
-  cupPresence.inNegativeHole = false;
-  cupPresence.holeWeightG = 0.0f;
-  resetCupPlaceStabilityStreak();
+  commitCupPlacement(cupPresence.placeCandidateWeightG, cupPresence.placeMinimumG,
+                     cupPresence.placeMaximumG, placementThresholdG, receivedAtMs,
+                     placementSampleValid,
+                     qualifiedReference && placementSampleValid
+                         ? cupPresence.placeCandidateWeightG - cupPresence.emptyAnchorG
+                         : NAN);
   return CupPresenceEvent::PLACED;
 }

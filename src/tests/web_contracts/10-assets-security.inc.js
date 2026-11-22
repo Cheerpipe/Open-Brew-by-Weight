@@ -800,9 +800,8 @@ if (!codeIncludes(ui, 'id="bullseyeMelodyEnabled"') ||
     !network.includes('"bullseyeMelodyEnabled"') ||
     !network.includes('"bullseyeRtttl"') ||
     !network.includes('stageBullseyeConfig') ||
-    !firmwareCore.includes('serviceBullseyeMelody') ||
-    !firmwareCore.includes('AlertOutputChannel::BUZZER_ONLY') ||
-    !firmwareCore.includes('BULLSEYE_STABILITY_MS')) {
+    !firmwareCore.includes('playBullseyeIfOnTarget') ||
+    !firmwareCore.includes('AlertOutputChannel::BUZZER_ONLY')) {
   throw new Error('Bullseye RTTTL alert must be configurable end-to-end');
 }
 {

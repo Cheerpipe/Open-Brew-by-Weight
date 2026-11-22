@@ -1617,6 +1617,9 @@ void t_firmware_cut_settles_off_through_a_short_shot_finalize() {
   holdStableWeight(1200);
   CHECK(machineRunState() == MachineRunState::IDLE);
   CHECK(hostRelayClosedWrites == closedBefore + 1);
+  // These readings bypass the drip tail, so the hold runs to its maximum wait.
+  CHECK(pendingFinalize.pending);
+  holdStableWeight(DEFAULT_DRIP_MAX_WAIT_MS);
   CHECK(!pendingFinalize.pending);  // The bad shot was stored on the way.
 }
 

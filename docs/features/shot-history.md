@@ -292,7 +292,8 @@ the scale-loss backup's recent shots read good shots only, and add their own
 rules on top.
 
 The controller collects accepted scale readings in memory while the shot runs
-and saves the completed curve after the configured drip delay. Each reading
+and saves the completed curve once the last drips settle (see
+[drip wait](../settings/scales.md#when-it-applies)). Each reading
 keeps its actual arrival time, including repeated weights and changing scale
 cadence. Duration ends when the machine circuit opens. During the drip delay,
 accepted readings continue as a faint dashed line without fill. A small hollow
@@ -716,7 +717,7 @@ weight columns show what the scale read, and their flow columns stay empty.
 Next come the stop details: `cut_s` is the shot time when the machine stopped,
 `cut_weight_g` the weight on the scale at that moment, `drip_g` the settled
 yield minus that weight (empty unless the yield was read after the drip
-delay), and `drip_delay_s` the drip delay that shot used. All four stay empty
+delay), and `drip_delay_s` the minimum drip wait that shot used. All four stay empty
 when the shot has no recorded stop; `drip_delay_s` is also empty for shots
 saved before it was recorded.
 

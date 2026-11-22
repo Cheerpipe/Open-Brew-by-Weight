@@ -100,6 +100,8 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   pendingFinalize.endedAtOffsetMinutes = end.offsetMinutes;
   pendingFinalize.endedAtHasWallTime = end.available;
   pendingFinalize.dripDelayMs = session.config.dripDelayMs;
+  pendingFinalize.dripSettleMs = session.config.dripSettleMs;
+  pendingFinalize.dripMaxWaitMs = session.config.dripMaxWaitMs;
   pendingFinalize.endedWeightSequence = currentWeightSequence;
   pendingFinalize.curveLastSequence = currentWeightSequence;
   pendingFinalize.cycleStartedAtMs =
@@ -675,6 +677,21 @@ void queueWebhookQuickSettingsChanged() {
 #endif
 }
 
+// Bullseye: an eligible shot whose settled yield, as history records it, is
+// exactly its target.
+void playBullseyeIfOnTarget(const PendingShotFinalize &snapshot, float yieldG,
+                            ActualWeightSource source) {
+  if (!snapshot.bullseyeEligible || source != ActualWeightSource::POST_DRIP ||
+      gramsToDg(yieldG) != snapshot.goalWeightDg || !bullseyeMelodyConfig.enabled ||
+      !soundAlertsEnabled() ||
+      currentAlertOutputChannel() != AlertOutputChannel::BUZZER_ONLY || !localBuzzer.ready) {
+    return;
+  }
+  (void)localBuzzer.requestBullseye();
+  serialTracef(LogLevel::INFO, "Bullseye: %.1fg settled on target",
+               static_cast<double>(yieldG));
+}
+
 void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
   const ProfileControlObservation profile;
   if (!pendingFinalize.pending) {
@@ -707,6 +724,8 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
     valid = true;
   }
   const bool good = snapshot.logEligible && shotLogWeightEligible(weightG, valid);
+  // Only a lifted cup keeps the celebration; the next cycle has begun otherwise.
+  if (good && profileReason == 1) playBullseyeIfOnTarget(snapshot, weightG, source);
   // A cup lifted once the tail settled took nothing the drip still owed; a
   // hold cut short earlier, or by the next cycle or a new coffee, does not
   // train, and says so.
@@ -732,11 +751,22 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
 
 #include "OpenBrewByWeightBbwFinalize.inc"
 
-void pendingShotFinalizeTask() {
-  if (!pendingFinalize.pending ||
-      elapsedMs(pendingFinalize.endedAtMs) < pendingFinalize.dripDelayMs) {
-    return;
+// Drip delay is the minimum hold (0 finalizes at once). The shot then waits
+// until its tail median has stopped rising for the settle time, up to the
+// maximum wait; without a fresh scale reading there is nothing to wait for.
+bool dripHoldComplete(const PendingShotFinalize &pending) {
+  const uint32_t heldMs = elapsedMs(pending.endedAtMs);
+  if (heldMs < pending.dripDelayMs) return false;
+  if (pending.dripDelayMs == 0 || heldMs >= pending.dripMaxWaitMs ||
+      !pending.startedWithScale || !scaleAvailable() || !currentWeightIsFresh()) {
+    return true;
   }
+  return std::isfinite(pending.tailPlateauG) &&
+         elapsedMs(pending.tailPlateauAtMs) >= pending.dripSettleMs;
+}
+
+void pendingShotFinalizeTask() {
+  if (!pendingFinalize.pending || !dripHoldComplete(pendingFinalize)) return;
 
   captureLateTareCompletion();
   const ProfileControlObservation profile;
@@ -788,6 +818,7 @@ void pendingShotFinalizeTask() {
   // the learning speed or the quick start.
   const bool good =
       snapshot.logEligible && shotLogWeightEligible(logWeightG, logWeightValid);
+  if (good) playBullseyeIfOnTarget(snapshot, logWeightG, weightSource);
   snapshot.bbwLearningApplied =
       good && learnPendingBbw(snapshot, finalWeightG, postDripWeightValid);
 
@@ -806,31 +837,5 @@ void pendingShotFinalizeTask() {
 
 }
 
-void serviceBullseyeMelody() {
-  if (!bullseyeTracker.pending) {
-    return;
-  }
-  const uint32_t nowMs = millis();
-  if (!bullseyeMelodyConfig.enabled || !soundAlertsEnabled() ||
-      currentAlertOutputChannel() != AlertOutputChannel::BUZZER_ONLY ||
-      !localBuzzer.ready || session.active ||
-      cupPresenceState() != CupPresenceState::PRESENT ||
-      cupPresencePlacementId() != bullseyeTracker.shot.cupPlacementId) {
-    bullseyeTracker.clear();
-    return;
-  }
-  if (currentWeightSequence == bullseyeTracker.processedWeightSequence ||
-      !scaleAvailable() || !currentWeightIsFresh(nowMs)) {
-    return;
-  }
-  if (bullseyeTracker.accept({currentWeight, currentWeightReceivedAtMs, currentWeightSequence},
-                             MAX_AUTOMATION_WEIGHT_AGE_MS)) {
-    (void)localBuzzer.requestBullseye();
-    serialTracef(LogLevel::INFO,
-                 "Bullseye: %.2fg stable at target for %lums",
-                 static_cast<double>(currentWeight),
-                 static_cast<unsigned long>(BULLSEYE_STABILITY_MS));
-  }
-}
 
 // ---------------------------------------------------------------------------
