@@ -132,6 +132,9 @@ class EspressoScaleBLE {
         ScaleCommandResult setBeepLevel(uint8_t level, const ScaleCommandAdmission *admission);
 
         ScaleCommandResult heartbeat();
+        // Restarts the scale's own auto-off countdown; never scheduled by the
+        // library (ScaleFeatureAutoOffReset).
+        ScaleCommandResult resetAutoOff();
         // Powers the scale down when the protocol supports it; the link then
         // drops from the remote side.
         ScaleCommandResult powerOff();

@@ -108,9 +108,8 @@ inline uint8_t scaleBookooOpcode(ScaleOp op) {
         case ScaleOp::ResetTimer: return 0x06;
         case ScaleOp::CombinedTareStart: return 0x07;
         case ScaleOp::PowerOff: return 0x15;
-        // Keep-alive: resets the auto-off countdown (Mini V1.4.3+, Ultra
-        // V4.0.1+); both specs recommend sending it periodically.
-        case ScaleOp::Heartbeat: return 0x25;
+        // Restarts the auto-off countdown (Mini V1.4.3+, Ultra V4.0.1+).
+        case ScaleOp::ResetAutoOff: return 0x25;
         default: return 0;
     }
 }
@@ -167,18 +166,20 @@ extern const ScaleProtocol kScaleProtocolWeighMyBru;
 extern const ScaleProtocol kScaleProtocolVaria;
 extern const ScaleProtocol kScaleProtocolEureka;
 
+// Both Bookoo models share one command set (Mini V1.4.3+, Ultra V4.0.0+);
+// only the volume range differs (Ultra: 0-3; the Mini clamps above 5 itself).
+inline ScaleFeatureSet scaleModelFeatures(ScaleFeatureSet features,
+                                          ScaleModel model) {
+    if (model == ScaleModel::BookooUltra) features.volumeMax = 3;
+    return features;
+}
+
 inline ScaleFeatureSet scaleFeaturesForModel(const ScaleProtocol *protocol,
                                              ScaleModel model) {
-    ScaleFeatureSet result = protocol == nullptr ? scaleFeatureSetNone()
-                                                : protocol->features;
-    // The Mini gained power-off with the same 0x15 opcode as the Ultra
-    // (Mini release V1.4.3+); only the volume range still differs by model
-    // (Ultra V4.0.0+: 0-3; the Mini clamps above 5 itself).
-    if (protocol == &kScaleProtocolGenericFf11 &&
-        model == ScaleModel::BookooUltra) {
-        result.volumeMax = 3;
-    }
-    return result;
+    if (protocol == nullptr) return scaleFeatureSetNone();
+    return protocol == &kScaleProtocolGenericFf11
+               ? scaleModelFeatures(protocol->features, model)
+               : protocol->features;
 }
 
 #endif

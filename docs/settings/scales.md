@@ -66,10 +66,9 @@ running.
 
 **Supported commands** lists the commands available for the connected,
 identified Bookoo model. Both Themis models list tare, volume, start/stop/reset
-timer, tare and start timer, and power off: the Mini supports power off since
-the BooKoo firmware release that unified its command with the Ultra's, and a
-Mini running older firmware ignores the command. Ultra may ignore power off
-while charging. An unidentified model shows that command support is unknown.
+timer, tare and start timer, and power off. Power off needs Mini firmware 1.4.3
+or Ultra firmware 4.0.0 or later, and the Ultra ignores it while charging. An
+unidentified model shows that command support is unknown.
 
 When no scale is connected, the Bluetooth symbol and its signal bars in the
 header share the same faded appearance in both light and dark modes.
@@ -153,8 +152,8 @@ itself accepts a power-off command. The explicit support list:
 
 | Scale | Power-off over Bluetooth |
 | --- | --- |
-| Bookoo Themis Ultra | Yes — BooKoo's published protocol, command `0x15`; may be ignored while charging |
-| Bookoo Themis Mini | Yes — BooKoo's published protocol, command `0x15`, since the Mini release that unified it with the Ultra; older Mini firmware ignores it |
+| Bookoo Themis Ultra | Yes — BooKoo's published protocol, command `0x15`, firmware 4.0.0 or later; ignored while charging |
+| Bookoo Themis Mini | Yes — BooKoo's published protocol, command `0x15`, firmware 1.4.3 or later |
 | Acaia (Lunar, Pearl S, Pyxis, Cinco, Proch) | No — no power-off command is documented for the Acaia protocol |
 | Felicita (Arc) | No |
 | AtomHeart Eclair | No |
@@ -168,13 +167,13 @@ itself accepts a power-off command. The explicit support list:
 Both identified Bookoo models receive the shutdown command. If a Bookoo
 broadcast does not reveal the model, the controller keeps the existing generic
 Bookoo behavior, so shutdown may be attempted. Other scales without power-off
-support receive no shutdown command. Scale support assumes the current
-manufacturer firmware.
+support receive no shutdown command.
 
-While a Bookoo scale is connected, the controller also resets the scale's
-automatic shutdown countdown about once a minute with a small keep-alive
-command, so an idle scale stays connected instead of powering itself off. The
-scale's own auto-off setting is not changed.
+BooKoo does not say how older scale firmware reacts to the command. If the
+scale is still connected three seconds after the shutdown — because it is
+charging or its firmware predates power-off — the controller notes it in the
+log, disconnects, and reconnects normally once the scale is found again; the
+scale simply stays on.
 
 For Bookoo, the controller leaves at least 100 ms between Bluetooth commands.
 Once it asks the scale to shut down, it sends no more commands on that

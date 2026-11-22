@@ -647,10 +647,7 @@ class EspressoScaleBLE {
     if (!connected) {
       return scaleFeatureSetNone();
     }
-    ScaleFeatureSet next = connectedFeatures;
-    if (model() == ScaleModel::BookooUltra) {
-      next.volumeMax = 3;
-    }
+    ScaleFeatureSet next = scaleModelFeatures(connectedFeatures, model());
     if (!tareStartTimerSupported) {
       next.flags &= ~static_cast<uint32_t>(ScaleFeatureCombinedTareStart);
     }

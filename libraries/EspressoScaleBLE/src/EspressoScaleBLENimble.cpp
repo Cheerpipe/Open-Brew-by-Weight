@@ -147,6 +147,7 @@ const char *scaleOpName(ScaleOp op) {
     case ScaleOp::Heartbeat: return "heartbeat";
     case ScaleOp::SetVolume: return "set_volume";
     case ScaleOp::PowerOff: return "power_off";
+    case ScaleOp::ResetAutoOff: return "reset_auto_off";
   }
   return "unknown";
 }
@@ -3295,6 +3296,14 @@ ScaleCommandResult EspressoScaleBLE::heartbeat() {
     return ScaleCommandResult::Unsupported;
   }
   return client.writeOp(ScaleOp::Heartbeat);
+}
+
+ScaleCommandResult EspressoScaleBLE::resetAutoOff() {
+  NimbleScaleClient &client = clientFromStorage(g_clientStorage);
+  if (!client.features().has(ScaleFeatureAutoOffReset)) {
+    return ScaleCommandResult::Unsupported;
+  }
+  return client.writeOp(ScaleOp::ResetAutoOff);
 }
 
 ScaleCommandResult EspressoScaleBLE::powerOff() {

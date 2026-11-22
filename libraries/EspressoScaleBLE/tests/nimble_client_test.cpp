@@ -1267,7 +1267,9 @@ static void run() {
     CHECK(c.model()==ScaleModel::BookooMini);
     CHECK(c.features().has(ScaleFeaturePowerOff));
     CHECK(c.features().volumeMax==5);
-    CHECK(c.writeOp(ScaleOp::Heartbeat)==ScaleCommandResult::Ok);
+    CHECK(c.features().has(ScaleFeatureAutoOffReset));
+    CHECK(!c.features().has(ScaleFeatureHeartbeat) && !c.heartbeatRequired());
+    CHECK(c.writeOp(ScaleOp::ResetAutoOff)==ScaleCommandResult::Ok);
     CHECK(c.writeOp(ScaleOp::PowerOff)==ScaleCommandResult::Ok);
     CHECK(testWrites==2 && c.closedCommandGeneration_==c.generation_);
     CHECK(c.writeOp(ScaleOp::Tare)==ScaleCommandResult::NotConnected);
@@ -1336,14 +1338,17 @@ static void run() {
     CHECK(strcmp(scaleDefaultFriendlyName("LUNAR"),"LUNAR")==0);
   }
   {
-    // The keep-alive resets the scale's auto-off countdown (Mini V1.4.3+,
-    // Ultra V4.0.1+): same 6-byte command shape as every other Bookoo op.
+    // The auto-off reset (Mini V1.4.3+, Ultra V4.0.1+) uses the same 6-byte
+    // command shape as every other Bookoo op; Bookoo has no link heartbeat.
     uint8_t out[SCALE_MAX_COMMAND_LENGTH]={}; int length=0;
-    CHECK(scaleBookooOpcode(ScaleOp::Heartbeat)==0x25);
-    CHECK(kScaleProtocolGenericFf11.encodeCommand(ScaleOp::Heartbeat,0,out,&length));
+    CHECK(scaleBookooOpcode(ScaleOp::ResetAutoOff)==0x25);
+    CHECK(scaleBookooOpcode(ScaleOp::Heartbeat)==0);
+    CHECK(kScaleProtocolGenericFf11.features.heartbeatPeriodMs==0);
+    CHECK(kScaleProtocolGenericFf11.encodeCommand(ScaleOp::ResetAutoOff,0,out,&length));
     const uint8_t keepAlive[]={0x03,0x0a,0x25,0x00,0x00,0x2c};
     CHECK(length==6);
     for(size_t i=0;i<sizeof(keepAlive);++i) CHECK(out[i]==keepAlive[i]);
+    CHECK(!kScaleProtocolAcaia.encodeCommand(ScaleOp::ResetAutoOff,0,out,&length));
     // Ultra automatic-mode event (0x0d) and powder weight (0x0f) frames are
     // documented, unconsumed traffic: recognized, but never corrupt packets.
     uint8_t event[20]={0x03,0x0d,0x01}; event[19]=0x03^0x0d^0x01;
@@ -1353,6 +1358,20 @@ static void run() {
     --event[19];
     CHECK(!kScaleProtocolGenericFf11.ignorableFrame(event,20));
     CHECK(!kScaleProtocolGenericFf11.ignorableFrame(powder,19));
+    // Through the notification loop: neither frame is a rejected packet, and
+    // a corrupt one still is.
+    NimbleScaleClient c(false); ready(c);
+    os_mbuf b={}; b.length=20;
+    ++event[19]; memcpy(b.data,event,20);
+    c.onNotification(1,10,&b,c.linkOperationId_);
+    memcpy(b.data,powder,20);
+    c.onNotification(1,10,&b,c.linkOperationId_);
+    CHECK(!c.newWeightAvailable());
+    CHECK(c.rejectedPackets_==0 && c.consecutiveRejectedPackets_==0);
+    b.data[19]^=0xff;
+    c.onNotification(1,10,&b,c.linkOperationId_);
+    CHECK(!c.newWeightAvailable());
+    CHECK(c.rejectedPackets_==1);
   }
   for (const auto preset : {std::make_pair(BLE_SCAN_RELAXED_INTERVAL,BLE_SCAN_RELAXED_WINDOW),
                             std::make_pair(BLE_SCAN_AGGRESSIVE_INTERVAL,BLE_SCAN_AGGRESSIVE_WINDOW)}) {

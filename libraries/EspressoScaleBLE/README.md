@@ -50,14 +50,25 @@ connecting, and `scaleBookooCommandAt()` enumerates implemented commands and
 their wire codes for identified models.
 
 `EspressoScaleBLE::powerOff()` sends command `0x15`
-(`03 0A 15 00 00 1C`) to a recognized Ultra. The Mini has no shutdown
-command, so the call returns `ScaleCommandResult::Unsupported` before a BLE
-write or terminal barrier. A recognized Ultra accepts volume 0–3, while a
-recognized Mini accepts 0–5; invalid Ultra levels return
-`ScaleCommandResult::InvalidArgument` without a write. Unknown Bookoo models
-retain the generic family behavior, and other protocols retain their existing
-feature sets. The library assumes the current manufacturer firmware. The
-published Ultra protocol notes that shutdown is ignored while charging.
+(`03 0A 15 00 00 1C`) to both Bookoo models; BooKoo documents it from Mini
+firmware 1.4.3 and Ultra firmware 4.0.0, and the Ultra ignores it while
+charging. BooKoo does not document how older firmware reacts, so the owner
+disconnects a scale that stays connected after the shutdown. A recognized
+Ultra accepts volume 0–3, while a recognized Mini accepts 0–5; invalid Ultra
+levels return `ScaleCommandResult::InvalidArgument` without a write. Unknown
+Bookoo models retain the generic family behavior, and other protocols retain
+their existing feature sets.
+
+`EspressoScaleBLE::resetAutoOff()` sends `0x25` (`03 0A 25 00 00 2C`), which
+restarts the Bookoo auto-off countdown (Mini 1.4.3+, Ultra 4.0.1+). It is
+declared by `ScaleFeatureAutoOffReset` and is not a link heartbeat: the
+library never schedules it, so a connected scale keeps its own auto-off unless
+the owner sends it. Bookoo has no link heartbeat; packet silence is its
+watchdog.
+
+The Ultra also sends automatic-mode event (`03 0D`) and powder-weight
+(`03 0F`) frames. `ScaleProtocol::ignorableFrame` recognizes them by envelope
+and checksum, so they are neither consumed nor counted as rejected packets.
 
 Once an admitted shutdown is requested, that BLE
 connection generation is closed to every later application command, even if

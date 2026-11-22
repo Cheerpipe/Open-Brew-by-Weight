@@ -11,13 +11,11 @@ static const ScaleFeatureSet kGenericFeatures = {
     SCALE_CORE_FEATURES | ScaleFeatureCombinedTareStart |
         ScaleFeatureIndependentBeep | ScaleFeatureVolume |
         ScaleFeatureCommandAudibleFeedback | ScaleFeaturePowerOff |
-        ScaleFeatureHeartbeat | ScaleFeatureFlowRate |
-        ScaleFeatureTimerInWeightFrame | ScaleFeatureBatteryLevel,
+        ScaleFeatureFlowRate | ScaleFeatureTimerInWeightFrame |
+        ScaleFeatureBatteryLevel | ScaleFeatureAutoOffReset,
     0,
     5,
-    // Keep-alive (0x25) resets the scale's auto-off countdown; the countdown
-    // is 5-30 minutes, so one write a minute keeps it comfortably awake.
-    60000,
+    0,
     8000,
     100,
     // Themis Mini on a Linea Micra: the post-cut knee sat at 0.55 +/- 0.01 s

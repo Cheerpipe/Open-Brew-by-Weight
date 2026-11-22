@@ -6072,6 +6072,16 @@ void d13_idle_delays_relax_without_scale() {
   CHECK(controlLoopTickDelayMs(getScaleLinkSnapshot()) == 1);
 }
 
+bool scaleWarningContains(const char *fragment) {
+  DebugEvent events[DEBUG_EVENT_CAPACITY] = {};
+  const size_t count = copyDebugEvents(0, events, DEBUG_EVENT_CAPACITY);
+  for (size_t i = 0; i < count; ++i) {
+    if (events[i].level == LogLevel::WARNING &&
+        strstr(events[i].text, fragment) != nullptr) return true;
+  }
+  return false;
+}
+
 void d13b_scale_power_off_is_terminal_for_connection_generation() {
   resetHarness(false, false);
   scale.connectedFeatures.flags |= ScaleFeaturePowerOff;
@@ -6106,6 +6116,7 @@ void d13b_scale_power_off_is_terminal_for_connection_generation() {
   hostMillis += SCALE_POWER_OFF_DISCONNECT_TIMEOUT_MS;
   serviceScalePowerOffTimeout(hostMillis);
   CHECK(!scale.isConnected());
+  CHECK(scaleWarningContains("Scale stayed on after power off"));
   CHECK(!scalePowerOffBlocksGeneration(generation));
   CHECK(!scaleDiscoveryPaused());
   CHECK(scale.communicationSilenceRemainingMs() ==
@@ -6115,16 +6126,6 @@ void d13b_scale_power_off_is_terminal_for_connection_generation() {
   hostMillis+=SCALE_DISCONNECT_SILENCE_MS;
   serviceScaleWorkerDiscovery(discovery);
   CHECK(!scaleDiscoveryPaused()); CHECK(scale.startScanCalls==1);
-}
-
-bool scaleWarningContains(const char *fragment) {
-  DebugEvent events[DEBUG_EVENT_CAPACITY] = {};
-  const size_t count = copyDebugEvents(0, events, DEBUG_EVENT_CAPACITY);
-  for (size_t i = 0; i < count; ++i) {
-    if (events[i].level == LogLevel::WARNING &&
-        strstr(events[i].text, fragment) != nullptr) return true;
-  }
-  return false;
 }
 
 // The Mini supports shutdown with the same 0x15 opcode as the Ultra
@@ -6159,10 +6160,10 @@ void d13d_known_mini_accepts_shutdown_like_the_ultra() {
 void d13d2_scale_without_power_off_support_keeps_pending_commands() {
   resetHarness(false, false);
   copyCString(scale.connectedLocalName, sizeof(scale.connectedLocalName),
-              "BOOKOO_SC 715097");
+              "LUNAR-1A2B3C");
   setScaleConnected(true);
   const ScaleLinkSnapshot link = getScaleLinkSnapshot();
-  CHECK(link.model == ScaleModel::BookooMini);
+  CHECK(link.model == ScaleModel::Unknown);
   CHECK(!link.features.has(ScaleFeaturePowerOff));
   requestScaleBrewBeep(1);
   CHECK(scaleBeepPending);

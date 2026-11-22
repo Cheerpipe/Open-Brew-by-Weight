@@ -39,6 +39,7 @@ inline const char *scaleBleCommandName(uint8_t command) {
         case 5: return "heartbeat";
         case 6: return "volume";
         case 7: return "power_off";
+        case 8: return "reset_auto_off";
         default: return "none";
     }
 }

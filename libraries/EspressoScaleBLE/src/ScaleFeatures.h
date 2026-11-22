@@ -21,7 +21,10 @@ enum ScaleFeature : uint16_t {
     // frames parseWeight accepted and skips its own integrity check.
     ScaleFeatureTimerInWeightFrame = 1u << 12,
     // The scale reports its battery in frames it already sends (parseBattery).
-    ScaleFeatureBatteryLevel = 1u << 13
+    ScaleFeatureBatteryLevel = 1u << 13,
+    // ScaleOp::ResetAutoOff restarts the scale's own auto-off countdown. Not a
+    // link heartbeat: the library never schedules it; the owner decides when.
+    ScaleFeatureAutoOffReset = 1u << 14
 };
 
 struct ScaleFeatureSet {
@@ -76,7 +79,8 @@ enum class ScaleOp : uint8_t {
     CombinedTareStart,
     Heartbeat,
     SetVolume,
-    PowerOff
+    PowerOff,
+    ResetAutoOff
 };
 
 // The scale's own power-on and power-off sounds as RTTTL, for a host that

@@ -1730,6 +1730,9 @@ void serviceScalePowerOffTimeout(uint32_t nowMs) {
           SCALE_POWER_OFF_DISCONNECT_TIMEOUT_MS) {
     return;
   }
+  serialTraceCategoryf(LogLevel::WARNING, DebugCategory::SCALE,
+                       "Scale stayed on after power off: it may be charging or "
+                       "its firmware may not support it; disconnecting");
   scale.disconnect();
   updateWorkerLinkState();
   setScaleLinkState(ScaleLinkState::DISCONNECTED);
@@ -2874,8 +2877,8 @@ void scaleWorkerTask(void *) {
             SCALE_LINK_SNAPSHOT_INTERVAL_MS;
 
     // Packet timeout / remote-drop detection must not wait behind beeps or
-    // queued commands. Bookoo's keep-alive only resets its own auto-off
-    // countdown; packet silence remains the disconnect watchdog.
+    // queued commands. Bookoo has no link heartbeat; silence is the only
+    // watchdog.
     if (linked) {
       discovery.connectAttemptSeriesActive = false;
       serviceScaleWorkerLink();
