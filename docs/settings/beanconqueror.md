@@ -5,7 +5,11 @@ connected espresso machine. Open Brew by Weight can play that machine:
 Beanconqueror then reads your shots from the controller and fills in a new
 brew with the curve, the time, the yield and more, so you only add the bean.
 
-You set it up in **Settings → Coffee apps → Beanconqueror**.
+You set it up in **Settings → Coffee apps → Beanconqueror**. The **Coffee
+apps** section, and the Beanconqueror option on your shots, show while
+**Admin → Integrations → Beanconqueror** is on (the default); turning it off
+hides them and the controller stops answering Beanconqueror, keeping your
+choice for when you turn it on again.
 
 ## Choose how Beanconqueror sees the controller
 

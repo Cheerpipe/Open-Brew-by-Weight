@@ -197,6 +197,17 @@ times it asked the controller for missing records. It has one switch per job:
     shots, without asking the controller, even while the machine is off. Like
     the controller's, its address needs no password.
   - **Off:** only the controller's own address answers Beanconqueror.
+- **Mahlkönig through the companion** (on by default; needs the shot
+  archive).
+  - **On:** with a [Mahlkönig grinder](../settings/mahlkonig.md) set up, the
+    companion talks to it for the controller. An E65W, E65T, E80W or E80T is
+    asked every 2 seconds, as Mahlkönig intended, instead of every 15 to 25
+    seconds by the controller, so a shot pulled right after grinding still
+    syncs: for these grinders the companion is strongly recommended. An E64
+    WS can check in with the companion instead of the controller (Settings
+    shows the address), which keeps the controller's Wi-Fi free for the
+    scale; it works well without the companion too.
+  - **Off:** the controller talks to the grinder itself.
 
 Save and Revert work like the rest of Admin.
 

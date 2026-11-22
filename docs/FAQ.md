@@ -66,6 +66,23 @@ brewing. A momentary machine needs a stop pulse and valid state conditions;
 without scale/reed evidence, a tap-started machine may not receive it. Read
 [Momentary limits](settings/momentary.md#stopping-and-time-limits).
 
+## Mahlkönig grinder
+
+### My Mahlkönig grinder does not sync
+
+First check what **Settings → Mahlkönig** says; its legend shows the state
+and the [Mahlkönig guide](settings/mahlkonig.md#if-something-goes-wrong) says
+what to do for each one. Remember that the integration is not tested with a
+real grinder yet, and that an E65W, E65T, E80W or E80T without Open Brew by
+Weight Companion can miss a shot pulled soon after grinding.
+
+To report it, send the Web UI log (**Log**) from around the shot and the
+diagnostic data (**Diagnostic → Download diagnostic data**). The download's
+`mahlkonig` section lists the last exchanges with the grinder (what was
+asked, what came back, any error code) without your grinder's ids, and the
+log names every change: the grinder checking in or going quiet, pairing
+steps, and what each shot was reported as.
+
 ## Notifications
 
 ### A notification did not arrive

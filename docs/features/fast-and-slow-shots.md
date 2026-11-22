@@ -210,6 +210,15 @@ it on every phone and browser until the advice changes: another direction, a
 firmer suggestion or a new grind setting brings it back. **Show hidden notes again**, in **Admin →
 Frontend**, brings back every hidden piece of advice at once.
 
+With a [Mahlkönig grinder](../settings/mahlkonig.md) that received your
+active preset's last shot, the grinder corrects the grind itself, so Home
+pauses **Dialling in**, **Grind hint** and **Checking your change** and shows
+one line instead: adjusting by hand as well would correct twice. **Shots
+vary** stays, because a grind change can't fix a spread. The preset's
+**Grind hints** setting is not changed, and the controller keeps learning
+meanwhile; the cards return by themselves after a shot the grinder didn't
+receive (a cancelled shot, the grinder away, or the integration turned off).
+
 ## Examples
 
 Factory Double · Adaptive: 36 g target, 27–36 s window, up to 6 g extra and

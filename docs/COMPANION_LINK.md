@@ -116,11 +116,11 @@ public key; it discards its request key.
 
 | Body | Effect |
 | --- | --- |
-| `{"action":"approve","code":"123456","lm":true,"log":true,"archive":true,"bc":true}` | Approves the open request; `lm`, `log`, `archive` and `bc` (optional, `true` when absent) are the La Marzocco, diagnostic log, shot archive and Beanconqueror switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
+| `{"action":"approve","code":"123456","lm":true,"log":true,"archive":true,"bc":true,"gbs":true}` | Approves the open request; `lm`, `log`, `archive`, `bc` and `gbs` (optional, `true` when absent) are the La Marzocco, diagnostic log, shot archive, Beanconqueror and Mahlkönig switches chosen in the approval panel. `422 COMPANION_CODE` for a wrong code (the third one denies the request), `409 PAIRING_NOT_READY` before the controller's key exists |
 | `{"action":"ignore"}` | Denies the open request and ignores that `id` until **Stop ignoring** (the four most recent ids, kept across restarts) |
 | `{"action":"unignore"}` | Forgets the ignored ids |
 | `{"action":"forget"}` | Removes the pairing and closes the link; the next link attempt receives `erase` |
-| `{"action":"switches","ui":false,"lm":true,"log":true,"archive":true,"bc":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere), `log` **Diagnostic log through the companion**, `archive` **Shot archive in the companion** and `bc` **Beanconqueror through the companion** (every build). An open link receives a new `cfg` |
+| `{"action":"switches","ui":false,"lm":true,"log":true,"archive":true,"bc":true,"gbs":true}` | Sets the switches present in the body: `ui` is **Web UI through the companion** (on when paired), `lm` the La Marzocco switch (Linea Micra builds only; `400 INVALID_REQUEST` elsewhere), `log` **Diagnostic log through the companion**, `archive` **Shot archive in the companion**, `bc` **Beanconqueror through the companion** and `gbs` **Mahlkönig through the companion** (every build). An open link receives a new `cfg` |
 
 Every action answers `{"ok":true}`. Approve and Ignore without an open request
 answer `409 PAIRING_NOT_PENDING`; Forget and Switches without a pairing answer
@@ -132,7 +132,7 @@ Admin reads the pairing, the open request and the link state from
 ```json
 "companion":{"paired":true,"name":"Kitchen server","address":"192.168.1.20",
  "version":"1.0.0","link":"open","linkAgeS":3600,"peerProtocol":0,
- "ui":true,"log":true,"archive":true,"bc":true,"relay":"ready","relayAgeS":12,"relayRejects":0,
+ "ui":true,"log":true,"archive":true,"bc":true,"gbs":true,"relay":"ready","relayAgeS":12,"relayRejects":0,
  "route":"companion","lm":true,"upstream":true,"refused":false,"credentials":true,
  "request":null,"ignored":0}
 ```
@@ -142,7 +142,7 @@ up or went down (`-1` when neither happened since the controller started),
 `peerProtocol` the protocol of the paired companion's last hello that this
 controller refused with `PROTOCOL` (0 when none, or once a link opens), `ui`
 the Web UI switch, `log` the diagnostic log switch, `archive` the shot archive
-switch, `bc` the Beanconqueror switch, `relay` `ready` once a
+switch, `bc` the Beanconqueror switch, `gbs` the Mahlkönig switch, `relay` `ready` once a
 [relay handshake](#relay) succeeded
 since the controller started (`down` before and after Forget), `relayAgeS` the
 seconds since the last relay handshake or admitted request (`-1` none since it
@@ -159,7 +159,9 @@ exists). Home's stream carries `companion.requestName` and
 `companion.archive` (paired with the shot archive switch on, so History and
 Stats opened directly can say the companion keeps a copy). The Settings
 stream carries `companion.beanconqueror` (paired with the shot archive and
-Beanconqueror switches on, so Coffee apps can show the companion's address).
+Beanconqueror switches on, so Coffee apps can show the companion's address)
+and `companion.gbs` (paired with the shot archive and Mahlkönig switches on,
+for the E64 WS address rule).
 The Diagnostic stream carries `companion.paired`, `name`, `address`, `version`,
 `protocol` (the open link's, 0 while down), `peerProtocol`, `link`,
 `linkAgeS`, `reconnects`, `authFailures` (link and relay handshakes), `ui`,
@@ -237,6 +239,7 @@ older peer; the controller counts them in one rate-limited Web UI log line.
 | Frame | Meaning |
 | --- | --- |
 | `{"t":"cfg","lm":true,"conn":"ws","observe":true,"ui":true,"log":true,"archive":true,"bc":"gaggimate"}` | Switches and the La Marzocco options that apply (`conn` `ws` or `api`); builds without La Marzocco send only `{"t":"cfg","ui":true,"log":true,"archive":true,"bc":"off"}`. `bc` is the [Beanconqueror](schemas/README.md#beanconqueror-machine-endpoints-v1) format the companion serves from its archive: **Settings → Coffee apps**' choice (`gaggiuino` or `gaggimate`) while the archive and Beanconqueror switches are on, otherwise `off`; the companion keeps it, so it answers with the controller off, and never asks the controller for those answers. A companion that does not know `bc` serves nothing. Sent after `ready` and on every change, a new format included |
+| `cfg` … `"gbs":{"m":"e65w","h":"192.168.1.87","d":"…","p":4821,"fp":"…"}` | Present only while the Mahlkönig integration is on with a grinder chosen and the shot archive and Mahlkönig switches are on ([Mahlkönig Grind-by-Sync](#mahlkönig-grind-by-sync)); absent otherwise, which tells the companion to stop. An older companion ignores it |
 | `{"t":"dev","name":"Kitchen","id":"AA:BB:CC:DD:EE:FF"}` | The controller's device name, its identity on the local network (`<name>.local`), so the companion can label it instead of by address, and its stable device id (the webhook's `deviceId`), the log store's key. Up to 32 bytes of letters, digits, spaces and hyphens, empty while no name is published yet. Sent first after `ready` and again whenever the name changes |
 | `{"t":"creds","gen":3,"iv":"…","ct":"…"}` | La Marzocco account, encrypted (below). `{"t":"creds","gen":4,"erase":true}` deletes it |
 | `{"t":"route","to":"companion"}` | Start sending machine state; `"direct"` stops it |
@@ -284,14 +287,16 @@ secrets directory and never in logs.
 | `{"t":"rf","s":"shots","o":0,"n":50,"r":7}` | A fetch window: offset `o` 0–1000, `n` 1–50 shots or 1–120 activations, `r` echoed as the page's `request` |
 | `{"t":"rt","id":12,"b":43,"e":918204}` | One shot's trace by its Stats identity (`id` ≥ 1, `bootId`, `endedAtMs`) |
 | `{"t":"ps","on":true}` | Whether any device wants events ([events](#events)) |
+| `{"t":"gbs","own":true,"st":"ok","ok":1003}` | Its Mahlkönig state ([below](#mahlkönig-grind-by-sync)), sent on change and never during a sync hold |
 | `{"t":"logsub","on":true,"boot":42,"after":1234}` | The diagnostic log subscription: the boot the companion stored last and its last stored sequence; the controller maps another boot to `after` 0. Sent once per session, after `cfg.log` is true and `dev` named the controller (so the cursor is that controller's), and again from the same cursor when the companion could not store a frame; `on:false` asks the controller to stop the stream (the switch itself is `cfg`'s to say) |
 
 Builds without La Marzocco know only `ping` (its `up` is ignored there),
-`ps`, `logsub`, `rx`, `rf` and `rt`; the other four are types they do not know and
+`ps`, `gbs`, `logsub`, `rx`, `rf` and `rt`; the other four are types they do not know and
 ignore. A malformed `rx`, `rf` or `rt` closes the link like any known frame.
 
 The controller closes a link that sends nothing for two ping intervals: 35
-seconds while the La Marzocco route is `companion`, 250 seconds otherwise. A
+seconds while the La Marzocco route is `companion` or the companion owns the
+Mahlkönig grinder (`own:true`), 250 seconds otherwise. A
 route request (`pending`) keeps the long limit, since the companion may still
 be on its 120 s cadence; the request itself fails after 30 s without a ping or
 the `full` frame. Liveness is one-sided: the controller sends nothing
@@ -572,6 +577,37 @@ under the same rules as any reconnection (never during a shot with a scale, a
 scale connection or the BLE quiet interval). Two La Marzocco sessions for a
 moment are harmless: the companion has its own installation. Commands go only
 through the route active when they are sent.
+
+### Mahlkönig Grind-by-Sync
+
+The companion can carry the [Mahlkönig grinder](MAHLKONIG_GBS.md) for the
+controller: it polls an E65/E80 every 2 s (over its own HTTPS client, pinned
+to the same certificate) and answers an E64 WS on its own port 80, so the
+controller does no per-poll work and adds no frame during a shot.
+
+- **`cfg.gbs`** carries only what the companion uses: `m` the model; for a
+  paired and pinned E65/E80 also `h` the grinder's address, `d` the
+  `brewDeviceId`, `p` the pairing id and `fp` the certificate's SHA-256
+  (lowercase hex). An E65/E80 not yet paired is not sent. Pairing always runs
+  on the controller; the companion receives its result here.
+- **`gbs`** (companion to controller): `own` whether the companion talks to
+  the grinder now, `st` `ok`, `unreach`, `unpaired` or `identity` (E65/E80)
+  or `seen`/`lost` (E64 WS), and `ok` the id of the last shot record the
+  grinder received as Success (0 none). Sent on change, never during a sync
+  hold; `own:true` comes once `cfg.gbs` is acknowledged and its archive is
+  current. While `own` is true the companion pings every 15 s.
+- **Route.** The controller stops its own grinder requests while `own` is
+  true and resumes on link loss, a missed ping (35 s), `own:false` or the
+  switch off; two owners for a moment are harmless (a second take is a
+  re-take, a second result is refused by the grinder and ignored).
+- **Attribution.** The companion needs no new frame: a grind (an E64 WS
+  `execute`, or a job first seen) is matched to the first new shot record
+  that started after it, by the record's wall clock when it has one and
+  otherwise by the `hold` frame that began after the grind; the result is
+  the shared reporting rule over the archived row.
+- **Older peers.** An older companion ignores `cfg.gbs` and never sends
+  `gbs`, so the controller stays direct; an older controller never sends
+  `cfg.gbs`, so the companion does nothing for the grinder.
 
 ## Relay
 
