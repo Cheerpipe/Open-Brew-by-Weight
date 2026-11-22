@@ -6,7 +6,7 @@
 # ESP-IDF NimBLE as the only BLE backend.
 
 IDF_PROJECT_NAME="openbrewbyweight"
-IDF_DEFAULT_HOME="${HOME}/esp/esp-idf-v6.1"
+IDF_DEFAULT_HOME="${HOME}/esp/esp-idf-v6.1.1"
 
 obbw_idf_find() {
   if [[ -n "${IDF_PATH:-}" && -f "${IDF_PATH}/export.sh" ]]; then
@@ -99,10 +99,10 @@ obbw_idf_source() {
   fi
   idf_root="$(obbw_idf_find)" || {
     echo "ESP-IDF not found (idf.py / export.sh)." >&2
-    echo "Install ESP-IDF v6.1 and run again:" >&2
+    echo "Install ESP-IDF v6.1.1 and run again:" >&2
     echo "  mkdir -p \"\$HOME/esp\" && cd \"\$HOME/esp\"" >&2
-    echo "  git clone -b v6.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1" >&2
-    echo "  cd esp-idf-v6.1 && ./install.sh esp32s3 && . ./export.sh" >&2
+    echo "  git clone -b v6.1.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1.1" >&2
+    echo "  cd esp-idf-v6.1.1 && ./install.sh esp32s3 && . ./export.sh" >&2
     exit 127
   }
   unset IDF_PYTHON_ENV_PATH ESP_PYTHON
@@ -145,7 +145,7 @@ obbw_idf_filter_output() {
   '
 }
 
-# Match the v6.1 release used by CI and the component lock.
+# Match the v6.1.1 release used by the component lock.
 obbw_idf_require_version() {
   local ver_line ver
   ver_line="$(idf.py --version 2>/dev/null | head -n1 || true)"
@@ -154,16 +154,16 @@ obbw_idf_require_version() {
     ver="$(printf '%s' "$ver_line" | sed -n 's/.*v\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')"
   fi
   case "$ver" in
-    6.1|6.1.0)
+    6.1.1)
       if [[ "${OBBW_IDF_QUIET:-}" != "1" ]]; then
-        echo "ESP-IDF version: v${ver} (required: 6.1.0)"
+        echo "ESP-IDF version: v${ver} (required: 6.1.1)"
       fi
       ;;
     *)
-      echo "ESP-IDF 6.1.0 is required (CI uses v6.1)." >&2
+      echo "ESP-IDF 6.1.1 is required." >&2
       echo "Found: ${ver_line:-unknown} (parsed: ${ver:-none})" >&2
-      echo "Install or point IDF_PATH at v6.1:" >&2
-      echo "  git clone -b v6.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1" >&2
+      echo "Install or point IDF_PATH at v6.1.1:" >&2
+      echo "  git clone -b v6.1.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1.1" >&2
       exit 127
       ;;
   esac

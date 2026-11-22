@@ -32,9 +32,9 @@ On macOS (Ubuntu packages are in the [build guide](BUILD.md#linux)):
 ```sh
 brew install git python cmake ninja cjson node cppcheck ccache
 
-# ESP-IDF 6.1; the project scripts find it here on their own
-git clone -b v6.1 --recursive https://github.com/espressif/esp-idf.git ~/esp/esp-idf-v6.1
-~/esp/esp-idf-v6.1/install.sh esp32s3
+# ESP-IDF 6.1.1; the project scripts find it here on their own
+git clone -b v6.1.1 --recursive https://github.com/espressif/esp-idf.git ~/esp/esp-idf-v6.1.1
+~/esp/esp-idf-v6.1.1/install.sh esp32s3
 
 git clone https://github.com/Cheerpipe/Open-Brew-by-Weight.git
 cd Open-Brew-by-Weight

@@ -123,13 +123,14 @@ RECURSION_BOUNDS: tuple[tuple[str, Callable[[], int]], ...] = (
                              "JSON_DOCUMENT_MAX_DEPTH") + 1),
     # PSA's key and algorithm dispatch makes these mbedTLS recursions reachable
     # from every PSA call (the companion's HMAC and HKDF run none of them): a
-    # GCM or CCM context drives its block cipher once, the AES DMA path
-    # re-enters once for a buffer it stages in internal memory, and the
+    # GCM or CCM context drives its block cipher once, the AES and SHA DMA
+    # paths re-enter once for a buffer they restage at the MSPI alignment
+    # (SHA lengths are whole blocks, so the copy always satisfies it), and the
     # hardware bignum splits a factor wider than its multiplier at most twice
     # (4096-bit RSA, the widest key the firmware's TLS accepts).
     (r"^(?:gcm_mask|mbedtls_ccm_(?:crypt|update)|mbedtls_cipher_update|mbedtls_gcm_update)$",
      lambda: 2),
-    (r"^esp_aes_process_dma", lambda: 2),
+    (r"^(?:esp_aes_process_dma|esp_sha_dma_process)", lambda: 2),
     (r"^(?:mbedtls_mpi_mul_mpi|mpi_mult_mpi_overlong)", lambda: 3),
     # An abandoned tag capture is replayed at most kMaxBodyReplays times.
     (r"OtaImageTagScanner::(?:feedByte|replayAbandonedBody)\(",

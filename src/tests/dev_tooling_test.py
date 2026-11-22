@@ -400,7 +400,7 @@ def idf_doctor_fixture(with_install: bool, with_venv: bool):
     """Create a sandbox HOME with an optional ESP-IDF checkout and python_env."""
     with tempfile.TemporaryDirectory(prefix="openbrewbyweight-doctor-idf-") as temporary:
         root = Path(temporary)
-        fallback = root / "esp/esp-idf-v6.1"
+        fallback = root / "esp/esp-idf-v6.1.1"
         installed_env = root / ".espressif/python_env/idf6.1_py3.14_env"
         missing_env = root / ".espressif/python_env/idf6.1_py3.11_env"
         if with_install:
@@ -1496,11 +1496,11 @@ def idf_activation(active_version: str | None, active_python: bool = True):
     with tempfile.TemporaryDirectory(prefix="openbrewbyweight-idf-") as temporary:
         root = Path(temporary)
         active = root / "active"
-        fallback = root / "esp/esp-idf-v6.1"
+        fallback = root / "esp/esp-idf-v6.1.1"
         active_env = root / "active-python"
         fallback_env = root / "fallback-python"
         for idf, env, version in ((active, active_env, active_version),
-                                  (fallback, fallback_env, "6.1")):
+                                  (fallback, fallback_env, "6.1.1")):
             (idf / "tools").mkdir(parents=True)
             (env / "bin").mkdir(parents=True)
             (env / "bin/python").write_text("#!/bin/sh\nexit 0\n")
@@ -1544,12 +1544,12 @@ def idf_activation(active_version: str | None, active_python: bool = True):
                               capture_output=True, text=True), active, fallback
 
 
-active_idf, active_root, _ = idf_activation("6.1")
+active_idf, active_root, _ = idf_activation("6.1.1")
 active_values = active_idf.stdout.split("|")
 assert active_idf.returncode == 0 and active_values == [
     str(active_root), str(active_root.parent / "active-python"),
     str(active_root / "tools/idf.py")], active_idf.stderr
-for version, has_python in (("6.0", True), ("6.1", False)):
+for version, has_python in (("6.1", True), ("6.1.1", False)):
     fallback_idf, _, fallback_root = idf_activation(version, has_python)
     fallback_values = fallback_idf.stdout.split("|")
     assert fallback_idf.returncode == 0 and fallback_values == [
@@ -1567,14 +1567,14 @@ def idf_python_env_selection(python_env: str | None, home_leaf: str = "home"):
     with tempfile.TemporaryDirectory(prefix="openbrewbyweight-idf-env-") as temporary:
         root = Path(temporary)
         home = root / home_leaf
-        fallback = home / "esp/esp-idf-v6.1"
+        fallback = home / "esp/esp-idf-v6.1.1"
         missing_env = home / ".espressif/python_env/idf6.1_py3.11_env"
         installed_env = home / ".espressif/python_env/idf6.1_py3.14_env"
         for directory in (fallback / "tools",
                           fallback / "components/esp_common/include",
                           missing_env / "bin", installed_env / "bin"):
             directory.mkdir(parents=True)
-        (fallback / "tools/idf.py").write_text("#!/bin/sh\necho 'ESP-IDF v6.1'\n")
+        (fallback / "tools/idf.py").write_text("#!/bin/sh\necho 'ESP-IDF v6.1.1'\n")
         (fallback / "tools/idf.py").chmod(0o755)
         (fallback / "components/esp_common/include/esp_idf_version.h").write_text(
             "#define ESP_IDF_VERSION_MAJOR   6\n"
@@ -1663,7 +1663,7 @@ def flash_command(layout: str, *extra: str, arch: str = "n16r8"):
         (tools / "idf.py").write_text(
             "#!/bin/sh\n"
             f'printf "idf:%s\\n" "$*" >>"{log}"\n'
-            "case \" $* \" in *' --version '*) echo 'ESP-IDF v6.1';; esac\n")
+            "case \" $* \" in *' --version '*) echo 'ESP-IDF v6.1.1';; esac\n")
         (tools / "node").write_text("#!/bin/sh\nexit 0\n")
         (tools / "python").write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
         (tools / "esptool").write_text(
@@ -1728,8 +1728,8 @@ scripts_text = "\n".join(
     path.read_text(errors="replace") for path in (ROOT / "scripts").rglob("*")
     if path.is_file())
 idf_helpers = (ROOT / "scripts/openbrewbyweight_idf.sh").read_text()
-assert 'IDF_DEFAULT_HOME="${HOME}/esp/esp-idf-v6.1"' in idf_helpers, \
-    "official SDK discovery must use the versioned ESP-IDF 6.1 checkout"
+assert 'IDF_DEFAULT_HOME="${HOME}/esp/esp-idf-v6.1.1"' in idf_helpers, \
+    "official SDK discovery must use the versioned ESP-IDF 6.1.1 checkout"
 assert "python@3.12" not in idf_helpers, \
     "ESP-IDF 6.1 must activate the Python environment created by its installer"
 assert '. "${idf_root}/export.sh" >/dev/null' in idf_helpers, \

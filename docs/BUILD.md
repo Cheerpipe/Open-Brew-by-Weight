@@ -2,7 +2,7 @@
 
 <a id="build-environment"></a>
 
-Supported firmware uses ESP-IDF **6.1.0** (release tag **v6.1**),
+Supported firmware uses ESP-IDF **6.1.1** (release tag **v6.1.1**),
 Arduino-ESP32 **4.0.0** as an IDF component, and native NimBLE.
 The bundled EspressoScaleBLE library is not installed through Library Manager.
 
@@ -73,7 +73,7 @@ reference host.
 | --- | --- | --- |
 | Node.js | No pin; any current release resolved from `PATH` | [`./scripts/dev doctor`](../scripts/dev) |
 | Web UI packages | Exact direct and resolved versions via `npm ci` | [`package.json`](../package.json), [`package-lock.json`](../package-lock.json) |
-| ESP-IDF | Exactly 6.1.0 (tag v6.1) | This guide and the build scripts |
+| ESP-IDF | Exactly 6.1.1 (tag v6.1.1) | This guide and the build scripts |
 | IDF components | Locked graph, including mDNS 1.14.1 and ESP WebSocket client 1.8.0 | [`idf/dependencies.lock`](../idf/dependencies.lock) |
 | Cppcheck | No pin; any current release resolved from `PATH` | [`./scripts/dev doctor`](../scripts/dev) |
 | Host CMake | 3.25 or newer | [`CMakePresets.json`](../CMakePresets.json) schema 6 |
@@ -101,17 +101,17 @@ This is an explicit setup step. Test commands never install dependencies.
 <a id="3-install-esp-idf-required"></a>
 
 Prefer the [ESP-IDF Installation Manager (EIM)](https://docs.espressif.com/projects/idf-im-ui/en/latest/):
-install ESP-IDF **6.1.0** (tag **v6.1**), open a fresh shell, and source
+install ESP-IDF **6.1.1** (tag **v6.1.1**), open a fresh shell, and source
 the activation script printed by EIM (or use **Open IDF Terminal** in its GUI).
 For example, use the actual filename EIM created:
 
 ```sh
-source "$HOME/.espressif/tools/activate_idf_v6.1.sh"
+source "$HOME/.espressif/tools/activate_idf_v6.1.1.sh"
 idf.py --version
 ```
 
 The project scripts reuse an active environment only when `IDF_PATH`, its
-`IDF_PYTHON_ENV_PATH/bin/python`, `idf.py`, and the reported 6.1.0 version all
+`IDF_PYTHON_ENV_PATH/bin/python`, `idf.py`, and the reported 6.1.1 version all
 agree. A stale or mismatched active environment is discarded before fallback.
 
 When the legacy SDK's own activation script points at a Python environment
@@ -128,18 +128,18 @@ you to the repository when installation finishes:
 (
   mkdir -p "$HOME/esp"
   cd "$HOME/esp"
-  git clone -b v6.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1
-  cd esp-idf-v6.1
+  git clone -b v6.1.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1.1
+  cd esp-idf-v6.1.1
   ./install.sh esp32s3
 )
-. "$HOME/esp/esp-idf-v6.1/export.sh"
+. "$HOME/esp/esp-idf-v6.1.1/export.sh"
 idf.py --version
 ```
 
 If that SDK directory already exists, verify its version instead of cloning
 over it. For an inactive legacy SDK elsewhere, export `IDF_PATH`; the scripts
-source its `export.sh`. Otherwise they discover `$HOME/esp/esp-idf-v6.1`.
-Every path rejects versions other than 6.1.0.
+source its `export.sh`. Otherwise they discover `$HOME/esp/esp-idf-v6.1.1`.
+Every path rejects versions other than 6.1.1.
 
 `idf/main/idf_component.yml` and `idf/dependencies.lock` define the component
 graph, including mDNS 1.14.1 and ESP WebSocket client 1.8.0. The WebSocket

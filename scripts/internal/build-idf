@@ -38,7 +38,7 @@ Firmware optimization level (build-only, exclusive, not persisted):
 Recommended development compile flags (Enter at the prompt):
   $OBBW_CLI_DEFAULT_FLAGS
 
-Requires ESP-IDF 6.1.0. If IDF_PATH is unset, ${IDF_DEFAULT_HOME} is used when
+Requires ESP-IDF 6.1.1. If IDF_PATH is unset, ${IDF_DEFAULT_HOME} is used when
 it exists.
 
 BLE backend:

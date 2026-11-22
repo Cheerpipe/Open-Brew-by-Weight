@@ -121,10 +121,10 @@ claiming Windows validation.
 
 1. **Git for Windows** — the repo scripts are bash; run them from **Git Bash**
    (`winget install Git.Git`).
-2. **ESP-IDF 6.1.0** — use [EIM](https://docs.espressif.com/projects/idf-im-ui/en/latest/)
-   (or the VS Code extension backend) and select release v6.1.
+2. **ESP-IDF 6.1.1** — use [EIM](https://docs.espressif.com/projects/idf-im-ui/en/latest/)
+   (or the VS Code extension backend) and select release v6.1.1.
    In Git Bash, point `IDF_PATH` at that SDK, or use the supported legacy clone
-   at `%USERPROFILE%\esp\esp-idf-v6.1`. EIM also provides CMake, Ninja and the
+   at `%USERPROFILE%\esp\esp-idf-v6.1.1`. EIM also provides CMake, Ninja and the
    Xtensa GCC toolchain that produce the compilation database.
 3. **Cppcheck** — install a current release from the
    [official releases](https://github.com/cppcheck-opensource/cppcheck/releases)
@@ -147,14 +147,14 @@ Windows notes:
 
 ## 5. ESP-IDF and esp-clang
 
-The firmware needs ESP-IDF **6.1.0** (tag v6.1):
+The firmware needs ESP-IDF **6.1.1** (tag v6.1.1):
 
-Select v6.1 in EIM. From a fresh shell, use **Open IDF
+Select v6.1.1 in EIM. From a fresh shell, use **Open IDF
 Terminal** or source the activation script EIM printed, then confirm the
 version before building the compilation database:
 
 ```sh
-source "$HOME/.espressif/tools/activate_idf_v6.1.sh"  # use EIM's actual filename
+source "$HOME/.espressif/tools/activate_idf_v6.1.1.sh"  # use EIM's actual filename
 idf.py --version
 ```
 
@@ -163,8 +163,8 @@ stale or mismatched, they discard it and use the supported legacy fallback:
 
 ```sh
 mkdir -p "$HOME/esp" && cd "$HOME/esp"
-git clone -b v6.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1
-cd esp-idf-v6.1 && ./install.sh esp32s3 && . ./export.sh   # macOS/Linux
+git clone -b v6.1.1 --recursive https://github.com/espressif/esp-idf.git esp-idf-v6.1.1
+cd esp-idf-v6.1.1 && ./install.sh esp32s3 && . ./export.sh   # macOS/Linux
 ```
 
 clang-tidy must understand the `xtensa-esp32s3-elf` target. The stock clang
@@ -172,7 +172,7 @@ from Homebrew or apt does **not** — use Espressif's LLVM fork (`esp-clang`),
 which ships a clang-tidy with Xtensa support:
 
 ```sh
-python "$HOME/esp/esp-idf-v6.1/tools/idf_tools.py" install esp-clang
+python "$HOME/esp/esp-idf-v6.1.1/tools/idf_tools.py" install esp-clang
 ```
 
 This installs into `~/.espressif/tools/esp-clang/` (all OSes, including the
@@ -227,7 +227,7 @@ fixed in the code, never silenced: the project uses no `// NOLINT` and no
 **Caution with `clang-tidy -fix`:** fixes are applied for every file that
 contributed diagnostics, including headers outside this repository (the
 ESP-IDF checkout itself). If you use `-fix`, review `git status` in **both**
-this repository and `$HOME/esp/esp-idf-v6.1` afterwards and revert any changes
+this repository and `$HOME/esp/esp-idf-v6.1.1` afterwards and revert any changes
 under `esp-idf/`.
 
 ## 7. Running Include-What-You-Use
@@ -361,7 +361,7 @@ takes about ten minutes.
   stock clang-tidy (Homebrew/apt) against the Xtensa database. Install
   esp-clang (section 5) or point `ESP_CLANG_TIDY` at it.
 - **`clang-tidy (esp-clang) not found`** — run
-  `python "$HOME/esp/esp-idf-v6.1/tools/idf_tools.py" install esp-clang`, or set
+  `python "$HOME/esp/esp-idf-v6.1.1/tools/idf_tools.py" install esp-clang`, or set
   `ESP_CLANG_TIDY`.
 - **IWYU version mismatch** (instant assertion or `unsupported option` on
   ordinary code) — IWYU was built against a different clang than the one it

@@ -303,7 +303,7 @@ Node.js and Cppcheck carry no project version pin: every script resolves them
 from `PATH`, so install current releases with your package manager (see
 [Build](BUILD.md#2-install-host-prerequisites)). `./scripts/dev analyze` needs
 Cppcheck on `PATH`; see [Static analysis](STATIC_ANALYSIS.md) for local setup.
-Firmware builds require ESP-IDF 6.1.0 and fail if the IDF component lock
+Firmware builds require ESP-IDF 6.1.1 and fail if the IDF component lock
 changes during resolution. Review upgrades through [Build](BUILD.md#upgrade-dependencies-deliberately).
 
 To regenerate the immutable time-zone table after reviewing a new IANA
