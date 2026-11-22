@@ -177,6 +177,20 @@ GATES = (
     # The shot trace pool (recovery, curve cache load, record staging and
     # append), the shot-store image that lands a pending pool clear, and the
     # staged control records (quick start, drip learning memory).
+    # The Mahlkönig E65/E80 client's request, one TLS connection each, runs
+    # on this task: esp_transport and esp-tls reach the TLS transport through
+    # pointers, and mbedTLS calls the certificate pin as its verify callback.
+    Gate("network_manager Mahlkönig TLS request",
+         lambda _: source_constant("src/OpenBrewByWeightNetwork.cpp",
+                                   "NETWORK_MANAGER_TASK_STACK_SIZE"),
+         r"OpenBrewByWeightNetwork::taskEntry\(",
+         (r"::mahlkonigClientStep\(",),
+         {r"^esp_transport_connect_async$": (r"^ssl_connect_async$",),
+          r"^esp_transport_read$": (r"^ssl_read$",),
+          r"^esp_transport_write$": (r"^ssl_write$",),
+          r"^esp_tls_conn_read$": (r"^esp_mbedtls_read$",),
+          r"^esp_tls_conn_write$": (r"^esp_mbedtls_write$",),
+          r"^x509_crt_verify_restartable_ca_cb": (r"::gbsVerifyCertificate\(",)}),
     Gate("settings_persist shot pool",
          lambda _: source_constant("src/openBrewByWeight.cpp",
                                    "SETTINGS_PERSIST_TASK_STACK_SIZE"),

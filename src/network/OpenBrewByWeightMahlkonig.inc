@@ -472,8 +472,11 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
     const CompanionStored &stored = g_companion.stored;
     companionWanted = stored.paired && stored.archiveSwitch && stored.gbsSwitch;
   }
-  char config[COMPANION_GBS_CONFIG_TEXT];
-  work.companionRoute = companion.own && companionWanted && mahlkonigCompanionConfig(config, sizeof(config)) != 0;
+  {
+    // Scoped: this frame stays live under the client's TLS handshake.
+    char config[COMPANION_GBS_CONFIG_TEXT];
+    work.companionRoute = companion.own && companionWanted && mahlkonigCompanionConfig(config, sizeof(config)) != 0;
+  }
   if (work.companionRoute != work.loggedRoute)
     lifecycleLog(work.companionRoute ? "Mahlkönig: the companion now talks to the grinder"
                                      : "Mahlkönig: the controller talks to the grinder itself");

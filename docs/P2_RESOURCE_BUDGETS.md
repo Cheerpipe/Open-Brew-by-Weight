@@ -320,7 +320,9 @@ large return-value and default-aggregate temporaries.
 The destructive paths have a whole-call-chain bound instead: the stack-depth
 gate in [Validation](../VALIDATION.md) covers boot recovery on the loopTask,
 the Web UI factory reset on `network_manager`, and the OTA transfer and commit
-on `ota_worker` and its inline httpd fallback. It also bounds the two deepest
+on `ota_worker` and its inline httpd fallback. It also bounds the Mahlkönig
+grinder's TLS request on `network_manager` (handshake and certificate pin
+included), and the two deepest
 httpd requests, a UI stream request, the crash archive download, and the shot
 trace download and Shot storage (through their persistence callbacks),
 against the HTTPD stack. No `PersistedSettings` copy
