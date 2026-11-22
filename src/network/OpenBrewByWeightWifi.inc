@@ -188,7 +188,7 @@ void OpenBrewByWeightNetwork::armPendingConfirmWindow(uint32_t now, uint32_t tim
   dataMux_.lock();
   staConfirmArmed_ = true;
   staConfirmDeadlineMs_ = now + timeoutMs;
-  status_.staChangeResult = "";
+  status_.staChangeResult = status_.staChangeResultHidden = "";
   // The network on trial, which the result card names once it is decided.
   copyCString(status_.staChangeSsid, sizeof(status_.staChangeSsid), settings_.staSsid);
   dataMux_.unlock();

@@ -53,9 +53,9 @@
   assert.notEqual(view(preset(hint(), {id: 4})).key, key({}));
   assert.equal(key({state: 'vary', direction: null, tier: null}), '3:41:vary:');
 
-  // Its close ignores the advice it showed, once the Undo strip ends.
+  // Its close ignores the advice it showed at once; its Undo takes it back.
   if (!codeIncludes(viewJs.home, 'const key = $("grindHintCard").dataset.key;') ||
-      !codeIncludes(viewJs.home, 'R.closeCard($("grindHintCard"), "Hidden until the advice changes.", () =>\n        R.dismissOnController("grind", key),') ||
+      !codeIncludes(viewJs.home, 'R.closeCard($("grindHintCard"), "Hidden until the advice changes.", () => R.dismissOnController("grind", key), () => R.dismissOnController("grind", key, true)') ||
       !codeIncludes(viewJs.home, '$("grindHintNewBeans").onclick = () => R.startNewCoffee()') ||
       !codeIncludes(partialHtml.home, '<button id="grindHintDismiss" class="cardClose" type="button" aria-label="Hide for now">×</button>') ||
       !partialHtml.home.includes('<span class="t">Relearn</span>') ||

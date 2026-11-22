@@ -209,7 +209,8 @@ function firmwareResultChecks() {
       assert.equal(url, '/api/v1/home/dismiss');
       const body = JSON.parse(options.body);
       posted.push(body);
-      if (body.key) seen = {...seen, [body.card]: body.key};
+      if (body.restore) seen = {...seen, [body.card]: body.key ? '' : false};
+      else if (body.key) seen = {...seen, [body.card]: body.key};
     },
     renderHomeCards() {}, sub: (text, values) => text + ':' + values.join(',')});
   vm.runInContext('let firmwareRestart = null, fwReloading = false;' + restartSource + wifiSource, context);
@@ -231,6 +232,12 @@ function firmwareResultChecks() {
   card.dismiss();
   assert.deepEqual(posted.at(-1), {card: 'image', key: oldImage});
   assert.equal(run(9, '1.0', oldImage), null);
+  // The card's Undo is its dismissal's undo: the update reaches this browser
+  // again until it is dismissed once more.
+  card.undo();
+  assert.deepEqual(posted.at(-1), {card: 'image', key: oldImage, restore: true});
+  assert.equal(run(9, '1.0', oldImage).failed, false, 'Undo brings the update card back');
+  card.dismiss();
   // An update from anywhere reaches every browser until one dismisses it.
   card = run(9, '2.0', image);
   assert.match(card.text, /firmware_updated_text:2\.0/);
@@ -257,6 +264,11 @@ function firmwareResultChecks() {
   // Dismissed stays dismissed everywhere, until this browser flashes it again.
   card.dismiss();
   assert.deepEqual(posted.at(-1), {card: 'rollback', key: image});
+  assert.equal(run(10, '1.0', oldImage, image), null);
+  card.undo();
+  assert.deepEqual(posted.at(-1), {card: 'rollback', key: image, restore: true});
+  assert.equal(run(10, '1.0', oldImage, image).failed, true, 'Undo brings the rollback back');
+  card.dismiss();
   assert.equal(run(10, '1.0', oldImage, image), null);
   note();
   assert.equal(run(10, '1.0', oldImage, image).failed, true);
@@ -299,6 +311,11 @@ function firmwareResultChecks() {
   card.dismiss();
   assert.deepEqual(posted.at(-1), {card: 'wifi'});
   assert.equal(wifi(reverted), null, 'hidden at once');
+  card.undo();
+  assert.deepEqual(posted.at(-1), {card: 'wifi', restore: true});
+  assert.equal(wifi(reverted).failed, true, 'Undo brings the Wi-Fi report back');
+  card.dismiss();
+  assert.equal(wifi(reverted), null, 'hidden again');
   // Saving starts the result over, and only the two endings set it.
   const firmware = fs.readFileSync(path.join(__dirname, '../network/OpenBrewByWeightWifi.inc'), 'utf8');
   for (const [fn, value] of [['::armPendingConfirmWindow', ''], ['::confirmPendingNetwork', 'CONFIRMED'],

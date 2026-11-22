@@ -124,6 +124,9 @@ struct NetworkStatusSnapshot {
   // How the last network change ended: "", "CONFIRMED" or "REVERTED", and
   // the network it tried; a Home card dismissal clears the result.
   const char *staChangeResult = "";
+  // The result the dismissal set aside, restored by the card's Undo; string
+  // literals only, so no owner is needed.
+  const char *staChangeResultHidden = "";
   char staChangeSsid[WIFI_SSID_CAPACITY] = {};
   int8_t staRssi = 0;
   uint8_t staSignalLevel = 0;

@@ -416,8 +416,11 @@ export function init() {
   if ($("grindHintDismiss"))
     $("grindHintDismiss").onclick = () => {
       const key = $("grindHintCard").dataset.key;
-      R.closeCard($("grindHintCard"), __WEBUI_TEXT__("home.closed_until_advice"), () =>
-        R.dismissOnController("grind", key),
+      R.closeCard(
+        $("grindHintCard"),
+        __WEBUI_TEXT__("home.closed_until_advice"),
+        () => R.dismissOnController("grind", key),
+        () => R.dismissOnController("grind", key, true),
       );
     };
   for (const id of [
@@ -439,10 +442,18 @@ export function init() {
     if (!dismiss) continue;
     // Dismissals are kept on the controller, so other phones skip them too.
     dismiss.onclick = () =>
-      R.closeCard($(id), __WEBUI_TEXT__("runtime.card_closed"), () => {
-        R.dismissOnController(cardName(id));
-        renderHints(R.homeStatusCache());
-      });
+      R.closeCard(
+        $(id),
+        __WEBUI_TEXT__("runtime.card_closed"),
+        () => {
+          R.dismissOnController(cardName(id));
+          renderHints(R.homeStatusCache());
+        },
+        () => {
+          R.dismissOnController(cardName(id), "", true);
+          renderHints(R.homeStatusCache());
+        },
+      );
   }
   if ($("laMarzoccoPolicyHintAccept"))
     $("laMarzoccoPolicyHintAccept").onclick = () => R.laMarzoccoAction("acceptPolicy");
@@ -457,10 +468,18 @@ export function init() {
     $("scaleRecDownload").onclick = async () => handled(await R.downloadScaleProfile());
     $("scaleRecDismiss").onclick = () => {
       const key = $("scaleRecCard").dataset.snooze;
-      R.closeCard($("scaleRecCard"), __WEBUI_TEXT__("home.closed_until_shot"), () => {
-        R.dismissCard(cardKey("scaleRec"), key);
-        renderHints(R.homeStatusCache());
-      });
+      R.closeCard(
+        $("scaleRecCard"),
+        __WEBUI_TEXT__("home.closed_until_shot"),
+        () => {
+          R.dismissCard(cardKey("scaleRec"), key);
+          renderHints(R.homeStatusCache());
+        },
+        () => {
+          R.dismissCard(cardKey("scaleRec"), "");
+          renderHints(R.homeStatusCache());
+        },
+      );
     };
   }
   if ($("scaleOnlyHintUse"))

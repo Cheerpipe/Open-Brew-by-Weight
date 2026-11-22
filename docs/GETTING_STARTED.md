@@ -102,9 +102,10 @@ apply: whether to ask for a password, how to connect a Linea Micra to your La Ma
 a reminder to check your recipe before the first shot, and, once your scale is
 saved, the option to use only that scale. Each note has a button that takes
 you straight there and a **×** in its corner. Tapping **×** closes the note on
-every phone and browser, and for a few seconds an **Undo** button sits where
-the note was, in case you tapped it by mistake. Close several cards in a row
-and each keeps its own **Undo**. Notes
+every phone and browser right away, and for a few seconds an **Undo** button
+sits where the note was, in case you tapped it by mistake. Undo brings the
+note back on every phone. Close several cards in a row and each keeps its own
+**Undo**. Notes
 also leave on their own once you're done: the recipe note, for example, goes
 away after your first shot or when you change a recipe.
 

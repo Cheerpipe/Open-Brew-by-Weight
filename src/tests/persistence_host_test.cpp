@@ -1574,6 +1574,14 @@ void p91c_card_dismissals_validate_order_and_persist() {
   CHECK(cardIgnoreGrind(d, "20:1:vary:"));
   for (const char *entry : d.grind) CHECK(cardGrindPreset(entry) != 3);
 
+  // The Undo of an ignored advice takes its key back out, followers closing
+  // the gap; an unknown key changes nothing.
+  CardDismissals r;
+  CHECK(cardIgnoreGrind(r, "3:41:vary:") && cardIgnoreGrind(r, "4:7:finer:likely"));
+  CHECK(cardRestoreGrind(r, "3:41:vary:"));
+  CHECK(strcmp(r.grind[0], "4:7:finer:likely") == 0 && r.grind[1][0] == '\0');
+  CHECK(!cardRestoreGrind(r, "3:41:vary:"));
+
   CHECK(cardNoteBit("scaleOnly") == 1 && cardNoteBit("laMarzoccoCloud") == 8 &&
         cardNoteBit("grind") == 0 && cardNoteBit("") == 0);
   d.notes = cardNoteBit("recipe") | cardNoteBit("companionPair");

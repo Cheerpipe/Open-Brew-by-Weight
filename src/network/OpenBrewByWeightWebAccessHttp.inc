@@ -431,8 +431,10 @@ esp_err_t OpenBrewByWeightNetwork::authAccessHandler(httpd_req_t *request) {
 // "grind","key":...} names the image prefix or advice key the page showed,
 // so a stale page can only dismiss what it showed; {"card":"wifi"} ends the
 // Wi-Fi change report; "access" or a CARD_NOTES name dismisses that Home
-// note. {"restore":true} brings back every note and ignored advice; the
-// acknowledged images stay, since they report past events.
+// note. The same card with "restore":true is the Undo of its dismissal: the
+// note or advice comes back, and only an acknowledged image whose prefix
+// matches comes back. {"restore":true} alone is Admin's restore, every note
+// and ignored advice at once.
 esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
   OpenBrewByWeightNetwork &self = *instance_;
   esp_err_t sent = self.lockJsonBody(request, nullptr, "OTA_JSON_REQUEST_REQUIRED");
@@ -441,38 +443,66 @@ esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(httpd_req_t *request) {
   bool restore = false;
   cJSON *root = parseJsonDocument(self.workBuf_->requestBody);
   static const char *const fields[] = {"card", "key", "restore"};
-  const bool parsed =
-      root != nullptr && jsonHasOnlyUniqueFields(root, fields, 3) &&
-      (jsonFieldPresent(root, "restore")
-           ? jsonBoolean(root, "restore", restore) && restore && cJSON_GetArraySize(root) == 1
-           : jsonString(root, "card", card, sizeof(card), false) &&
-                 (!jsonFieldPresent(root, "key") ||
-                  jsonString(root, "key", key, sizeof(key), false)));
+  const bool parsed = root != nullptr && jsonHasOnlyUniqueFields(root, fields, 3) &&
+                      (!jsonFieldPresent(root, "restore") ||
+                       (jsonBoolean(root, "restore", restore) && restore)) &&
+                      (!jsonFieldPresent(root, "card") ||
+                       jsonString(root, "card", card, sizeof(card), false)) &&
+                      (!jsonFieldPresent(root, "key") ||
+                       jsonString(root, "key", key, sizeof(key), false));
   if (root != nullptr) cJSON_Delete(root);
   self.unlockJsonBody();
   const bool image = strcmp(card, "image") == 0, rollback = strcmp(card, "rollback") == 0;
+  const uint8_t note = cardNoteBit(card);
   bool known = parsed;
   if (known) {
     TaskLockGuard lock(self.dataMux_);
-    if (restore) {
-      g_cardDismissalsDirty |= g_cardDismissals.notes != 0 || g_cardDismissals.grind[0][0] != '\0';
-      g_cardDismissals.notes = 0;
-      memset(g_cardDismissals.grind, 0, sizeof(g_cardDismissals.grind));
-      g_webAccess.dirty |= g_webAccess.stored.noticeDismissed != 0;
-      g_webAccess.stored.noticeDismissed = 0;
+    if (card[0] == '\0') {
+      // No card names Admin's restore, every note and advice at once.
+      if (restore) {
+        g_cardDismissalsDirty |=
+            g_cardDismissals.notes != 0 || g_cardDismissals.grind[0][0] != '\0';
+        g_cardDismissals.notes = 0;
+        memset(g_cardDismissals.grind, 0, sizeof(g_cardDismissals.grind));
+        g_webAccess.dirty |= g_webAccess.stored.noticeDismissed != 0;
+        g_webAccess.stored.noticeDismissed = 0;
+      } else {
+        known = false;
+      }
     } else if ((image || rollback) && key[0] != '\0' && cardImageValid(key)) {
-      g_cardDismissalsDirty |= cardDismissImage(
-          image ? g_cardDismissals.image : g_cardDismissals.rollback, key);
+      char (&slot)[CARD_IMAGE_CHARS + 1] =
+          image ? g_cardDismissals.image : g_cardDismissals.rollback;
+      if (restore) {
+        g_cardDismissalsDirty |= strcmp(slot, key) == 0 && cardDismissImage(slot, "");
+      } else {
+        g_cardDismissalsDirty |= cardDismissImage(slot, key);
+      }
     } else if (strcmp(card, "grind") == 0 && cardGrindPreset(key) != 0) {
-      g_cardDismissalsDirty |= cardIgnoreGrind(g_cardDismissals, key);
-    } else if (const uint8_t note = cardNoteBit(card)) {
-      g_cardDismissalsDirty |= (g_cardDismissals.notes & note) == 0;
-      g_cardDismissals.notes |= note;
+      g_cardDismissalsDirty |=
+          restore ? cardRestoreGrind(g_cardDismissals, key)
+                  : cardIgnoreGrind(g_cardDismissals, key);
+    } else if (note) {
+      if (restore) {
+        g_cardDismissalsDirty |= (g_cardDismissals.notes & note) != 0;
+        g_cardDismissals.notes &= static_cast<uint8_t>(~note);
+      } else {
+        g_cardDismissalsDirty |= (g_cardDismissals.notes & note) == 0;
+        g_cardDismissals.notes |= note;
+      }
     } else if (strcmp(card, "access") == 0) {
-      g_webAccess.dirty |= g_webAccess.stored.noticeDismissed == 0;
-      g_webAccess.stored.noticeDismissed = 1;
+      const uint8_t target = restore ? 0 : 1;
+      g_webAccess.dirty |= g_webAccess.stored.noticeDismissed != target;
+      g_webAccess.stored.noticeDismissed = target;
     } else if (strcmp(card, "wifi") == 0) {
-      self.status_.staChangeResult = "";
+      // The result is RAM state: the dismissal keeps it aside so the card's
+      // Undo can bring it back, and a new change forgets it.
+      if (restore) {
+        self.status_.staChangeResult = self.status_.staChangeResultHidden;
+        self.status_.staChangeResultHidden = "";
+      } else {
+        self.status_.staChangeResultHidden = self.status_.staChangeResult;
+        self.status_.staChangeResult = "";
+      }
     } else {
       known = false;
     }

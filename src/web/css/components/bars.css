@@ -86,14 +86,9 @@ dialog .btnBar {
   text-decoration: none;
 }
 
-/* Close (×): a bare glyph on a full tap target in the card's corner. While
-   its Undo strip shows, the card stays out of view whatever renders it. */
+/* Close (×): a bare glyph on a full tap target in the card's corner. */
 .homeCard:has(> .cardClose) > :first-child {
   padding-right: 2rem;
-}
-
-.homeCard.closing {
-  display: none;
 }
 
 .cardClose {

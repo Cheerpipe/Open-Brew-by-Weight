@@ -117,6 +117,18 @@ inline bool cardIgnoreGrind(CardDismissals &dismissals, const char *key) {
   return true;
 }
 
+// Restores a valid advice key: it leaves the list and its followers close the
+// gap. Returns whether it changed.
+inline bool cardRestoreGrind(CardDismissals &dismissals, const char *key) {
+  size_t at = 0;
+  while (at < MAX_SHOT_PRESETS && strcmp(dismissals.grind[at], key) != 0) ++at;
+  if (at == MAX_SHOT_PRESETS) return false;
+  memmove(dismissals.grind[at], dismissals.grind[at + 1],
+          (MAX_SHOT_PRESETS - at - 1) * CARD_GRIND_KEY_BYTES);
+  dismissals.grind[MAX_SHOT_PRESETS - 1][0] = '\0';
+  return true;
+}
+
 #if !defined(OPEN_BREW_BY_WEIGHT_HOST_TEST) ||                                      \
     defined(OPEN_BREW_BY_WEIGHT_PERSISTENCE_HOST_TEST)
 inline SettingsBlobLoad loadCardDismissals(CardDismissals &dismissals) {

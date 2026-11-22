@@ -34,12 +34,14 @@
     assert.ok(network.includes(route), `Missing access route ${route}`);
   }
   assert.ok(network.includes('if (matched->open) return matched->handler(request);'));
-  // The open-access note is one more Home dismissal. Restore brings back every
-  // note and ignored advice, alone in its body; acknowledged images stay.
+  // The open-access note is one more Home dismissal. Restore alone in its
+  // body brings back every note and ignored advice; a named card's restore is
+  // that card's Undo, and acknowledged images come back only by their prefix.
   const dismiss = body(access, 'esp_err_t OpenBrewByWeightNetwork::cardDismissHandler(');
-  const restore = dismiss.slice(dismiss.indexOf('if (restore) {'), dismiss.indexOf('} else if', dismiss.indexOf('if (restore) {')));
+  const restore = dismiss.slice(dismiss.indexOf('if (card[0] == \'\\0\') {'),
+      dismiss.indexOf('} else if', dismiss.indexOf('if (card[0] == \'\\0\') {')));
   assert.ok(!network.includes('/api/v1/auth/notice') &&
-      dismiss.includes('jsonBoolean(root, "restore", restore) && restore && cJSON_GetArraySize(root) == 1') &&
+      dismiss.includes('jsonBoolean(root, "restore", restore) && restore') &&
       restore.includes('g_cardDismissals.notes = 0;') &&
       restore.includes('memset(g_cardDismissals.grind, 0, sizeof(g_cardDismissals.grind));') &&
       restore.includes('g_webAccess.stored.noticeDismissed = 0;') && !restore.includes('image') &&
@@ -237,7 +239,7 @@
   const home = {R: {$, applyHomeStatus() {}, reveal() {}, homeStatusCache: () => null, presetState: {items: []},
     cardDismissed: (k) => cards.get(k) || '', dismissCard: (k, v = '1') => cards.set(k, v),
     dismissOnController: (card) => posted.push(card), shotRecorded: () => recorded,
-    shotCycle: () => cycle, closeCard: (card, text, commit) => closes.push({card, text, commit}),
+    shotCycle: () => cycle, closeCard: (card, text, commit, undo) => closes.push({card, text, commit, undo}),
     controlsMutable: true, uiState: here, companionHere: () => Promise.resolve(here.companionHere),
     companionPairable: () => pairable, sub: (t, a) => t + ':' + a.join(',')},
     document: {}, __LA_MARZOCCO__: false, __WEBUI_TEXT__: (key) => key};
@@ -289,8 +291,8 @@
   assert.deepEqual(shown({...fresh, dismissed: gone}), ['accessHint']);
   assert.deepEqual(posted.splice(0), ['laMarzoccoCloud']);
   cards.delete('obbwCard:laMarzoccoCloud');
-  assert.ok(codeIncludes(viewJs.home, 'R.closeCard($(id),"You won’t see this again.",()=>{R.dismissOnController(cardName(id));renderHints(R.homeStatusCache());});') &&
-      !viewJs.home.includes('/api/v1/auth/notice'), 'Closing a note is sent to the controller once its Undo ends');
+  assert.ok(codeIncludes(viewJs.home, 'R.closeCard($(id),"You won’t see this again.",()=>{R.dismissOnController(cardName(id));renderHints(R.homeStatusCache());},()=>{R.dismissOnController(cardName(id),"",true);renderHints(R.homeStatusCache())') &&
+      !viewJs.home.includes('/api/v1/auth/notice'), 'Closing a note is sent to the controller at once and its Undo takes it back');
   for (const id of order.slice(3))
     assert.ok(codeIncludes(partialHtml.home, `<button id="${id}Dismiss" class="cardClose" type="button" aria-label="Dismiss">×</button>`), id);
   for (const id of order.slice(0, 3))
@@ -366,7 +368,7 @@
   assert.ok(nodes.scaleRecCard.hidden && cards.get('obbwCard:scaleRec') === '');
   assert.ok(codeIncludes(rawPartialHtml.home, '<section id="scaleRecCard" class="homeCard warnHint" hidden>') &&
       codeIncludes(partialHtml.home, '<button id="scaleRecDismiss" class="cardClose" type="button" aria-label="Hide for now">×</button>') &&
-      codeIncludes(viewJs.home, 'R.closeCard($("scaleRecCard"),"Hidden until your next shot.",()=>{R.dismissCard(cardKey("scaleRec"),key);') &&
+      codeIncludes(viewJs.home, 'R.closeCard($("scaleRecCard"),"Hidden until your next shot.",()=>{R.dismissCard(cardKey("scaleRec"),key);renderHints(R.homeStatusCache());},()=>{R.dismissCard(cardKey("scaleRec"),"");renderHints(R.homeStatusCache())') &&
       codeIncludes(viewJs.home, 'R.command("/api/v1/diagnostic/scale-profile",{action:"stop"})') &&
       codeIncludes(viewJs.home, '"Delete this scale recording? It cannot be recovered.")&&handled(await R.command("/api/v1/diagnostic/scale-profile",{action:"delete"}))') &&
       codeIncludes(viewJs.home, '$("scaleRecDownload").onclick=async()=>handled(await R.downloadScaleProfile());') &&
@@ -375,44 +377,45 @@
   assert.ok(codeIncludes(rawPartialHtml.home, 'href="/settings#recipeSettings"') &&
       codeIncludes(rawPartialHtml.settings, 'id="recipeSettings"') &&
       !codeIncludes(rawPartialHtml.home, 'type="checkbox"'));
-  // A close hides its card behind its own Undo strip. Undo brings it back and
-  // commits nothing; its strip's end or a hidden page commits. Closes in a row
-  // keep independent strips, each with its own countdown.
-  const closeSrc = rawRuntimeJs.slice(rawRuntimeJs.indexOf('const closing = new Map();'),
+  // A close hides its card and sends its dismissal at once; its Undo strip is
+  // only the timed offer to take that back, so Undo re-shows the card and
+  // reverts, and the strip's end just removes it. Closes in a row keep
+  // independent strips, each with its own countdown.
+  const closeSrc = rawRuntimeJs.slice(rawRuntimeJs.indexOf('function closeCard('),
       rawRuntimeJs.indexOf('function firmwareResult('));
-  const timers = [], hideListeners = [], el = () => ({remove() { this.removed = true; },
-    setAttribute() {}, append(...c) { this.kids = c; }, focus() {},
+  const timers = [], el = () => ({remove() { this.removed = true; },
+    setAttribute() {}, append(...c) { this.kids = c; }, focus() { this.focused = true; },
     style: {setProperty(k, v) { this[k] = v; }}});
   const card = () => {
-    const c = new Set();
-    return {classList: {add: (x) => c.add(x), remove: (x) => c.delete(x), has: (x) => c.has(x)},
-      after(strip) { this.strip = strip; }, querySelector: () => ({focus() {}})};
+    const c = {hidden: false, refocused: false, after(strip) { this.strip = strip; },
+      querySelector: () => ({focus: () => { c.refocused = true; }})};
+    return c;
   };
-  const close = {__WEBUI_TEXT__: (k) => k, clearTimeout() {}, Map,
+  const close = {__WEBUI_TEXT__: (k) => k, clearTimeout() {},
     getComputedStyle: () => ({borderLeftColor: 'rgb(1, 2, 3)'}),
     setTimeout: (f, ms, ...a) => timers.push(() => f(...a)),
-    document: {createElement: el, addEventListener: (t, f) => hideListeners.push(f), hidden: false}};
+    document: {createElement: el}};
   vm.runInNewContext(closeSrc + ';this.closeCard = closeCard;', close);
-  const commits = [], a = card(), b = card();
-  close.closeCard(a, 'gone', () => commits.push('a'));
-  assert.ok(a.classList.has('closing') && a.strip.kids[0] === 'gone' && commits.length === 0);
+  const commits = [], reverts = [], a = card(), b = card();
+  close.closeCard(a, 'gone', () => commits.push('a'), () => reverts.push('a'));
+  assert.ok(a.hidden && a.strip.kids[0] === 'gone' && a.strip.kids[1].focused,
+      'A close hides its card at once and offers Undo');
+  assert.deepEqual(commits, ['a'], 'The dismissal is sent when the card closes');
+  assert.deepEqual(reverts, [], 'The strip has reverted nothing yet');
   assert.equal(a.strip.style['--cardAc'], 'rgb(1, 2, 3)', 'The strip takes its card\'s accent');
   a.strip.kids[1].onclick();
-  assert.ok(!a.classList.has('closing') && a.strip.removed && commits.length === 0, 'Undo commits nothing');
-  close.closeCard(a, 'gone', () => commits.push('a'));
-  close.closeCard(b, 'gone', () => commits.push('b'));
-  assert.ok(commits.length === 0 && !a.strip.removed && !b.strip.removed,
+  assert.ok(!a.hidden && a.strip.removed && a.refocused, 'Undo brings the card back');
+  assert.deepEqual(reverts, ['a'], 'Undo reverts the dismissal it closed');
+  close.closeCard(a, 'gone', () => commits.push('a2'), () => reverts.push('a2'));
+  close.closeCard(b, 'gone', () => commits.push('b'), () => reverts.push('b'));
+  assert.ok(!a.strip.removed && !b.strip.removed,
       'Another close keeps the first strip and its Undo');
   b.strip.kids[1].onclick();
-  assert.ok(commits.length === 0 && !b.classList.has('closing') && a.classList.has('closing'),
-      'Each Undo restores only its own card');
-  timers.at(-2)();
-  assert.deepEqual(commits, ['a'], 'Each strip commits when its own countdown ends');
-  close.closeCard(a, 'gone', () => commits.push('a2'));
-  close.closeCard(b, 'gone', () => commits.push('b2'));
-  close.document.hidden = true;
-  hideListeners.forEach((f) => f());
-  assert.deepEqual(commits, ['a', 'a2', 'b2'], 'A hidden page commits every open strip');
+  assert.ok(!b.hidden && b.strip.removed && a.hidden, 'Each Undo restores only its own card');
+  timers.forEach((fire) => fire());
+  assert.ok(a.strip.removed && b.strip.removed, 'Each strip ends with its own countdown');
+  assert.deepEqual(commits, ['a', 'a2', 'b'], 'A strip\'s end commits and reverts nothing');
+  assert.deepEqual(reverts, ['a', 'b'], 'Every Undo took its own dismissal back');
   // Admin brings every hidden note back, on the controller and in this browser.
   assert.ok(codeIncludes(partialHtml.admin, '<button id="restoreNotesButton" class="btnGlyph mutable" type="button">') &&
       codeIncludes(viewJs.admin, 'if(k.startsWith("obbwCard:"))localStorage.removeItem(k);') &&

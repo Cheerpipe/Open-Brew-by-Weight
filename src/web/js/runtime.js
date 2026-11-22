@@ -2869,53 +2869,50 @@ function noteFirmwareFlash(flash) {
 // advice, the Home notes, and the Wi-Fi change result. The page hides a card at once; the
 // status confirms it.
 let dismissed = { image: "", rollback: "", grind: [] };
-function dismissOnController(card, key) {
-  if (card === "grind") dismissed.grind = [key, ...dismissed.grind];
+function dismissOnController(card, key = "", restore = false) {
+  if (card === "grind")
+    dismissed.grind = restore
+      ? dismissed.grind.filter((k) => k !== key)
+      : [key, ...dismissed.grind];
+  else if (restore) dismissed[card] = key ? "" : false;
   else dismissed[card] = key || true;
-  api("/api/v1/home/dismiss", {
-    method: "POST",
-    body: JSON.stringify(key ? { card, key } : { card }),
-  }).catch(() => {});
+  const body = { card };
+  if (key) body.key = key;
+  if (restore) body.restore = true;
+  api("/api/v1/home/dismiss", { method: "POST", body: JSON.stringify(body) }).catch(() => {});
   renderHomeCards();
 }
-// A closed card leaves an Undo strip in its place for 6 s (the strip's
-// countdown in bars.css); each card keeps its own. Its commit waits for its
-// strip to end or the page to hide, so an undone close sends nothing. The
-// strip takes the card's accent for its edge and countdown line.
-const closing = new Map();
-function endClose(card, keep) {
-  const c = closing.get(card);
-  if (!c) return;
-  closing.delete(card);
-  clearTimeout(c.timer);
-  c.strip.remove();
-  // Hidden first, so a renderer that animates (reveal) has nothing to fold.
-  if (keep) {
-    card.hidden = true;
-    c.commit();
-  }
-  card.classList.remove("closing");
-  if (!keep) card.querySelector(".cardClose")?.focus();
-}
-function closeCard(card, text, commit) {
+// Closing a card hides it and sends its dismissal at once; an Undo strip
+// stands in its place for 6 s (the strip's countdown in bars.css), and its
+// Undo runs the caller's revert, which brings the card back. Each card keeps
+// its own strip. The strip takes the card's accent for its edge and countdown
+// line.
+function closeCard(card, text, commit, revert) {
   const strip = document.createElement("div"),
     undo = document.createElement("button");
   strip.className = "cardUndo";
   strip.setAttribute("role", "status");
   strip.style.setProperty("--cardAc", getComputedStyle(card).borderLeftColor);
+  const end = () => {
+    clearTimeout(timer);
+    strip.remove();
+  };
   undo.type = "button";
   undo.textContent = __WEBUI_TEXT__("runtime.undo");
-  undo.onclick = () => endClose(card, false);
+  undo.onclick = () => {
+    end();
+    card.hidden = false;
+    revert();
+    card.querySelector(".cardClose")?.focus();
+  };
   strip.append(text, undo);
-  card.classList.add("closing");
+  // Hidden first, so a renderer that animates (reveal) has nothing to fold.
+  card.hidden = true;
+  commit();
   card.after(strip);
-  closing.set(card, { strip, commit, timer: setTimeout(endClose, 6e3, card, true) });
+  const timer = setTimeout(end, 6e3);
   undo.focus({ preventScroll: true });
 }
-document.addEventListener(
-  "visibilitychange",
-  () => document.hidden && [...closing.keys()].forEach((card) => endClose(card, true)),
-);
 function firmwareResult(s) {
   let flash = null;
   try {
@@ -2925,16 +2922,24 @@ function firmwareResult(s) {
   }
   if (!Number.isInteger(s.bootId) || flash?.bootId === s.bootId) return null;
   const image = s.rolledBackImage,
-    dismiss = (card, key) => () => {
-      noteFirmwareFlash(null);
-      dismissOnController(card, key);
-    };
+    close = (card, key) => ({
+      dismiss: () => {
+        noteFirmwareFlash(null);
+        dismissOnController(card, key);
+      },
+      // Undo also brings back what this browser had flashed, so the card
+      // still names its version after the next boot.
+      undo: () => {
+        noteFirmwareFlash(flash);
+        dismissOnController(card, key, true);
+      },
+    });
   if (image) {
     const named = flash?.imageSha256?.startsWith(image);
     if (dismissed.rollback === image && !named) return null;
     return {
       failed: true,
-      dismiss: dismiss("rollback", image),
+      ...close("rollback", image),
       title: __WEBUI_TEXT__("shell.firmware_rollback_title"),
       text: named
         ? sub(__WEBUI_TEXT__("shell.firmware_rollback_named"), [flash.version, s.firmwareVersion])
@@ -2952,7 +2957,7 @@ function firmwareResult(s) {
     ? null
     : {
         failed: false,
-        dismiss: dismiss("image", running),
+        ...close("image", running),
         title: __WEBUI_TEXT__("shell.firmware_updated_title"),
         text:
           sub(__WEBUI_TEXT__("shell.firmware_updated_text"), [version]) +
@@ -2966,12 +2971,17 @@ function firmwareResult(s) {
 // same network.
 function wifiResult(s) {
   if (!s.wifiChangeResult) return null;
-  const failed = s.wifiChangeResult !== "CONFIRMED";
+  const failed = s.wifiChangeResult !== "CONFIRMED",
+    result = s.wifiChangeResult;
   return {
     failed,
     dismiss: () => {
       s.wifiChangeResult = "";
       dismissOnController("wifi");
+    },
+    undo: () => {
+      s.wifiChangeResult = result;
+      dismissOnController("wifi", "", true);
     },
     title: failed
       ? __WEBUI_TEXT__("shell.wifi_failed_title")
@@ -3011,10 +3021,18 @@ function renderResultCards(s) {
       renderRoute(open.pathname);
     };
     $(id + "Dismiss").onclick = () =>
-      closeCard(card, __WEBUI_TEXT__("runtime.card_closed"), () => {
-        view.dismiss();
-        renderResultCards(s);
-      });
+      closeCard(
+        card,
+        __WEBUI_TEXT__("runtime.card_closed"),
+        () => {
+          view.dismiss();
+          renderResultCards(s);
+        },
+        () => {
+          view.undo();
+          renderResultCards(s);
+        },
+      );
   }
 }
 function beginNetworkReconnectWait() {
