@@ -664,6 +664,11 @@ summary {
   flex-wrap: wrap;
 }
 
+/* Only the conflict chip lives here; without it the bar takes no space. */
+.configSaveBar:not(:has(> :not(.hidden))) {
+  display: none;
+}
+
 .configSaveBar > .warn {
   padding: 0.25rem 0.5rem;
   border-radius: 0.35rem;

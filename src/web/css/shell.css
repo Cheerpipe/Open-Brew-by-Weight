@@ -1646,7 +1646,7 @@ fieldset,
   background: var(--sf);
 }
 
-fieldset > :last-child {
+fieldset > :is(:last-child, :has(+ .configSaveBar:last-child)) {
   margin-bottom: 0;
 }
 
