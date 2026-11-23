@@ -16,20 +16,33 @@ A toolbar at the top of Stats holds the three chart choices and stays in view
 while you scroll through the charts. Each button shows
 your current choice; tap it to pick another from its menu. On a narrow screen
 the buttons may show only their icons, still opening the same menus. The first
-chooses how far back Stats looks: **Last 10**, **50**, or **100** shots. The
-averages and the charts follow your choice. Only the choices that make a
-difference appear: every size smaller than the number of good shots in the
-list, plus the first one that covers them all, and none with ten shots or
-fewer. Filtering the list down to fewer shots moves the selection to the
-largest size still shown. Each browser remembers the size you picked, along with
-the preset and band choices below: when it no longer fits, for example after
-you delete shots or open Stats without the companion, Stats uses the largest
-size still shown, and your choice comes back once it fits again. Through [the companion](companion.md#your-whole-history) with its archive,
-Stats covers your whole history and also offers 500 and 1,000. While the
-companion is still catching up with the controller's newest shots, or cannot
-answer, Stats show the controller's own figures instead, with a note saying so,
-and offer only 10, 50 and 100 until the whole-history figures return with
-the size you picked. Opened
+chooses which shots Stats looks at, either your latest shots or the shots of
+some days, and the averages and the charts follow your choice.
+
+- **Latest shots**: **Last 10**, **25**, **50**, or **100** shots. Only the
+  sizes that make a difference appear: every size smaller than the number of
+  good shots in the list, plus the first one that covers them all. Filtering
+  the list down to fewer shots moves the selection to the largest size still
+  shown.
+- **Dates**: **Today**, **Last 3 days**, **Last 7 days**, **Last 30 days**, or
+  **Pick dates**, where you choose the first and the last day with your
+  phone's or computer's own date picker and tap **Apply**. Days follow the
+  controller's clock and time zone, the same ones the shot times show, and
+  the ranges that end today move on by themselves at midnight. Shots without
+  a date, made while the controller did not know the time, are never in a
+  date range. A range covers up to its newest 100 shots, and a note says so
+  when it holds more.
+
+Each browser remembers what you picked, along with the preset and band choices
+below. When a size no longer fits, for example after you delete shots or open
+Stats without the companion, Stats uses the largest size still shown, and your
+choice comes back once it fits again. Through
+[the companion](companion.md#your-whole-history) with its archive, Stats covers
+your whole history: the sizes add 500 and 1,000, and a date range covers up to
+its newest 1,000 shots. While the companion is still catching up with the
+controller's newest shots, or cannot answer, Stats show the controller's own
+figures instead, with a note saying so, and offer only the controller's sizes
+until the whole-history figures return with what you picked. Opened
 directly, Stats always cover the shots on the controller. Preset figures, such
 as a preset's arrival line and grind hint, always come from the controller's
 own shots, with or without the companion.
@@ -420,11 +433,12 @@ when it is not the current one). Hovering a time shows its exact date and
 time to the second, and the CSV export always keeps that full detail no
 matter how the table displays it.
 
-Stats uses up to the newest **10, 50, or 100 good shots**, as you choose,
-for duration, yield, available flow, daily count, and both Stats charts,
-regardless of how the table is sorted, filtered, or how far you have scrolled
-it. **Avg BBW error** independently uses up to the same number of newest
-**good shots stopped by weight** in the full history, skipping manual shots and time
+Stats uses up to the newest **10, 25, 50, or 100 good shots**, or the good
+shots of the days you pick, as you choose, for duration, yield, available
+flow, daily count, and the Stats charts, regardless of how the table is
+sorted, filtered, or how far you have scrolled it. **Avg BBW error**
+independently uses up to the same number of newest **good shots stopped by
+weight** in the full history (in those days, for a date range), skipping manual shots and time
 or safety stops. Each miss is measured against the planned stop — the cut line
 when the stop was commanded, which is above the target for a fast shot and
 below it for a slow one — and the absolute percentages are averaged, so

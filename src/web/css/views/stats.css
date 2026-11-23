@@ -42,6 +42,50 @@ from Bands down (app.js fitBar). */
   display: none;
 }
 
+/* The window menu's custom dates, under their choice and aligned with its
+text: the native date fields one above the other in the panel, side by side
+in the phone sheet (stacked again on the narrowest phones), then Apply. */
+.statsRange {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0 0.6rem 0.5rem 2.35rem;
+}
+
+.statsRange label {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  color: var(--mu);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.statsRange button {
+  min-height: 2.4rem;
+  border: 1.5px solid var(--pri);
+  background: var(--pri);
+  color: var(--on);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheetBody .statsRange {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  padding: 0 0.7rem 0.7rem 2.9rem;
+}
+
+.sheetBody .statsRange button {
+  grid-column: 1 / -1;
+  min-height: 3rem;
+}
+
+@media (width <= 359px) {
+  .sheetBody .statsRange {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .statsDensZones {
   display: grid;
   grid-template-columns: var(--zf) var(--zo) 1fr;

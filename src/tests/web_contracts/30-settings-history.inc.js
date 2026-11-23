@@ -1323,8 +1323,9 @@ if (!statsSection ||
     !statsSection[1].includes('id="statsChartBar"') ||
     !['statsWindowButton', 'statsPresetButton', 'statsBandButton'].every((id) =>
       statsSection[1].includes(`id="${id}"`)) ||
-    !codeIncludes(viewJs.stats, 'R.sendUiOperation({op:"stats",on:true,window:Math.min(R.uiState.statsWindow,100)});') ||
-    !codeIncludes(viewJs.stats, '...(uiState.statsWindow!==10&&{window:Math.min(uiState.statsWindow,100)}),') ||
+    !codeIncludes(viewJs.stats, 'R.sendUiOperation({op:"stats",on:true,...statsScope(100)});') ||
+    !codeIncludes(viewJs.stats, '...((uiState.statsSpan!=null||uiState.statsWindow!==10)&&statsScope(100)),') ||
+    !codeIncludes(viewJs.stats, '...statsScope(1000),') ||
     !codeIncludes(viewJs.stats, 'shown=sizes.filter((v,i)=>i===0||sizes[i-1]<n);') ||
     !codeIncludes(viewJs.stats, '...(Object.keys(uiState.shotFilter).length&&{filter:uiState.shotFilter}),') ||
     !codeIncludes(viewJs.stats, 'R.createFilterMenu("shotFilterButton"') ||

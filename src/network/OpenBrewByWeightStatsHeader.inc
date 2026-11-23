@@ -120,27 +120,28 @@ bool appendStatsDensity(StatsHeaderWork &cache, size_t n, size_t *used) {
   return jsonScratchAppend(cache.header, sizeof(cache.header), used, "]}");
 }
 
-// The Web UI Stats header over the newest `window` eligible shots: the
-// aggregate; "dens", the density charts for all presets and for `presetId`
-// (null without its timed shots, true when it equals the first); "cons",
-// the timed arrivals oldest first in tenths of a second with their preset
-// ids ("p", one number when they share one) and, when any guard decided a
-// stop, the guard per shot ("g", statsGuardStop), for the consistency chart;
-// "facets", the presets and scales the good shots of the whole log hold,
-// newest first, for the list filter (scales keyed by shotLogScaleKey); and
-// "cut", for the cut accuracy chart: `presetId`'s newest `window` good weight
-// cuts with a settled weight, oldest first, as their targets ("t", tenths of
-// a gram, one number when they share one), the settled weight's miss from
-// the target ("e", hundredths of a gram) and "g" as above; "preset", the
+// The Web UI Stats header over the newest `window` eligible shots of a scope
+// (shotLogStatsWindow: a window, or a range of local days): the aggregate;
+// "dens", the density charts for all presets and for `presetId` (null
+// without its timed shots, true when it equals the first); "cons", the timed
+// arrivals oldest first in tenths of a second with their preset ids ("p", one
+// number when they share one) and, when any guard decided a stop, the guard
+// per shot ("g", statsGuardStop), for the consistency chart; "facets", the
+// presets and scales the good shots of the whole log hold, newest first, for
+// the list filter (scales keyed by shotLogScaleKey); and "cut", for the cut
+// accuracy chart: `presetId`'s newest `window` good weight cuts in the scope
+// with a settled weight, oldest first, as their targets ("t", tenths of a
+// gram, one number when they share one), the settled weight's miss from the
+// target ("e", hundredths of a gram) and "g" as above; "preset", the
 // `presetId` they follow, so a page can tell a header built for an earlier
 // choice. `presetId` 0 is All: no preset chart and no "cut", as for a preset
 // without such shots.
 __attribute__((optimize("Os")))
-bool formatStatsHeader(StatsHeaderWork &cache, size_t window, uint8_t presetId) {
+bool formatStatsHeader(StatsHeaderWork &cache, size_t scope, uint8_t presetId) {
   const ShotStatsRecordsSnapshot &snapshot = cache.snapshot;
   char *out = cache.header;
-  const size_t capacity = sizeof(cache.header);
-  const ShotStatsView stats = shotLogStatsView(snapshot.count, window,
+  const size_t capacity = sizeof(cache.header), window = shotLogStatsWindow(scope);
+  const ShotStatsView stats = shotLogStatsView(snapshot.count, scope,
       [&](size_t n) -> const ShotLogRecord & { return snapshot.records[n]; });
   if (!buildIntegrationStats(stats, out, capacity, window, false)) return false;
   size_t used = strlen(out) - 1;  // Reopen the aggregate over its closing brace.
@@ -148,7 +149,7 @@ bool formatStatsHeader(StatsHeaderWork &cache, size_t window, uint8_t presetId) 
   bool onePreset = true;
   for (size_t i = 0, found = 0; i < snapshot.count && found < window; ++i) {
     const ShotLogRecord &record = snapshot.records[i];
-    if (!shotLogRecordEligible(record)) continue;
+    if (!shotLogRecordEligible(record) || !shotLogStatsInScope(record, scope)) continue;
     ++found;
     if (shotLogResult(record) > 2) continue;
     onePreset = onePreset && (!timed || shotLogPresetId(record) == shotLogPresetId(*cache.timed[0]));
@@ -223,7 +224,7 @@ bool formatStatsHeader(StatsHeaderWork &cache, size_t window, uint8_t presetId) 
   for (size_t i = 0; presetId && i < snapshot.count && cuts < window; ++i) {
     const ShotLogRecord &record = snapshot.records[i];
     if (shotLogPresetId(record) != presetId || !shotLogRecordEligible(record) ||
-        !shotLogBbwErrorEligible(record) || record.actualWeightCg == SHOT_LOG_WEIGHT_MISSING)
+        !shotLogStatsInScope(record, scope) || !shotLogBbwErrorEligible(record) || record.actualWeightCg == SHOT_LOG_WEIGHT_MISSING)
       continue;
     oneTarget = oneTarget && (!cuts || record.goalWeightDg == cache.scope[0]->goalWeightDg);
     cache.scope[cuts++] = &record;

@@ -491,7 +491,8 @@ class OpenBrewByWeightNetwork {
     // Stats page subscription, same layout plus the sort field and the
     // fetch's own window and filter (sentinel appends page by the view's
     // order and filter; the CSV export asks for date/desc, unfiltered), and
-    // the number of newest shots the aggregate and charts cover.
+    // the scope the aggregate and charts cover (shotLogStatsWindow: a number
+    // of newest shots, or a range of local days).
     bool statsOn = false, statsResync = true, statsFetch = false;
     size_t statsOffset = 0, statsLimit = SHOT_LOG_PAGE_DEFAULT,
            statsFetchOffset = 0, statsFetchLimit = SHOT_LOG_PAGE_DEFAULT;
@@ -500,7 +501,7 @@ class OpenBrewByWeightNetwork {
     ShotLogSortDir statsDir = ShotLogSortDir::Desc, statsFetchDir = ShotLogSortDir::Desc;
     ShotListFilter statsFilter, statsFetchFilter;
     uint32_t statsEpoch = 0, statsFingerprint = 0, statsBoot = 0, statsSeq = 0, statsKnownTag = 0;
-    // Window and preset of the last standing page's header.
+    // Scope and preset of the last standing page's header.
     size_t statsShownWindow = 0;
     uint8_t statsPresetId = 0;
     // The preset the page's charts follow (`preset`), and a fetch's own:

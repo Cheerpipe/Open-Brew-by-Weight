@@ -272,11 +272,14 @@ const uiState = {
   historyNextRequest: 0,
   historyDir: "desc",
   // Firmware-side list filters (empty = everything), which outlive no page;
-  // the Stats window, band and the preset the Stats charts follow (0 All,
-  // null the active one), which Stats restores from this browser.
+  // the Stats window, its date span instead (null none, a number of days
+  // up to today, or a [from, to] pair of ISO dates), band and the preset the
+  // Stats charts follow (0 All, null the active one), which Stats restores
+  // from this browser.
   historyTypes: [],
   shotFilter: {},
   statsWindow: 10,
+  statsSpan: null,
   statsBand: "range",
   statsPreset: null,
   scanTimer: 0,
@@ -1127,9 +1130,12 @@ function deviceUtcSec() {
     ? statusUtcAnchorSec + Math.floor((performance.now() - statusUtcAnchorAt) / 1000)
     : Math.floor(Date.now() / 1000);
 }
+// The controller's local now, in its own zone; 0 until a status arrives.
+const deviceLocalSec = () =>
+  statusUtcAnchorSec ? deviceUtcSec() + statusTimezoneOffsetMinutes * 60 : 0;
 function formatHumanTime(l) {
   const dt = new Date(l * 1e3),
-    now = statusUtcAnchorSec ? deviceUtcSec() + statusTimezoneOffsetMinutes * 60 : 0,
+    now = deviceLocalSec(),
     n = new Date(now * 1e3),
     d = Math.floor(now / 86400) - Math.floor(l / 86400),
     c = dt.toISOString().slice(11, 16),
@@ -8520,6 +8526,7 @@ export {
   initGroupRows,
   renderGroupRows,
   formatHumanTime,
+  deviceLocalSec,
   deviceUtcSec,
   resetNetworkAddressLoaded,
   formatWallTimeLocal,

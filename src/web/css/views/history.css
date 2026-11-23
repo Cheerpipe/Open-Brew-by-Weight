@@ -1214,11 +1214,14 @@
   background: var(--pa);
 }
 
+/* Menu items are labels and radios, not form fields: they drop the form
+label's margin and the text field's height. */
 .histFilterItem {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   min-height: 2.5rem;
+  margin: 0;
   padding: 0.4rem 0.6rem;
   border-radius: 0.6rem;
   cursor: pointer;
@@ -1253,6 +1256,7 @@
   flex: none;
   width: 1.15rem;
   height: 1.15rem;
+  min-height: 0;
   margin: 0;
   accent-color: var(--pri);
 }

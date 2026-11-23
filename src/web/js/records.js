@@ -276,7 +276,8 @@ export function actionMenu(label, items) {
   return menu;
 }
 // A single-choice menu on the shared popup, titled like the filter menu:
-// items() lists {text, hint, tag, on, off, pick}; picking one closes it.
+// items() lists {text, hint, tag, on, off, pick, stay}, a string starting a
+// group and a node shown as it is; picking one closes it unless it stays.
 export function choiceMenu(label, items) {
   const menu = createPopup(label, (p, ui) => {
     if (!ui.sheet)
@@ -287,13 +288,24 @@ export function choiceMenu(label, items) {
         }),
       );
     for (const o of items()) {
+      if (typeof o === "string" || o instanceof Node) {
+        p.append(
+          o instanceof Node
+            ? o
+            : Object.assign(document.createElement("div"), {
+                className: "histFilterGroup",
+                textContent: o,
+              }),
+        );
+        continue;
+      }
       const item = document.createElement("label"),
         box = document.createElement("input");
       item.className = "histFilterItem";
       item.innerHTML = '<span class="menuText"><b></b><small></small></span>';
       Object.assign(box, { type: "radio", name: "choice", checked: !!o.on, disabled: !!o.off });
       box.setAttribute("role", "menuitemradio");
-      box.onchange = () => (menu.close(), o.pick());
+      box.onchange = () => (o.stay || menu.close(), o.pick());
       item.prepend(box);
       item.querySelector("b").textContent = o.text;
       if (o.tag)

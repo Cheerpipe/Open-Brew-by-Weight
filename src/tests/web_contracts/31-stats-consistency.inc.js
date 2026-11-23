@@ -137,28 +137,33 @@
       [2, 0, 1, 0, 2]);
 }
 // S18: the window choices are every window smaller than the good shots the
-// list holds, plus the smallest one covering them; none up to ten. The
-// companion's merged header adds 500 and 1000; a hidden selection falls back.
+// list holds, plus the smallest one covering them; the button shows once
+// there is a good shot, the dates being a choice too. The companion's merged
+// header adds 500 and 1000; a hidden selection falls back.
 {
   const assert = require('assert');
-  const choices = (n, merged, selected, standIn = false) => {
+  const choices = (n, merged, selected, standIn = false, statsSpan = null, asked = '1,2') => {
     const label = {textContent: ''};
     const button = {hidden: false, querySelector: () => label};
     const state = {};
     const sent = [];
-    const uiState = {statsWindow: selected};
+    const uiState = {statsWindow: selected, statsSpan};
     let headers = 0;
     new Function('$', 'R', '__WEBUI_TEXT__', 'statsWindowState', 'statsMergedGood', 'statsGood',
         'statsMerged', 'statsSynced', 'sendStatsWindow', 'refreshMergedHeader', 'archiveStatsReady',
+        'statsSpanLabel', 'statsDays', 'statsDaysAsked',
         `${blockAt(rawViewJs.stats, 'function statsWindowChoices(')};statsWindowChoices();`)(
         () => button, {uiState, sub: (t, v) => t + v}, (k) => k, state, merged ? n : null, n,
-        merged ? {} : null, true, () => sent.push(uiState.statsWindow), () => headers++, () => standIn);
-    assert.equal(label.textContent, 'stats.last_n' + state.pressed, 'the button names the pressed window');
+        merged ? {} : null, true, () => sent.push(uiState.statsWindow), () => headers++, () => standIn,
+        (s) => 'span ' + s, () => [1, 2], asked);
+    assert.equal(label.textContent, statsSpan == null ? 'stats.last_n' + state.pressed : 'span ' + statsSpan,
+        'the button names the pressed window or the date span');
     return {shown: button.hidden ? [] : state.shown, selected: uiState.statsWindow, sent, headers,
       pressed: [state.pressed]};
   };
-  assert.deepEqual(choices(1, false, 10).shown, []);
-  assert.deepEqual(choices(10, false, 10).shown, []);
+  assert.deepEqual(choices(0, false, 10).shown, []);
+  assert.deepEqual(choices(1, false, 10).shown, [10]);
+  assert.deepEqual(choices(10, false, 10).shown, [10]);
   assert.deepEqual(choices(11, false, 10).shown, [10, 25]);
   assert.deepEqual(choices(51, false, 10).shown, [10, 25, 50, 100]);
   assert.deepEqual(choices(134, false, 10).shown, [10, 25, 50, 100]);
@@ -168,7 +173,7 @@
   assert.deepEqual(choices(50, true, 10).shown, [10, 25, 50]);
   assert.deepEqual(choices(500, true, 10).shown, [10, 25, 50, 100, 500]);
   assert.deepEqual(choices(501, false, 10).shown, [10, 25, 50, 100]);
-  for (const n of [1, 10]) assert.deepEqual(choices(n, true, 10).shown, []);
+  for (const n of [1, 10]) assert.deepEqual(choices(n, true, 10).shown, [10]);
   assert.deepEqual(choices(11, true, 10).shown, [10, 25]);
   assert.deepEqual(choices(51, true, 10).shown, [10, 25, 50, 100]);
   const fallen = choices(30, true, 500);
@@ -189,6 +194,34 @@
   // window shown and keeps the 500 for when the merged header returns.
   const few = choices(30, false, 500, true);
   assert.deepEqual([few.shown, few.pressed, few.selected, few.sent], [[10, 25, 50], [50], 500, []]);
+  // A date span presses no window, keeps the chosen one, stays offered with
+  // no good shot, and asks again only when its days moved (midnight).
+  const span = choices(30, false, 500, true, 7);
+  assert.deepEqual([span.pressed, span.selected, span.sent, span.headers], [[null], 500, [], 0]);
+  assert.deepEqual(choices(0, false, 10, false, 7).shown, [10]);
+  const moved = choices(30, true, 50, false, 1, '0,1');
+  assert.deepEqual([moved.sent, moved.headers], [[50], 1]);
+}
+// The date spans go out as [since, until] days of the controller's calendar
+// instead of a window; a remembered one is kept only when it is one of them.
+{
+  const assert = require('assert');
+  const scope = (statsSpan, localSec, max = 100) => new Function('R',
+      `${blockAt(rawViewJs.stats, 'const STATS_SPANS = ')};` +
+      `${blockAt(rawViewJs.stats, 'let statsDaysAsked')};` +
+      `return [statsScope(${max}), statsDaysAsked, spanOk];`)(
+      {uiState: {statsSpan, statsWindow: 500}, deviceLocalSec: () => localSec});
+  const day = 20780;  // 2026-11-23
+  assert.deepEqual(scope(null, day * 86400).slice(0, 2), [{window: 100}, 'null']);
+  assert.deepEqual(scope(null, day * 86400, 1000)[0], {window: 500});
+  assert.deepEqual(scope(1, day * 86400 + 86399).slice(0, 2), [{days: [day, day]}, '20780,20780']);
+  assert.deepEqual(scope(7, day * 86400)[0], {days: [day - 6, day]});
+  assert.deepEqual(scope(['2026-11-01', '2026-11-23'], day * 86400)[0], {days: [20758, day]});
+  const spanOk = scope(null, 0)[2];
+  assert.deepEqual([1, 3, 7, 30, 2, 0, null, ['2026-11-01', '2026-11-23'],
+    ['2026-11-02', '2026-11-01'], ['2026-11-01'], ['1970-01-01', '1970-01-02'],
+    ['2026-1-1', '2026-11-02']].map(spanOk),
+  [true, true, true, true, false, false, false, true, false, false, false, false]);
 }
 // The companion archive merge (S9, S12): one comparator over both sources, a
 // cut at the first row a source still has to send, a record both hold shown

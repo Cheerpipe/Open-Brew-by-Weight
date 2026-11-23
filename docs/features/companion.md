@@ -297,18 +297,20 @@ other orders the badge's description names that date.
 
 The averages and charts at the top of Stats also cover your whole history,
 built by the companion. You can pick how many of your newest shots they
-cover: 10, 50 and 100, plus 500 and 1,000 through the companion. Only the
+cover: 10, 25, 50 and 100, plus 500 and 1,000 through the companion. Only the
 choices that make a difference are offered: every size smaller than the
-number of shots in the list, plus the first one that covers them all, and no
-choice at all with ten shots or fewer. Filtering the list down to fewer
-shots moves the selection to the largest size still offered. The figures
-cover your whole history only once the companion holds the controller's
-newest shot; until then, or while it cannot answer, Stats show the
-controller's own figures with a note saying so, and offer 10, 50 and 100 only;
-the size you picked comes back with the whole-history figures.
-With the controller off they come from the companion's copy, or say they are
-not available right now. Opened directly, the controller offers 10, 50 and
-100 by the same rule. Preset figures, such as a preset's arrival line and
+number of shots in the list, plus the first one that covers them all.
+Filtering the list down to fewer shots moves the selection to the largest
+size still offered. You can also pick days instead, such as today, the last
+week or dates of your own, and then the figures cover up to the newest 1,000
+shots of those days. The figures cover your whole history only once the
+companion holds the controller's newest shot; until then, or while it cannot
+answer, Stats show the controller's own figures with a note saying so, and
+offer 10, 25, 50 and 100 only; what you picked comes back with the
+whole-history figures. With the controller off they come from the companion's
+copy, or say they are not available right now. Opened directly, the
+controller offers 10, 25, 50 and 100 by the same rule, and its date ranges
+cover up to their newest 100 shots. Preset figures, such as a preset's arrival line and
 grind hint, and Home Assistant's statistics stay the controller's own.
 
 **Opened directly**, Stats and History show what the controller holds, and

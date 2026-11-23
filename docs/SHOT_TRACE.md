@@ -420,7 +420,7 @@ decides, never the shot's quality; the newest saved records are always kept.
 
 The newest 500 curves stay in a PSRAM cache (`ShotCurveCache`,
 `src/OpenBrewByWeightShotCurve.h`, about 2.8 MB, under `shotStoreMutex`), so
-Home, the Stats charts and the last 10, 50 or 100 shots never touch flash. The
+Home, the Stats charts and the last 10, 25, 50 or 100 shots or a date range never touch flash. The
 curves not in the pool yet are always the newest ones in the cache; the worker
 saves them oldest first.
 

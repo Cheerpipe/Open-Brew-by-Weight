@@ -437,13 +437,14 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         // View-scoped Stats page subscription on the same contract; one-shot
         // fetches also serve the CSV export window (date/desc, good shots).
         // `filter` works like History's `types`; `window` picks the newest
-        // shots the aggregate and charts cover (a fetch's own header too);
-        // `preset` the one the charts follow (0 All; absent the active one; a
-        // fetch's own header too).
-        static const char *const kFields[] = {"op",    "on",      "offset",
-                                              "limit", "sort",    "dir",
-                                              "fetch", "request", "filter",
-                                              "window", "tag",    "preset"};
+        // shots the aggregate and charts cover, or `days` [since, until] a
+        // range of local days, either replacing the other (a fetch's own
+        // header too); `preset` the one the charts follow (0 All; absent the
+        // active one; a fetch's own header too).
+        static const char *const kFields[] = {"op",    "on",      "offset", "limit",
+                                              "sort",  "dir",     "fetch",  "request",
+                                              "filter", "window", "days",   "tag",
+                                              "preset"};
         const cJSON *requestId = cJSON_GetObjectItemCaseSensitive(message, "request");
         const cJSON *on = cJSON_GetObjectItemCaseSensitive(message, "on");
         const cJSON *offset = cJSON_GetObjectItemCaseSensitive(message, "offset");
@@ -453,14 +454,23 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         const cJSON *fetch = cJSON_GetObjectItemCaseSensitive(message, "fetch");
         const cJSON *filter = cJSON_GetObjectItemCaseSensitive(message, "filter");
         const cJSON *window = cJSON_GetObjectItemCaseSensitive(message, "window");
+        const cJSON *days = cJSON_GetObjectItemCaseSensitive(message, "days");
+        const cJSON *since = cJSON_GetArrayItem(days, 0), *until = cJSON_GetArrayItem(days, 1);
         const cJSON *tag = cJSON_GetObjectItemCaseSensitive(message, "tag");
         const cJSON *preset = cJSON_GetObjectItemCaseSensitive(message, "preset");
         ShotListFilter shotFilter;
         bool windowOk = !window;
         for (const size_t size : SHOT_LOG_STATS_WINDOWS)
           windowOk = windowOk || (cJSON_IsNumber(window) && window->valuedouble == size);
-        const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 12) &&
-                             uiStreamParseShotFilter(filter, shotFilter) && windowOk;
+        const bool daysOk = !days || (!window && cJSON_IsArray(days) &&
+                                      cJSON_GetArraySize(days) == 2 &&
+                                      uiStreamIntInRange(since, 1, UINT16_MAX) &&
+                                      uiStreamIntInRange(until, since->valuedouble, UINT16_MAX));
+        const bool scoped = window || days;
+        const size_t scope = days && daysOk ? shotLogStatsDays(since->valueint, until->valueint)
+                             : window ? static_cast<size_t>(window->valueint) : 0;
+        const bool shapeOk = cJSON_IsBool(on) && uiStreamKnownFields(message, kFields, 13) &&
+                             uiStreamParseShotFilter(filter, shotFilter) && windowOk && daysOk;
         const bool numbersOk =
             uiStreamIntInRange(requestId, 1, UINT32_MAX) &&
             uiStreamIntInRange(tag, 1, UINT32_MAX) &&
@@ -477,7 +487,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
         if (shapeOk && numbersOk) {
           if (!cJSON_IsTrue(on)) {
             accepted = !offset && !limit && !sort && !dir && !fetch && !requestId &&
-                       !filter && !window && !tag && !preset;
+                       !filter && !scoped && !tag && !preset;
             if (accepted) {
               session->statsOn = false;
               session->statsFetch = false;
@@ -488,8 +498,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
             accepted = offset != nullptr && !tag;
             if (accepted) {
               session->statsFetchFilter = filter ? shotFilter : session->statsFilter;
-              session->statsFetchWindow =
-                  window ? static_cast<size_t>(window->valueint) : session->statsWindow;
+              session->statsFetchWindow = scoped ? scope : session->statsWindow;
               session->statsFetchPresetChoice =
                   preset ? static_cast<int16_t>(preset->valueint) : session->statsPresetChoice;
               session->statsFetchOffset =
@@ -506,10 +515,10 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
               session->statsFetch = true;
               session->statsFetchRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
             }
-          } else if ((window || preset) && session->statsOn && !offset && !limit && !sort &&
+          } else if ((scoped || preset) && session->statsOn && !offset && !limit && !sort &&
                      !dir && !filter && !requestId && !tag) {
-            // A window or preset change refreshes the header: rows stay held.
-            if (window) session->statsWindow = static_cast<size_t>(window->valueint);
+            // A scope or preset change refreshes the header: rows stay held.
+            if (scoped) session->statsWindow = scope;
             if (preset) session->statsPresetChoice = static_cast<int16_t>(preset->valueint);
             accepted = true;
           } else {
@@ -520,8 +529,7 @@ esp_err_t OpenBrewByWeightNetwork::uiStreamHandler(httpd_req_t *request) {
             session->statsRequest = requestId ? static_cast<uint32_t>(requestId->valuedouble) : 0;
             session->statsFilter = shotFilter;
             session->statsKnownTag = tag ? static_cast<uint32_t>(tag->valuedouble) : 0;
-            session->statsWindow = window ? static_cast<size_t>(window->valueint)
-                                          : SHOT_LOG_STATS_WINDOW;
+            session->statsWindow = scoped ? scope : SHOT_LOG_STATS_WINDOW;
             session->statsPresetChoice =
                 preset ? static_cast<int16_t>(preset->valueint) : -1;
             if (offset)

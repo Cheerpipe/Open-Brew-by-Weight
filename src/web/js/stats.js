@@ -1409,11 +1409,16 @@ function renderShotStats() {
   q("Daily", s.shotsPerDay == null ? z : s.shotsPerDay.toFixed(1));
   q("Err", f(s.avgErrorPct, 1, "%"), s.avgErrorPct);
   q("Flow", f(s.avgFlowGps, 2, __WEBUI_TEXT__("runtime.g_s")));
-  const note = $("statsHeaderNote");
-  note.hidden = !!statsMerged || !(R.archiveView || archiveStatsReady());
-  note.textContent = R.archiveView
-    ? __WEBUI_TEXT__("stats.header_unavailable")
-    : __WEBUI_TEXT__("stats.header_controller_only");
+  // A date span covers its newest 100 shots on the controller, 1000 on the companion.
+  const note = $("statsHeaderNote"),
+    standIn = !statsMerged && (R.archiveView || archiveStatsReady()),
+    cap = statsMerged ? 1000 : 100;
+  note.hidden = !standIn && !(R.uiState.statsSpan != null && s.shotCount >= cap);
+  note.textContent = !standIn
+    ? R.sub(__WEBUI_TEXT__("stats.span_capped"), [cap])
+    : R.archiveView
+      ? __WEBUI_TEXT__("stats.header_unavailable")
+      : __WEBUI_TEXT__("stats.header_controller_only");
   statsWindowChoices();
   renderStatsDurChart();
 }
@@ -1427,7 +1432,7 @@ async function refreshMergedHeader() {
         ...Object.fromEntries(
           ["result", "preset", "scale"].filter((k) => q[k]).map((k) => [k, q[k]]),
         ),
-        window: R.uiState.statsWindow,
+        ...statsScope(1000),
         active: statsChosenPreset() || statsActivePreset(),
         epoch,
       });
@@ -1457,22 +1462,33 @@ async function refreshMergedHeader() {
 // hide falls to the largest window still shown. While the controller's header
 // stands in for the companion's, the choice stays for its return: the largest
 // button shown covers the same shots.
-// The window sizes the toolbar's menu offers, the one it marks, and whether
-// the companion's whole history adds 500 and 1000.
+// The window sizes the toolbar's menu offers, the one it marks (none while a
+// date span stands instead), and whether the companion's whole history adds
+// 500 and 1000. The dates are always offered once there is a good shot.
 const statsWindowState = { shown: [], pressed: 10, merged: false };
 function statsWindowChoices() {
   const merged = !!statsMerged,
+    span = R.uiState.statsSpan,
     n = merged ? (statsMergedGood ?? statsGood) : statsGood,
     sizes = merged ? [10, 25, 50, 100, 500, 1000] : [10, 25, 50, 100],
     shown = sizes.filter((v, i) => i === 0 || sizes[i - 1] < n),
     chosen = merged ? R.uiState.statsWindow : Math.min(R.uiState.statsWindow, 100),
     standIn = !merged && (R.archiveView || archiveStatsReady()),
-    pressed = standIn && !shown.includes(chosen) ? shown.at(-1) : chosen;
+    pressed = span != null ? null : standIn && !shown.includes(chosen) ? shown.at(-1) : chosen;
   Object.assign(statsWindowState, { shown, pressed, merged });
   const b = $("statsWindowButton");
-  b.hidden = shown.length < 2;
-  b.querySelector(".t").textContent = R.sub(__WEBUI_TEXT__("stats.last_n"), [pressed]);
-  if (!shown.includes(pressed) && (merged ? statsMergedGood != null : statsSynced)) {
+  b.hidden = !n && span == null;
+  b.querySelector(".t").textContent =
+    span != null ? statsSpanLabel(span) : R.sub(__WEBUI_TEXT__("stats.last_n"), [pressed]);
+  // A span up to today moves at the controller's midnight.
+  if (span != null && String(statsDays()) !== statsDaysAsked) {
+    sendStatsWindow();
+    refreshMergedHeader();
+  } else if (
+    span == null &&
+    !shown.includes(pressed) &&
+    (merged ? statsMergedGood != null : statsSynced)
+  ) {
     R.uiState.statsWindow = shown.at(-1);
     sendStatsWindow();
     // 500→100 or 1000→500 may leave the controller's window as it was: the
@@ -1484,7 +1500,79 @@ function sendStatsWindow() {
   // Only the header changes: the firmware refreshes it and keeps the rows;
   // past 100 the controller keeps its largest window and the companion's
   // header covers the rest.
-  R.sendUiOperation({ op: "stats", on: true, window: Math.min(R.uiState.statsWindow, 100) });
+  R.sendUiOperation({ op: "stats", on: true, ...statsScope(100) });
+}
+// The date spans: today and the last 3, 7 and 30 days by the controller's
+// calendar, or a custom [from, to] pair of ISO dates; days count from
+// 1970-01-01 in the controller's zone, as its shots' local times do.
+const STATS_SPANS = [1, 3, 7, 30],
+  isoDay = (d) => new Date(d * 864e5).toISOString().slice(0, 10),
+  dayOf = (iso) => Date.parse(iso) / 864e5,
+  spanOk = (s) =>
+    STATS_SPANS.includes(s) ||
+    (Array.isArray(s) &&
+      s.length === 2 &&
+      s[0] <= s[1] &&
+      s.every((d) => /^\d{4}-\d\d-\d\d$/.test(d) && dayOf(d) >= 1 && dayOf(d) < 65536));
+// The controller's local day: its status clock, the browser's until one arrives.
+const statsToday = () =>
+  Math.floor(
+    (R.deviceLocalSec() || Date.now() / 1e3 - new Date().getTimezoneOffset() * 60) / 86400,
+  );
+// The chosen span as [since, until] local days, or null for a window of shots.
+function statsDays() {
+  const s = R.uiState.statsSpan,
+    t = statsToday();
+  return s == null ? null : Array.isArray(s) ? s.map(dayOf) : [t - s + 1, t];
+}
+// The days last asked for, which a span up to today leaves at midnight.
+let statsDaysAsked = "";
+// The header's scope on the wire: the span's days, or the newest shots up to `max`.
+function statsScope(max) {
+  const days = statsDays();
+  statsDaysAsked = String(days);
+  return days ? { days } : { window: Math.min(R.uiState.statsWindow, max) };
+}
+function statsSpanLabel(s) {
+  const date = (iso) =>
+    __WEBUI_TEXT__("runtime.months_short").split(",")[iso.slice(5, 7) - 1] + " " + +iso.slice(8);
+  return !Array.isArray(s)
+    ? s === 1
+      ? __WEBUI_TEXT__("runtime.today")
+      : R.sub(__WEBUI_TEXT__("stats.n_days"), [s])
+    : s[0] === s[1]
+      ? date(s[0])
+      : date(s[0]) + " – " + date(s[1]);
+}
+// The custom dates: two native date fields, none past the controller's
+// today, and Apply; they open on the chosen days or the last week.
+function statsRangeForm(apply) {
+  const form = document.createElement("form"),
+    today = statsToday(),
+    [since, until] = statsDays() || [today - 6, today];
+  form.className = "statsRange";
+  form.innerHTML =
+    '<label><span></span><input type="date" required min="1970-01-02"></label>' +
+    '<label><span></span><input type="date" required></label><button type="submit"></button>';
+  const [from, to] = form.querySelectorAll("input"),
+    [a, b] = form.querySelectorAll("span"),
+    sync = () => {
+      to.min = from.value || from.min;
+      from.max = to.value || to.max;
+    };
+  a.textContent = __WEBUI_TEXT__("stats.date_from");
+  b.textContent = __WEBUI_TEXT__("stats.date_to");
+  form.querySelector("button").textContent = __WEBUI_TEXT__("stats.apply_dates");
+  to.max = isoDay(today);
+  from.value = isoDay(Math.min(since, today));
+  to.value = isoDay(Math.min(until, today));
+  sync();
+  form.oninput = sync;
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    apply([from.value, to.value]);
+  };
+  return form;
 }
 // Results always; scales and presets only when the log holds more than one;
 // bad shots last, which the list leaves out unless asked.
@@ -2988,7 +3076,7 @@ function statsSubscribeOp() {
     sort: R.uiState.shotSort,
     dir: R.uiState.shotSortDir,
     ...(Object.keys(R.uiState.shotFilter).length && { filter: R.uiState.shotFilter }),
-    ...(R.uiState.statsWindow !== 10 && { window: Math.min(R.uiState.statsWindow, 100) }),
+    ...((R.uiState.statsSpan != null || R.uiState.statsWindow !== 10) && statsScope(100)),
     ...(statsTag && { tag: statsTag }),
     ...(statsPresetSent != null && { preset: statsPresetSent }),
   };
@@ -3247,6 +3335,7 @@ const statsStream = {
   rejected() {
     shotFilterReset();
     R.uiState.statsWindow = 10;
+    R.uiState.statsSpan = null;
     R.uiState.statsPreset = statsPresetSent = null;
   },
   refresh: refreshShots,
@@ -3278,6 +3367,7 @@ export function init() {
   ready = true;
   const saved = statsChartsStored();
   if ([10, 25, 50, 100, 500, 1000].includes(saved.window)) R.uiState.statsWindow = saved.window;
+  if (spanOk(saved.span)) R.uiState.statsSpan = saved.span;
   if (Number.isInteger(saved.preset) && saved.preset >= 0) R.uiState.statsPreset = saved.preset;
   if (saved.band === "ewma") R.uiState.statsBand = "ewma";
   R.setStatsRenderers({
@@ -3373,11 +3463,14 @@ export function init() {
     $("sortRatingButton").onclick = () => setShotSort("rating");
     syncShotSortButtons();
   }
-  const pickWindow = (v) => {
+  // A window drops the date span; a span keeps the window for its return.
+  // Asked before the render, which then finds the span's days already sent.
+  const pickWindow = (v, span = null) => {
       saveStatsChart("window", (R.uiState.statsWindow = v));
-      renderShotStats();
+      saveStatsChart("span", (R.uiState.statsSpan = span));
       sendStatsWindow();
       refreshMergedHeader();
+      renderShotStats();
     },
     pickBand = (v) => {
       saveStatsChart("band", (R.uiState.statsBand = v));
@@ -3385,14 +3478,38 @@ export function init() {
     },
     menus = {
       statsWindowButton: choiceMenu(__WEBUI_TEXT__("stats.stats_window"), () => {
-        const { shown, pressed, merged } = statsWindowState;
-        return [...shown, ...(merged ? [] : [500, 1000])].map((v) => ({
-          text: R.sub(__WEBUI_TEXT__("stats.last_n_shots"), [v]),
-          hint: shown.includes(v) ? "" : __WEBUI_TEXT__("stats.window_needs_companion"),
-          on: v === pressed,
-          off: !shown.includes(v),
-          pick: () => pickWindow(v),
-        }));
+        const { shown, pressed, merged } = statsWindowState,
+          span = R.uiState.statsSpan,
+          range = statsRangeForm((v) => {
+            menus.statsWindowButton.close();
+            pickWindow(R.uiState.statsWindow, v);
+          });
+        return [
+          __WEBUI_TEXT__("stats.window_shots"),
+          ...[...shown, ...(merged ? [] : [500, 1000])].map((v) => ({
+            text: R.sub(__WEBUI_TEXT__("stats.last_n_shots"), [v]),
+            hint: shown.includes(v) ? "" : __WEBUI_TEXT__("stats.window_needs_companion"),
+            on: v === pressed,
+            off: !shown.includes(v),
+            pick: () => pickWindow(v),
+          })),
+          __WEBUI_TEXT__("stats.window_dates"),
+          ...STATS_SPANS.map((v) => ({
+            text:
+              v === 1
+                ? __WEBUI_TEXT__("runtime.today")
+                : R.sub(__WEBUI_TEXT__("stats.last_n_days"), [v]),
+            on: v === span,
+            pick: () => pickWindow(R.uiState.statsWindow, v),
+          })),
+          {
+            text: __WEBUI_TEXT__("stats.custom_dates"),
+            on: Array.isArray(span),
+            stay: true,
+            pick: () => range.querySelector("input").focus(),
+          },
+          range,
+        ];
       }),
       statsPresetButton: choiceMenu(__WEBUI_TEXT__("stats.chart_preset"), () =>
         statsPresetItems.map(([v, text]) => ({

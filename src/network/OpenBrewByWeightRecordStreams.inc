@@ -206,7 +206,7 @@ bool OpenBrewByWeightNetwork::sendStatsStream(UiStreamSession &session,
     epoch = stored.epoch;
     cache.curveHashes = {};
   }
-  // The header follows the store, the selected window, and the preset the
+  // The header follows the store, the selected scope, and the preset the
   // page's charts follow.
   const bool header = !rowsOnly && (!cache.valid || cache.headerEpoch != epoch ||
       cache.headerWindow != statsWindow || cache.headerPresetId != statsPreset);

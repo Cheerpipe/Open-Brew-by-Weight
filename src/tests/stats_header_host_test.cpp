@@ -3,8 +3,10 @@
 // companion's port of it must reproduce. Each fixture row is a Stats row in
 // the units the companion stores (the columns the header reads), converted
 // back to a ShotLogRecord with the exact inverse of formatShotStatsRow's
-// formatting. STATS_HEADER_REGENERATE=1 rewrites the file from the cases
-// below; otherwise every stored header must match, field for field.
+// formatting. A case with `days` [since, until] covers that range of local
+// days (its `window` is the range's cap). STATS_HEADER_REGENERATE=1 rewrites
+// the file from the cases below; otherwise every stored header must match,
+// field for field.
 
 #include "OpenBrewByWeightShotCurveTypes.h"
 #include "OpenBrewByWeightShotLogTypes.h"
@@ -108,11 +110,11 @@ ShotLogRecord recordOf(const cJSON *row) {
   return record;
 }
 
-std::string headerOf(const cJSON *rows, size_t window, uint8_t presetId) {
+std::string headerOf(const cJSON *rows, size_t scope, uint8_t presetId) {
   work.snapshot.count = 0;
   for (const cJSON *row = rows->child; row != nullptr; row = row->next)
     work.snapshot.records[work.snapshot.count++] = recordOf(row);
-  CHECK(formatStatsHeader(work, window, presetId));
+  CHECK(formatStatsHeader(work, scope, presetId));
   return work.header;
 }
 
@@ -193,13 +195,19 @@ cJSON *rowsOf(size_t count, const Shape &shape) {
   return rows;
 }
 
-cJSON *caseOf(const char *name, size_t window, uint8_t presetId, cJSON *rows) {
+cJSON *caseOf(const char *name, size_t window, uint8_t presetId, cJSON *rows,
+              uint16_t since = 0, uint16_t until = 0) {
   cJSON *item = cJSON_CreateObject();
   cJSON_AddStringToObject(item, "name", name);
   cJSON_AddNumberToObject(item, "window", static_cast<double>(window));
+  if (since) {
+    const int days[] = {since, until};
+    cJSON_AddItemToObject(item, "days", cJSON_CreateIntArray(days, 2));
+  }
   cJSON_AddNumberToObject(item, "presetId", presetId);
   cJSON_AddItemToObject(item, "rows", rows);
-  cJSON *header = cJSON_Parse(headerOf(rows, window, presetId).c_str());
+  cJSON *header = cJSON_Parse(
+      headerOf(rows, since ? shotLogStatsDays(since, until) : window, presetId).c_str());
   CHECK(header != nullptr);
   cJSON_AddItemToObject(item, "header", header);
   return item;
@@ -240,6 +248,15 @@ void regenerate(const char *path) {
   goal.presets = 1;
   goal.oneGoal = true;
   cJSON_AddItemToArray(cases, caseOf("window100_one_target", 100, 1, rowsOf(120, goal)));
+  // Ranges of local days: the shots of rowsOf's day 20000 + index / 4 inside
+  // them with a wall time, capped at the newest 100.
+  cJSON_AddItemToArray(cases, caseOf("days_range_mixed_presets", 100, 2, rowsOf(30, mixed),
+                                     20002, 20005));
+  cJSON_AddItemToArray(cases, caseOf("days_one_day", 100, 1, rowsOf(30, mixed), 20003, 20003));
+  cJSON_AddItemToArray(cases, caseOf("days_range_capped_180_rows", 100, 1, rowsOf(180, one),
+                                     20000, 20044));
+  cJSON_AddItemToArray(cases, caseOf("days_range_without_shots", 100, 1, rowsOf(20, mixed),
+                                     20100, 20101));
   char *printed = cJSON_Print(root);
   FILE *file = std::fopen(path, "wb");
   CHECK(file != nullptr && printed != nullptr);
@@ -260,9 +277,12 @@ void verify(const char *path) {
   size_t cases = 0;
   for (const cJSON *item = cJSON_GetObjectItemCaseSensitive(root, "cases")->child; item;
        item = item->next, ++cases) {
+    const cJSON *days = cJSON_GetObjectItemCaseSensitive(item, "days");
     const std::string header = headerOf(field(item, "rows"),
-                                         static_cast<size_t>(scaled(item, "window", 1)),
-                                         static_cast<uint8_t>(scaled(item, "presetId", 1)));
+        days ? shotLogStatsDays(static_cast<uint16_t>(cJSON_GetArrayItem(days, 0)->valueint),
+                                static_cast<uint16_t>(cJSON_GetArrayItem(days, 1)->valueint))
+             : static_cast<size_t>(scaled(item, "window", 1)),
+        static_cast<uint8_t>(scaled(item, "presetId", 1)));
     cJSON *computed = cJSON_Parse(header.c_str());
     if (computed == nullptr || !cJSON_Compare(computed, field(item, "header"), true)) {
       std::fprintf(stderr, "case %s: header differs\n%s\n", text(item, "name"), header.c_str());
@@ -270,7 +290,7 @@ void verify(const char *path) {
     }
     cJSON_Delete(computed);
   }
-  CHECK(cases >= 9);
+  CHECK(cases >= 13);
   cJSON_Delete(root);
 }
 

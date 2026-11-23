@@ -1551,17 +1551,24 @@ combine with AND and the values of a list with OR. Every page and fetch holds
 good shots only (longer than 12 s with a settled yield over 2 g); `"bad":true`
 also lists the bad shots, combined with the other lists as usual, and each row
 names why it is bad in `badReason` (`short`, `no_yield`, `low_yield`, or
-`null` for a good shot). `window` (`10`, `50`, or `100`, default `10`) picks
-how many of the newest good shots the `stats` header covers; a page opened
-through the companion with its archive may show 500 or 1,000, still subscribes
-with `100` and draws the header the companion builds over the whole history
-(the controller's when the companion cannot answer). `preset` (`0`–`255`)
-picks the preset the header's preset chart and cut series follow, `0` for All;
-without it they follow the active preset. A subscribe carrying only `window`,
-`preset` or both (no `request`) changes the header alone: the firmware sends a
-standing refresh with the new header and the rows it already holds as bare
-ids. A fetch may name its own `preset` as it names its `window`: its header
-follows it without changing the subscription.
+`null` for a good shot). `window` (`10`, `25`, `50`, or `100`, default `10`)
+picks how many of the newest good shots the `stats` header covers; a page
+opened through the companion with its archive may show 500 or 1,000, still
+subscribes with `100` and draws the header the companion builds over the whole
+history (the controller's when the companion cannot answer). `days`
+(`[since, until]`, instead of `window`) makes the header cover a range of days
+instead: local days since 1970-01-01 in the controller's zone (a shot's
+`endedAtLocalSec` divided by 86,400), both included, `1`–`65535` with `since`
+at most `until`. It covers the range's newest 100 good shots with a wall time
+(the companion's whole-history header, asked with `days=since,until`, its
+newest 1,000); the facets still cover the whole log. Each of `window` and
+`days` replaces the other. `preset` (`0`–`255`) picks the preset the header's
+preset chart and cut series follow, `0` for All; without it they follow the
+active preset. A subscribe carrying only `window` or `days`, `preset`, or both
+(no `request`) changes the header alone: the firmware sends a standing refresh
+with the new header and the rows it already holds as bare ids. A fetch may
+name its own `preset` as it names its `window` or `days`: its header follows
+it without changing the subscription.
 
 Scrolling to the page sentinel sends a one-shot fetch for the next window,
 and the CSV and JSON exports ask for their own export window — up to 1,000
@@ -1622,10 +1629,10 @@ the averages whatever the sort, filter, or scroll:
   the page can tell a header built for an earlier choice.
 - `cut`: for the cut accuracy chart, absent with All or when the chosen preset
   has none: that preset's newest `window` good shots stopped by weight (target,
-  fast-guard or slow-guard cut) with a settled yield, oldest first, as `t`,
-  their targets in tenths of a gram (one number when they share one), `e`,
-  the settled yield minus the target in hundredths of a gram, and `g` as in
-  `cons`.
+  fast-guard or slow-guard cut), within `days` when asked, with a settled
+  yield, oldest first, as `t`, their targets in tenths of a gram (one number
+  when they share one), `e`, the settled yield minus the target in hundredths
+  of a gram, and `g` as in `cons`.
 
 The integration API's stats object stays at ten shots.
 Each row retains its own `bootId` and curve arrays; row errors are calculated

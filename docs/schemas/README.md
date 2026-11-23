@@ -92,7 +92,10 @@ Versioning:
   the same header over the whole history and must reproduce every case. Each
   case gives `window`, the chosen `presetId` the preset chart and cut series
   follow (`0` All), `rows` (newest first) and the expected `header`; headers
-  compare as parsed JSON, field for field.
+  compare as parsed JSON, field for field. A case with `days` (`[since,
+  until]`, local days since 1970-01-01, both included) covers only the rows
+  with a wall time whose `endedAtLocalSec / 86400` falls in that range, at
+  most `window` of them; the facets still cover every row.
 - The rows are Stats rows in the units the Web UI and the companion store,
   limited to the columns the header reads. Back to the stored record:
   `durationDs = round(durationS × 10)`, `goalWeightDg = round(goalG × 10)`,

@@ -777,19 +777,38 @@ struct ShotStatsView {
   uint16_t durationsDs[SHOT_LOG_STATS_WINDOW] = {};
 };
 
-// The aggregate over the newest `window` eligible records of `count`, where
-// at(n) is the n-th newest. The BBW error averages the newest `window` weight
-// cuts, which may reach past that window. Only the first ten durations are
-// kept: they feed the integration's ten-shot chart.
+// A Stats scope: a window of the newest shots (at most
+// SHOT_LOG_STATS_WINDOW_MAX), or a range of local days since 1970-01-01, both
+// inclusive, packed as since << 16 | until (since >= 1, so above any window),
+// which covers the range's newest SHOT_LOG_STATS_WINDOW_MAX shots.
+inline size_t shotLogStatsDays(uint16_t since, uint16_t until) {
+  return static_cast<size_t>(since) << 16 | until;
+}
+inline size_t shotLogStatsWindow(size_t scope) {
+  return scope < SHOT_LOG_STATS_WINDOW_MAX ? scope : SHOT_LOG_STATS_WINDOW_MAX;
+}
+inline bool shotLogStatsInScope(const ShotLogRecord &record, size_t scope) {
+  return scope <= SHOT_LOG_STATS_WINDOW_MAX ||
+         (record.hasWallTime && record.endedAtLocalSec != 0 &&
+          record.endedAtLocalSec / 86400U >= scope >> 16 &&
+          record.endedAtLocalSec / 86400U <= (scope & 0xFFFFU));
+}
+
+// The aggregate over the newest `window` eligible records of `count` in a
+// scope (shotLogStatsWindow), where at(n) is the n-th newest. The BBW error
+// averages the newest `window` weight cuts, which may reach past that window.
+// Only the first ten durations are kept: they feed the integration's ten-shot
+// chart.
 template <typename At>
-inline ShotStatsView shotLogStatsView(size_t count, size_t window, At at) {
+inline ShotStatsView shotLogStatsView(size_t count, size_t scope, At at) {
+  const size_t window = shotLogStatsWindow(scope);
   ShotStatsView stats = {};
   int32_t newestDay = -1;
   int32_t oldestDay = -1;
   for (size_t n = 0;
        n < count && (stats.shotCount < window || stats.bbwCount < window); ++n) {
     const ShotLogRecord &record = at(n);
-    if (!shotLogRecordEligible(record)) continue;
+    if (!shotLogRecordEligible(record) || !shotLogStatsInScope(record, scope)) continue;
     if (stats.bbwCount < window && shotLogBbwErrorEligible(record)) {
       ++stats.bbwCount;
       stats.errorPctTenthsSum += shotLogBbwErrorTenths(record);
