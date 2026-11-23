@@ -134,6 +134,10 @@ from Bands down (app.js fitBar). */
   color: var(--ok);
 }
 
+.densPlot {
+  position: relative;
+}
+
 .consPlot {
   position: relative;
   margin: 0.85rem 2.4rem 0 0;

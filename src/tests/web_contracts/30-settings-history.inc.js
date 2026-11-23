@@ -1618,12 +1618,20 @@ if (!statsSection ||
       runtimeJs.slice(start, end) +
       viewJs.stats.slice(chartAt, chartEnd) +
       ';const R = {uiState, axisLabel, fadeFill, escHtml: String, lockControls() {}, get sub() { return sub; },' +
+      'PILL: "", placePill() {}, bindScrub() {},' +
       'sendUiOperation(op) { sentOps.push(op); }, get homeStatusCache() { return homeStatusCache; },' +
       'get presetState() { return presetState; }};' +
       'return{renderStatsDurChart,pick:pickStatsPreset,items:()=>statsPresetItems,merged(h){statsMerged=h;}};')();
   const histRoot = {dataset: {}, className: '', innerHTML: ''};
+  // The Shot time cursor: its slider's aria text and the colour it carries.
+  const node = () => ({attrs: {}, setAttribute(k, v) { this.attrs[k] = v; },
+    style: {setProperty(k, v) { this[k] = v; }}});
+  const densCursor = {...node(), firstChild: {children: [node(), node(), node()]}};
+  const densPlot = {...node(), lastChild: densCursor};
+  const cursorAt = () => densPlot.attrs['aria-valuetext'].replace(/[  ]/g, ' ') + '/' +
+      densCursor.style['--c'];
   const histPlot = {innerHTML: '', style: {setProperty(k, v) { this[k] = v; }},
-    querySelector() { return {}; }};
+    querySelector(q) { return q === '.densPlot' ? densPlot : {}; }};
   const cutRoot = {hidden: true, innerHTML: ''};
   // The toolbar's preset button names the preset the charts follow; its menu
   // lists All and the presets the header names.
@@ -1670,6 +1678,11 @@ if (!statsSection ||
       !histPlot.innerHTML.includes('<div class="statsLegend">')) {
     throw new Error('Stats must start on the active preset and draw its shared window in seconds');
   }
+  // The cursor starts on the curve's peak, coloured by its zone, and reads the
+  // share of shots within half a second of it.
+  if (cursorAt() !== '30.3 s · 18% of shots/var(--ok)') {
+    throw new Error('The Shot time cursor must start on the peak: ' + cursorAt());
+  }
   // Until a preset is chosen, the page follows the active one with the header.
   global.presetState.activeId = 2;
   global.shotStats = charts(curve(-7, 15, 0, 7, false, [1, 2, 2]),
@@ -1696,6 +1709,9 @@ if (!statsSection ||
       ticks.join() !== 'Window start,Window end,−5 s,+5 s' || tickMax !== 22 ||
       !cutRoot.innerHTML.includes('Active preset: House') || global.sentOps.length !== 1) {
     throw new Error('All presets must share out every shot by its own verdict against its own window');
+  }
+  if (cursorAt() !== '3.8 s into the window · 15% of shots/var(--ok)') {
+    throw new Error('Across windows the Shot time cursor must read against the window: ' + cursorAt());
   }
   // The active preset from All needs no new header: it draws at once.
   helpers.pick(1);

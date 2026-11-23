@@ -805,9 +805,11 @@ function renderStatsDurChart() {
     __WEBUI_TEXT__("runtime.stats_title_time") +
     '</p><div class="statsDensZones">' +
     tops +
-    '</div><svg class="statsDensPlot" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">' +
+    '</div><div class="densPlot"><svg class="statsDensPlot" viewBox="0 0 100 50" preserveAspectRatio="none" aria-hidden="true">' +
     svg +
-    '</svg><div class="ruleChartTicks"></div>' +
+    '</svg><svg class="consCursor" aria-hidden="true"><g class="shotCursor"><line class="rvGuide" y1="0" y2="100%"/><circle class="rvHandle" r="5"/>' +
+    R.PILL +
+    '</g></svg></div><div class="ruleChartTicks"></div>' +
     statsLegend([
       [
         "fast",
@@ -834,6 +836,55 @@ function renderStatsDurChart() {
     hi - lo,
     true,
   );
+  // The cursor starts on the peak and rides the curve in its zone's colour; the
+  // pill reads the time and the share of shots within half a second of it.
+  const plot = host.querySelector(".densPlot"),
+    cur = plot.lastChild,
+    [guide, dot, pill] = cur.firstChild.children,
+    dx = (hi - lo) / 120,
+    area = h.reduce((s, v, i) => s + (i && (v + h[i - 1]) / 2), 0) * dx,
+    label = (t) =>
+      shared
+        ? L(t, "s")
+        : t < a
+          ? "−" + L(a - t, "s")
+          : t > b
+            ? "+" + L(t - b, "s")
+            : R.sub(__WEBUI_TEXT__("runtime.stats_time_window"), [L(t - a, "s")]);
+  let now = lo + h.indexOf(Math.max(...h)) * dx;
+  const seek = (t, held = true) => {
+    now = t = Math.round(Math.max(lo, Math.min(hi, t)) * 10) / 10;
+    const px = x(t) + "%",
+      y = 1 - (0.92 * dens(t)) / peak,
+      text = R.sub(__WEBUI_TEXT__("runtime.stats_time_pill"), [
+        label(t),
+        Math.round((100 * dens(t)) / area),
+      ]);
+    guide.setAttribute("x1", px);
+    guide.setAttribute("x2", px);
+    dot.setAttribute("cx", px);
+    dot.setAttribute("cy", y * 100 + "%");
+    cur.style.setProperty("--c", zones[t < a ? 0 : t > b ? 2 : 1][3]);
+    plot.setAttribute("aria-valuenow", t);
+    plot.setAttribute("aria-valuetext", text);
+    if (held)
+      R.placePill(pill, R.escHtml(text), (x(t) / 100) * cur.clientWidth, y * cur.clientHeight);
+  };
+  R.bindScrub(
+    plot,
+    (cx) => {
+      const r = cur.getBoundingClientRect();
+      return lo + ((cx - r.left) / r.width) * (hi - lo);
+    },
+    seek,
+    () => now,
+    null,
+    ".shotCursor .rvHandle",
+  );
+  plot.setAttribute("aria-label", __WEBUI_TEXT__("runtime.stats_time_cursor"));
+  plot.setAttribute("aria-valuemin", lo);
+  plot.setAttribute("aria-valuemax", hi);
+  seek(now, false);
 }
 // Consistency of the window's timed shots, oldest first: each shot's time to
 // target as a share of its own preset's average, so recipes of any length

@@ -60,6 +60,12 @@ against its own window instead: the axis shows **Window start** and
 **Window end**, and how many seconds before or after the window a shot reached
 its target. The chart appears once a shot has a measured arrival time.
 
+A dot starts on the curve's highest point. Drag it along the curve, or focus
+the chart and use the arrow keys, to read a time and the share of your shots
+that reached their target within half a second of it; the dot and its label
+take the color of the part they are in. On a touch screen, put your finger on
+the dot itself to grab it, as on the other charts.
+
 Below it, the **Shot consistency** chart answers a different question: not whether your
 shots landed on recipe, but how alike they are. It measures time, not weight:
 every shot already stops at its target weight, so what changes from shot to
