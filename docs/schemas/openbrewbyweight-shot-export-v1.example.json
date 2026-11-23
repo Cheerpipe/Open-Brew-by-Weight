@@ -59,6 +59,7 @@
           "algorithmVersion": 1,
           "alpha": 0.35,
           "learningApplied": true,
+          "learningNote": "trained",
           "offsetG": 1.8
         },
         "window": {

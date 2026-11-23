@@ -9,6 +9,8 @@ bool learnPendingBbw(PendingShotFinalize &snapshot, float finalWeightG,
   // A rinse never reaches the shot log.
   snapshot.dripLearnNote = DripLearnNote::NONE;
   if (pendingFinalizeIsRinse(snapshot)) return false;
+  // A disturbance carries when it happened (ms since the circuit closed) in
+  // place of the drip it would have needed, which it never measured.
   const auto skip = [&snapshot](DripLearnNote note, int32_t neededCg = INT32_MIN) {
     snapshot.dripLearnNote = note;
     addDebugEvent(DebugCategory::CONFIG, DebugCode::DRIP_LEARN_SKIPPED,
@@ -16,9 +18,11 @@ bool learnPendingBbw(PendingShotFinalize &snapshot, float finalWeightG,
     return false;
   };
   if (!snapshot.offsetAnalysis)
-    return skip(!snapshot.automaticBrew ? DripLearnNote::MANUAL_BREW
-                : snapshot.timerOnly    ? DripLearnNote::TIMER_ONLY
-                                        : DripLearnNote::WEIGHT_DISTURBED);
+    return !snapshot.automaticBrew ? skip(DripLearnNote::MANUAL_BREW)
+         : snapshot.timerOnly      ? skip(DripLearnNote::TIMER_ONLY)
+         : snapshot.calibrationLoss == DripLearnNote::NONE
+             ? skip(DripLearnNote::WEIGHT_DISTURBED)
+             : skip(snapshot.calibrationLoss, snapshot.calibrationLostMs);
   if (snapshot.channeling) return skip(DripLearnNote::CHANNELING);
   if (snapshot.rateAtStopX100 == 0) return skip(DripLearnNote::NO_FLOW_RATE);
   if (!corridor::weightCutReason(static_cast<uint8_t>(snapshot.endReason)))

@@ -242,6 +242,8 @@ struct CycleSession {
   bool stopTimerCommandQueued = false;
   bool receivedFreshWeightInCycle = false;
   bool calibrationEligible = false;
+  DripLearnNote calibrationLoss = DripLearnNote::NONE;  // NONE again after a re-tare.
+  uint32_t calibrationLostAtMs = 0;
   bool hasWeightAnchor = false;
   bool directStopPending = false;
   bool awaitingPostTareBaseline = false;
@@ -339,6 +341,8 @@ struct PendingShotFinalize {
   bool scaleBaselineReady = false;
   bool bbwLearningApplied = false;
   DripLearnNote dripLearnNote = DripLearnNote::NONE;
+  DripLearnNote calibrationLoss = DripLearnNote::NONE;
+  int32_t calibrationLostMs = INT32_MIN;  // Since the circuit closed.
   bool pending = false;
   bool curveBreakPending = false;
   uint32_t curveLastSequence = 0;
@@ -1326,12 +1330,21 @@ void resetWeightTrend() {
   resetAccidentalTouchState();
 }
 
-void suspendWeightControl() {
+// Drip learning skips a disturbed shot; its first cause names the skip, as
+// what follows (a jump, then a suspension) is that cause's consequence.
+void loseCalibration(DripLearnNote cause) {
+  session.calibrationEligible = false;
+  if (session.calibrationLoss != DripLearnNote::NONE) return;
+  session.calibrationLoss = cause;
+  session.calibrationLostAtMs = millis();
+}
+
+void suspendWeightControl(DripLearnNote cause) {
   if (session.weightControlState == WeightControlState::ACTIVE ||
       session.weightControlState == WeightControlState::VALIDATING) {
     setWeightControlState(WeightControlState::SUSPENDED);
     session.recoveryConfirmations = 0;
-    session.calibrationEligible = false;
+    loseCalibration(cause);
     resetWeightTrend();
   }
 }

@@ -3033,14 +3033,21 @@ inline bool formatLifecycleDebugMessage(const DebugEvent &event, char *message,
                                                              : "",
                paddleModeId(static_cast<uint8_t>(event.argument1)));
       return true;
-    case DebugCode::DRIP_LEARN_SKIPPED:
-      formatWeightCentigrams(event.argument2, weightText, sizeof(weightText));
-      snprintf(message, capacity, "drip learning skipped: %s%s%s%s; correction unchanged",
-               dripLearnNoteText(static_cast<uint8_t>(event.argument1)),
-               event.argument2 == INT32_MIN ? "" : " (needed ",
-               event.argument2 == INT32_MIN ? "" : weightText,
-               event.argument2 == INT32_MIN ? "" : ")");
+    case DebugCode::DRIP_LEARN_SKIPPED: {
+      // A disturbance carries its time (ms since the circuit closed), any
+      // other skip the drip it would have needed.
+      const uint8_t note = static_cast<uint8_t>(event.argument1);
+      char detail[40] = "";
+      if (event.argument2 != INT32_MIN && dripLearnNoteIsDisturbance(note)) {
+        snprintf(detail, sizeof(detail), " at %.1f s", event.argument2 / 1000.0);
+      } else if (event.argument2 != INT32_MIN) {
+        formatWeightCentigrams(event.argument2, weightText, sizeof(weightText));
+        snprintf(detail, sizeof(detail), " (needed %s)", weightText);
+      }
+      snprintf(message, capacity, "drip learning skipped: %s%s; correction unchanged",
+               dripLearnNoteText(note), detail);
       return true;
+    }
     case DebugCode::SYSTEM_LOG_OVERRUN:
       snprintf(message, capacity, "diagnostic log overrun dropped=%ld",
                static_cast<long>(event.argument1));

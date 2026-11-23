@@ -616,12 +616,14 @@ void orchestratePostTareBaselineArm() {
 
 void confirmLateRetareBaseline();
 
-// A light cup's pre-zero packet can sit inside the baseline band; after
-// taring a cup, the baseline must have dropped by half a minimum cup.
+// A pre-zero packet can sit inside the baseline band: the baseline must be
+// nearer zero than the pre-tare load. Loads under the touch residual cannot
+// pass for a touch step, so they need no proof.
 bool postTareBaselinePlausible(float weightG) {
+  const float loadG = fabsf(session.preTareWeightG);
   return fabsf(weightG) <= POST_TARE_BASELINE_MAX_ABS_G &&
-      !(session.preTareWeightG >= runtimeConfig.minimumCupWeightG &&
-        weightG > session.preTareWeightG - runtimeConfig.minimumCupWeightG / 2.0f);
+      !(loadG >= ACCIDENTAL_TOUCH_RESIDUAL_G &&
+        fabsf(weightG - session.preTareWeightG) < loadG / 2.0f);
 }
 
 void applyShotTareResult(const ScaleEvent &event) {
@@ -688,6 +690,7 @@ void confirmLateRetareBaseline() {
     // A fresh zero: what disturbed the old frame (the cup going on) cannot
     // bias the drip this shot measures; later disturbances still clear it.
     session.calibrationEligible = session.automaticEnabled;
+    session.calibrationLoss = DripLearnNote::NONE;
   }
   if (pendingFinalize.pending && pendingFinalize.cycleId == session.id) {
     pendingFinalize.firstDropDs = SHOT_LOG_METRIC_MISSING;
@@ -866,7 +869,7 @@ bool holdLateStartTare(float rawG, uint32_t receivedAtMs, uint32_t packetSequenc
                   weightToCentigrams(session.lastAcceptedWeightG));
     session.softwareZeroG = session.lateTareDroppedZeroG;
     session.lateTareDroppedZeroG = 0.0f;
-    session.calibrationEligible = false;
+    loseCalibration(DripLearnNote::CUP_LIFTED);
   } else {
     const float keptG = session.hasWeightAnchor ? fmaxf(0.0f, session.lastAcceptedWeightG) : 0.0f;
     addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_LATE_TARE_RECOGNIZED,
@@ -1055,7 +1058,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
        session.weightControlState == WeightControlState::VALIDATING) &&
       session.ownedConnectionGeneration != 0 &&
       connectionGeneration != session.ownedConnectionGeneration) {
-    suspendWeightControl();
+    suspendWeightControl(DripLearnNote::SCALE_LOST);
   }
 
   if (weight < MIN_AUTOMATION_WEIGHT_G ||
@@ -1065,7 +1068,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                                connectionGeneration);
     }
     weightStreamState = WeightStreamState::OVERLOAD;
-    session.calibrationEligible = false;
+    loseCalibration(DripLearnNote::OVERLOAD);
     if (session.weightControlState == WeightControlState::ACTIVE) {
       setWeightControlState(WeightControlState::VALIDATING);
     }
@@ -1145,7 +1148,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   const bool belowEmpty = weight < emptyFloorG;
   if (session.weightControlState == WeightControlState::ACTIVE && (!plausible || belowEmpty)) {
     weightStreamState = WeightStreamState::ANOMALOUS;
-    session.calibrationEligible = false;
+    loseCalibration(belowEmpty ? DripLearnNote::CUP_LIFTED : DripLearnNote::WEIGHT_JUMP);
     setWeightControlState(WeightControlState::VALIDATING);
     session.recoveryConfirmations = 0;
     session.recoveryLastAtMs = 0;
@@ -1221,7 +1224,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
                                  weight, receivedAtMs, packetSequence,
                                  connectionGeneration, captureSequence, emptyFloorG);
       session.recoveryConfirmations = 0;
-      suspendWeightControl();
+      suspendWeightControl(DripLearnNote::CUP_LIFTED);
       return false;
     }
 

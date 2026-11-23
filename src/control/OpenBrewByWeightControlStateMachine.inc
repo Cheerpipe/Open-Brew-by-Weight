@@ -857,7 +857,7 @@ void stateMachineTask() {
       if ((session.weightControlState == WeightControlState::ACTIVE ||
            session.weightControlState == WeightControlState::VALIDATING) &&
           scaleAutomationUnavailableForSession()) {
-        suspendWeightControl();
+        suspendWeightControl(DripLearnNote::SCALE_LOST);
         weightStreamState = WeightStreamState::STALE;
         addDebugEvent(DebugCategory::SCALE, DebugCode::SCALE_STREAM_STALE);
         serialTraceCategory(LogLevel::WARNING, DebugCategory::SCALE,

@@ -94,6 +94,10 @@ void schedulePendingShotFinalize(EndReason reason, uint32_t durationMs,
   pendingFinalize = PendingShotFinalize{};
   pendingFinalize.pending = true;
   pendingFinalize.offsetAnalysis = offsetAnalysis;
+  pendingFinalize.calibrationLoss = session.calibrationLoss;
+  if (session.calibrationLoss != DripLearnNote::NONE)
+    pendingFinalize.calibrationLostMs = static_cast<int32_t>(session.calibrationLostAtMs -
+        (session.circuitClosedAtMs != 0U ? session.circuitClosedAtMs : session.startedAtMs));
   pendingFinalize.logEligible = logEligible;
   pendingFinalize.endedAtMs = end.endedAtMs;
   pendingFinalize.endedAtUtcSec = end.utcSec;

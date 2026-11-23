@@ -99,6 +99,14 @@
   assert.deepEqual(pick(6), ['#4 · at 1800000000 · 28.5 s', 'Yield 36.4 g of 36.0 g',
     'Drip needed 0.10 g, used 0.20 g', 'Not used: the scale stopped reporting before the drip wait ended']);
   assert.deepEqual(pick(9), ['#7 · 30.0 s', 'Drip needed 0.59 g, used 0.20 g', 'Used in the current correction']);
+  // A disturbance names its cause; the last note pins the table's order.
+  refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.70, bbwAlpha: 0.3,
+    bbwRecentG: [0.59, 0.72, 0.63, 0.10], bbwRecentSkipped: 10, bbwRecentNote: [0, 18, 0, 23],
+    bbwRecentShot: [[7, 0, 300, null, 360, 20], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [4, 1800000000, 285, 3640, 360, 20]],
+    bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
+  assert.equal(pick(6).at(-1), 'Not used: the scale stopped sending readings or reconnected during the shot');
+  assert.equal(pick(8).at(-1),
+    'Not used: the weight jumped and stayed: the cup was nudged or something was set on the scale');
   // An edited field keeps the owner's value across refreshes.
   elements.get('dripSetG').value = '0.50';
   elements.get('dripSetG').dataset.edited = '1';

@@ -1611,6 +1611,12 @@ function renderDripChart(c) {
     __WEBUI_TEXT__("runtime.drip_note_outlier"),
     "",
     __WEBUI_TEXT__("runtime.drip_note_cut_short"),
+    __WEBUI_TEXT__("runtime.drip_note_level_shift"),
+    __WEBUI_TEXT__("runtime.drip_note_touch_stop"),
+    __WEBUI_TEXT__("runtime.drip_note_overload"),
+    __WEBUI_TEXT__("runtime.drip_note_weight_jump"),
+    __WEBUI_TEXT__("runtime.drip_note_cup_lifted"),
+    __WEBUI_TEXT__("runtime.drip_note_scale_lost"),
   ];
   const unit = __WEBUI_TEXT__("runtime.g_2"),
     dripNum = (g) => (g > 0 ? g.toFixed(2) : "0"),

@@ -617,7 +617,9 @@ list's filter or sort:
   ones included: each shot with its full weight curve and its trace, plus the
   newest 16 traces that have no shot (shots interrupted by a restart, or not
   kept by the history). Use it as a backup, to analyze your shots in your own
-  tools, or to share it with the developers when something went wrong. Its
+  tools, or to share it with the developers when something went wrong. Each
+  shot also says what it did to the drip correction: whether it trained it,
+  or why it was left out. Its
   layout is published as a
   [JSON Schema](../schemas/openbrewbyweight-shot-export-v1.schema.json), with an
   [example file](../schemas/openbrewbyweight-shot-export-v1.example.json),

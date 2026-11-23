@@ -2213,6 +2213,13 @@ function shotJson(r, trace) {
     pos = (v) => (v > 0 ? v : null),
     event = (s, cg) => (s == null || cg == null ? null : { atS: s, weightG: cg / 100 }),
     guard = (enabled, marginG, extended) => ({ enabled: !!enabled, marginG, extended: !!extended }),
+    // DripLearnNote ids by number (firmware OpenBrewByWeightBbwTypes.h).
+    dripNotes = (
+      "trained,manual_brew,timer_only,weight_disturbed,channeling,no_flow_rate,not_weight_cut," +
+      "no_final_weight,final_too_low,not_fresh,out_of_range,preset_gone,other_algorithm," +
+      "restarted,impossible,outlier,target_only,cut_short,level_shift,touch_stop,overload," +
+      "weight_jump,cup_lifted,scale_lost"
+    ).split(","),
     // The v1 export keeps the legacy hardness names; the Stats row carries
     // the wire percent (whole levels only: a stored shot keeps its nearest
     // curve).
@@ -2264,6 +2271,9 @@ function shotJson(r, trace) {
         algorithmVersion: r.bbwAlgorithmVersion ?? null,
         alpha: r.bbwAlpha ?? null,
         learningApplied: r.bbwLearningApplied ?? null,
+        // 0 also stands for an earlier record: "trained" only when learning applied.
+        learningNote:
+          r.dripNote > 0 || r.bbwLearningApplied ? (dripNotes[r.dripNote] ?? null) : null,
         offsetG: r.offsetG,
       },
       window: { fastBeforeS: r.fastBeforeS, slowAfterS: r.slowAfterS },

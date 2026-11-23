@@ -285,7 +285,7 @@ void noteAccidentalTouchClass(AccidentalTouchClass classified, WeightSample samp
     session.accidentalTouchEpochS =
         static_cast<float>(ticksSince(sample.atMs, shot.startMs)) / 1000.0f;
     shotCurveSampler.markBreak();
-    session.calibrationEligible = false;
+    loseCalibration(DripLearnNote::LEVEL_SHIFT);
     addDebugEvent(DebugCategory::SCALE, DebugCode::ACCIDENTAL_TOUCH_SUSTAINED,
                   weightToCentigrams(sample.weightG));
     scaleProfileNoteEvent(ScaleProfileEvent::TOUCH_SUSTAINED, millis(),
@@ -593,7 +593,7 @@ void considerDirectStopSample(float weight, uint32_t receivedAtMs,
     session.directStopPending = true;
     session.directStopReason = EndReason::WEIGHT_ANOMALY;
     weightStreamState = WeightStreamState::OVERLOAD;
-    session.calibrationEligible = false;
+    loseCalibration(DripLearnNote::OVERLOAD);
     setWeightControlState(WeightControlState::FAULT_STOPPED);
     addDebugEvent(DebugCategory::SCALE,
                   DebugCode::SCALE_OVERLOAD_CONFIRMED,
@@ -903,7 +903,7 @@ bool automaticScaleStopDue() {
         elapsedMs(evidence.lastAtMs) <= MAX_AUTOMATION_WEIGHT_AGE_MS &&
         static_cast<uint32_t>(evidence.lastAtMs - evidence.firstAtMs) >=
             TOUCH_STOP_FALLBACK_MS) {
-      session.calibrationEligible = false;
+      loseCalibration(DripLearnNote::TOUCH_STOP);
       session.directStopPending = true;
       session.directStopReason = EndReason::TOUCH_WEIGHT_FALLBACK;
       return true;

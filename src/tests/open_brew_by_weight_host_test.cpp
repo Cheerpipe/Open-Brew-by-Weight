@@ -8258,6 +8258,7 @@ void r31_confirmed_overload_opens_without_learning() {
   CHECK(stopperState == StopperState::REQUIRES_OFF);
   CHECK(session.endReason == EndReason::WEIGHT_ANOMALY);
   CHECK(!session.calibrationEligible);
+  CHECK(session.calibrationLoss == DripLearnNote::OVERLOAD);
   // Stored as a bad shot (it started with a scale), never analysed.
   CHECK(pendingFinalize.pending && !pendingFinalize.logEligible);
   CHECK(!pendingFinalize.offsetAnalysis);
@@ -12256,6 +12257,32 @@ void r43_post_tare_baseline_accepts_zero_after_pre_tare_weight() {
   CHECK(stopperState == StopperState::BREW);
 }
 
+void r43b_post_tare_baseline_rejects_stale_light_load() {
+  // Shot 90: a 15.7 g load under a 50 g minimum cup, and a packet that still
+  // showed it after the tare write. Taken as the zero, the real zero became a
+  // -15.7 g touch that turned SUSTAINED and skipped drip learning.
+  struct Case { float preG, minCupG; bool staleAccepted; };
+  for (const Case c : {Case{15.7f, 50.0f, false}, Case{15.7f, 10.0f, false},
+                       Case{-20.0f, 10.0f, false}, Case{1.0f, 50.0f, true}}) {
+    resetHarness(false, true);
+    reachReadyFromBoot();
+    runtimeConfig.avoidAccidentalTouchEnabled = true;
+    runtimeConfig.minimumCupWeightG = c.minCupG;
+    currentWeight = c.preG;
+    currentWeightReceivedAtMs = hostMillis;
+    currentWeightSequence = 1;
+    startCycle();
+    CHECK(executeNextScaleCommand());
+    publishWeight(c.preG, hostMillis + 1);
+    CHECK(session.awaitingPostTareBaseline == !c.staleAccepted);
+    for (int i = 0; i < 30; ++i) publishWeight(0.0f, hostMillis + 100);
+    CHECK(!session.awaitingPostTareBaseline);
+    CHECK(!session.accidentalTouchHolding);
+    CHECK(session.accidentalTouchClass != AccidentalTouchClass::SUSTAINED);
+    CHECK(session.calibrationEligible);
+  }
+}
+
 void r54_post_tare_baseline_keeps_weight_control() {
   resetHarness(false, true);
   reachReadyFromBoot();
@@ -14326,7 +14353,7 @@ void s02k_curve_continuity_uses_control_rejections_and_fifo_provenance() {
       case 2: CHECK(!recordWeightSample(200, hostMillis)); break;
       case 3: armPostTareBaselineWindow(); break;
       case 4: resetWeightTrend(); break;
-      case 5: suspendWeightControl(); break;
+      case 5: suspendWeightControl(DripLearnNote::SCALE_LOST); break;
       default: {
         ScaleEvent event;
         event.receivedAtMs = hostMillis;
@@ -19290,7 +19317,7 @@ void at12_touch_fallback_duration_and_evidence_resets() {
                             last.packetSequence); break;
       case 4: publishWeight(46.0f, last.lastAtMs - 1, last.connectionGeneration,
                             last.packetSequence + 1); break;
-      case 5: suspendWeightControl(); break;
+      case 5: suspendWeightControl(DripLearnNote::SCALE_LOST); break;
       case 6: armPostTareBaselineWindow(); break;
       case 7: publishWeight(200.0f, hostMillis + 100); break; // Slew filter.
       case 8: publishWeight(46.0f, hostMillis + 100, last.connectionGeneration,
@@ -19808,6 +19835,7 @@ void at06_fast_extended_spike_does_not_cut_until_sustained() {
   CHECK(stopperState == StopperState::REQUIRES_OFF);
   CHECK(session.endReason == EndReason::TOUCH_WEIGHT_FALLBACK);
   CHECK(!session.calibrationEligible);
+  CHECK(session.calibrationLoss == DripLearnNote::TOUCH_STOP);
 }
 
 void at07_feature_off_matches_legacy_threshold_cut() {
@@ -20355,6 +20383,7 @@ void at21_spurt_plateau_is_accepted_without_learning() {
   CHECK(!session.accidentalTouchHolding);
   CHECK(fabsf(session.lastAcceptedWeightG - (base + 4.5f)) < 0.01f);
   CHECK(!session.calibrationEligible);
+  CHECK(session.calibrationLoss == DripLearnNote::LEVEL_SHIFT);
   CHECK(shotCurveBreakCount() == breaksBefore + 1U);  // A new segment...
   const size_t last = shotCurveSampler.count - 1U;  // ...on the accepted shift,
   CHECK((shotCurveSampler.breakBefore[last / 8U] >> (last % 8U)) & 1U);
@@ -20936,7 +20965,7 @@ void lt06_late_zero_outside_its_window_is_not_a_tare() {
              session.config.postTareBaselineGraceMs)
         idleWeight(cupG, 100);
     } else if (variant == 2) {
-      suspendWeightControl();
+      suspendWeightControl(DripLearnNote::SCALE_LOST);
     } else if (variant == 3) {
       rawG = 38.0f;
     }
@@ -21076,6 +21105,7 @@ void lt07_unseen_cup_lift_in_the_window_is_undone_when_it_returns() {
       CHECK(debugEventExists(DebugCode::SCALE_LATE_TARE_UNDONE));
       CHECK(session.softwareZeroG == zeroG);
       CHECK(!session.calibrationEligible);
+      CHECK(session.calibrationLoss == DripLearnNote::CUP_LIFTED);
       for (int i = 0; i < 3; ++i) idleWeight(zeroG + keptG, 100);
       CHECK(session.weightControlState == WeightControlState::ACTIVE);
       CHECK(fabsf(session.lastAcceptedWeightG - keptG) < 0.01f);
@@ -21998,6 +22028,27 @@ void fw08_drip_filter_physics_outliers_and_step() {
   CHECK(preset.bbwEwmaOffsetG > 0.55f && preset.bbwEwmaOffsetG < 0.85f);
 }
 
+void fw09b_first_disturbance_names_the_skip() {
+  // A jump that leads to a suspension is still the jump; every trigger keeps
+  // learning off, and a new cycle starts with no cause.
+  resetHarness(false, true);
+  reachReadyFromBoot();
+  startCycle();
+  advanceToBrew();
+  CHECK(session.calibrationEligible && session.calibrationLoss == DripLearnNote::NONE);
+  loseCalibration(DripLearnNote::WEIGHT_JUMP);
+  const uint32_t lostAtMs = session.calibrationLostAtMs;
+  ++hostMillis;
+  suspendWeightControl(DripLearnNote::SCALE_LOST);
+  CHECK(!session.calibrationEligible);
+  CHECK(session.calibrationLoss == DripLearnNote::WEIGHT_JUMP);
+  CHECK(session.calibrationLostAtMs == lostAtMs);
+  for (uint8_t note = 0; note < DRIP_LEARN_NOTE_COUNT; ++note)
+    CHECK(dripLearnNoteIsDisturbance(note) ==
+          (note == static_cast<uint8_t>(DripLearnNote::WEIGHT_DISTURBED) ||
+           note >= static_cast<uint8_t>(DripLearnNote::LEVEL_SHIFT)));
+}
+
 void fw09_learning_skips_name_their_reason() {
   // A11: a logged shot that does not train says why in the Web UI log, and
   // the drip stays where it was.
@@ -22041,6 +22092,23 @@ void fw09_learning_skips_name_their_reason() {
               [] { pendingFinalize.offsetAnalysis = false; }));
   CHECK(skips(DripLearnNote::MANUAL_BREW, "manual brew", [] {
     pendingFinalize.offsetAnalysis = pendingFinalize.automaticBrew = false;
+  }));
+  // A named disturbance replaces the generic note and says when it happened.
+  CHECK(skips(DripLearnNote::LEVEL_SHIFT, "weight shifted and stayed during the shot at 2.7 s;",
+              [] {
+                pendingFinalize.offsetAnalysis = false;
+                pendingFinalize.calibrationLoss = DripLearnNote::LEVEL_SHIFT;
+                pendingFinalize.calibrationLostMs = 2689;
+              }));
+  CHECK(skips(DripLearnNote::SCALE_LOST, "scale readings lost during the shot at 12.0 s;", [] {
+    pendingFinalize.offsetAnalysis = false;
+    pendingFinalize.calibrationLoss = DripLearnNote::SCALE_LOST;
+    pendingFinalize.calibrationLostMs = 12000;
+  }));
+  CHECK(skips(DripLearnNote::TIMER_ONLY, "timer-only shot; correction unchanged", [] {
+    pendingFinalize.offsetAnalysis = false;
+    pendingFinalize.timerOnly = true;
+    pendingFinalize.calibrationLoss = DripLearnNote::OVERLOAD;
   }));
   CHECK(skips(DripLearnNote::CHANNELING, "channeling; correction unchanged",
               [] { pendingFinalize.channeling = true; }));
@@ -27219,6 +27287,7 @@ const TestCase testCases[] = {
     {"CF09", cup_fsm_untared_lift_to_zero_is_removed},
     {"R42", r42_weight_below_automation_min_stays_manual},
     {"R43", r43_post_tare_baseline_accepts_zero_after_pre_tare_weight},
+    {"R43B", r43b_post_tare_baseline_rejects_stale_light_load},
     {"R54", r54_post_tare_baseline_keeps_weight_control},
     {"R66", r66_post_tare_rejected_stream_does_not_enforce_atm},
     {"R67", r67_observed_silence_enforces_atm},
@@ -27264,6 +27333,7 @@ const TestCase testCases[] = {
     {"FW07", fw07_quick_start_save_retries_and_reports_once},
     {"FW08", fw08_drip_filter_physics_outliers_and_step},
     {"FW09", fw09_learning_skips_name_their_reason},
+    {"FW09B", fw09b_first_disturbance_names_the_skip},
     {"FW10", fw10_drip_learning_memory_survives_a_restart},
     {"FW11", fw11_drip_learning_save_retries_and_reports_once},
     {"RT21", rt21_empty_pan_at_cycle_start_resyncs_stuck_present},

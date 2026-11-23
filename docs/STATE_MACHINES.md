@@ -193,8 +193,18 @@ the raw observations of the next three learning shots stopped at the target
 counted. When max − min ≤ 0.40 g the third sets the offset to their median
 instead of the EWMA step. Every good shot stores its `DripLearnNote` in shot
 record bits 2–6 of `actualWeightSource` (0 in earlier records), which the
-drip chart and a `DRIP_LEARN_SKIPPED` debug event (Web UI log and shot trace)
-name.
+drip chart, the Stats row's `dripNote` column (the JSON export's
+`learningNote` id) and a `DRIP_LEARN_SKIPPED` debug event (Web UI log and shot
+trace) name. Every path that makes a cycle calibration-ineligible records its
+first cause (`loseCalibration`): an accepted level shift (`LEVEL_SHIFT`), the
+touch fallback (`TOUCH_STOP`), an out-of-range reading or overload stop
+(`OVERLOAD`), an implausible slew (`WEIGHT_JUMP`), a below-empty reading or an
+undone late zero (`CUP_LIFTED`), and a suspension for a new connection or a
+stale stream (`SCALE_LOST`). A later cause never replaces it; a re-tare that
+restores eligibility clears it. Earlier records keep the cause-less
+`WEIGHT_DISTURBED`. For a named disturbance the debug event's second argument
+is its time since the circuit closed instead of the drip it would have
+needed.
 EWMA reuses the accepted final observation and additionally requires fresh weight,
 valid baseline and matching connection provenance. Control updates only the
 originating preset/algorithm generation. Reset or deletion invalidates pending
@@ -486,7 +496,7 @@ Source: `OpenBrewByWeightScaleTypes.h`, `setWeightControlState()` in
 | Three coherent recovery samples | `SUSPENDED`/`VALIDATING` → `ACTIVE` (A→M enforcement cleared). Only `SUSPENDED` also requires the samples not to fall more than 2 g below the last accepted weight, because a stream gap can hide a cup lift. |
 | Out-of-range / overload sample | `ACTIVE` → `VALIDATING`, stream `OVERLOAD`. |
 | Shot weight below −max(`minimumCupWeightG`, 10 g) | `ACTIVE` → `VALIDATING`, the sample rejected as range against that floor (as slew when it also broke the slew limit); a below-empty sample that completes recovery is rejected (`SCALE_SAMPLE_REJECTED_RANGE`, limit −max(minimum cup, 10 g)) and moves `VALIDATING` → `SUSPENDED` (A→M armed → enforced) instead of `ACTIVE`, so control never accepts such a weight. |
-| Tare / post-tare grace | May promote `VALIDATING` → `ACTIVE` so the new zero is used. If the shot-start grace expires while the latest reading is still within half a minimum cup of the pre-tare load (at least the minimum cup), that load becomes a software zero subtracted from shot samples, first flow restarts on it, and the cup is restored as an untared presence (`TARE_BASELINE_TIMEOUT` carries the zero). While that software zero stands, within one more grace after the deadline, on the connection that acknowledged a successful shot-start tare write and outside `SUSPENDED`, two consecutive raw samples within half a minimum cup of zero that would have passed as the grace baseline, not claimed by a cup-removal stop, are the late zero: the first is held, the second replaces the software zero with minus the last accepted shot weight (never below 0 g), so control continues from the coffee already weighed (`SCALE_LATE_TARE_RECOGNIZED`). The dropped zero is remembered: a lift of a cup the detector never saw reads the same, and while the shot tracks weight on that connection two consecutive raw samples within half a minimum cup of that zero plus the last accepted shot weight (the cup and the coffee it held, a step a real scale zero never adds) are the cup coming back: the first is held, the second restores the dropped software zero, marks a curve break and makes the cycle calibration-ineligible (`SCALE_LATE_TARE_UNDONE`, WARNING); cup removal is not applied after the fact. A new tare (baseline window armed) forgets the dropped zero. Any other drop stays a lift for cup removal or the below-empty rule. |
+| Tare / post-tare grace | May promote `VALIDATING` → `ACTIVE` so the new zero is used. A post-tare reading is the baseline only within 50 g of zero and, after a pre-tare load of at least the 1.5 g touch residual (either sign), nearer zero than that load: a packet the scale sent before applying the tare is never the zero, so the real zero cannot follow it as a touch step. If the shot-start grace expires while the latest reading is still within half a minimum cup of the pre-tare load (at least the minimum cup), that load becomes a software zero subtracted from shot samples, first flow restarts on it, and the cup is restored as an untared presence (`TARE_BASELINE_TIMEOUT` carries the zero). While that software zero stands, within one more grace after the deadline, on the connection that acknowledged a successful shot-start tare write and outside `SUSPENDED`, two consecutive raw samples within half a minimum cup of zero that would have passed as the grace baseline, not claimed by a cup-removal stop, are the late zero: the first is held, the second replaces the software zero with minus the last accepted shot weight (never below 0 g), so control continues from the coffee already weighed (`SCALE_LATE_TARE_RECOGNIZED`). The dropped zero is remembered: a lift of a cup the detector never saw reads the same, and while the shot tracks weight on that connection two consecutive raw samples within half a minimum cup of that zero plus the last accepted shot weight (the cup and the coffee it held, a step a real scale zero never adds) are the cup coming back: the first is held, the second restores the dropped software zero, marks a curve break and makes the cycle calibration-ineligible (`SCALE_LATE_TARE_UNDONE`, WARNING); cup removal is not applied after the fact. A new tare (baseline window armed) forgets the dropped zero. Any other drop stays a lift for cup removal or the below-empty rule. |
 
 ---
 

@@ -459,6 +459,40 @@
                     "null"
                   ]
                 },
+                "learningNote": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "What the shot did to the drip correction: trained, or why it left it unchanged (level_shift..scale_lost name the first disturbance during the shot; weight_disturbed is an older record's unnamed one). Null when unknown.",
+                  "enum": [
+                    "trained",
+                    "manual_brew",
+                    "timer_only",
+                    "weight_disturbed",
+                    "channeling",
+                    "no_flow_rate",
+                    "not_weight_cut",
+                    "no_final_weight",
+                    "final_too_low",
+                    "not_fresh",
+                    "out_of_range",
+                    "preset_gone",
+                    "other_algorithm",
+                    "restarted",
+                    "impossible",
+                    "outlier",
+                    "target_only",
+                    "cut_short",
+                    "level_shift",
+                    "touch_stop",
+                    "overload",
+                    "weight_jump",
+                    "cup_lifted",
+                    "scale_lost",
+                    null
+                  ]
+                },
                 "offsetG": {
                   "type": "number",
                   "description": "Stop-early offset used for this shot."

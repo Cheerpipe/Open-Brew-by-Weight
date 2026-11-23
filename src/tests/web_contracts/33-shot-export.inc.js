@@ -60,7 +60,7 @@
     estimatedG: null, blind: false, fastBeforeS: 25, slowAfterS: 33, fastMarginG: 2,
     slowMarginG: 2, delayS: 0.4, wallS: 45, fastRampS: 0, slowRampS: 4, fastCurve: 'even',
     slowCurve: 'late', fastCurveHardness: 'soft', slowCurveHardness: 'hard', dripDelayS: 3,
-    actualWeightSource: 'post_drip', rating: 4,
+    actualWeightSource: 'post_drip', rating: 4, dripNote: 0,
     wCg: [0, 0, 120, 900, 2400, 2600, 3300, 3510, 3620],
     wAtMs: [100, 5000, 6200, 9000, 18000, 18500, 26000, 28400, 31400],
     wBreakBefore: [6], wHeld: [5], wTruncated: false, dropS: 6.1, dropCg: 20,
@@ -70,7 +70,7 @@
     actualG: null, estimatedG: 30.5, stopDetail: 'auto_to_manual', cutType: 'auto',
     scaleLossSource: 'projection', blind: true, rating: 0, scaleName: '', doseG: 0, ratio: 0,
     targetTempDeciC: 0, bbwAlgorithm: 'unknown', bbwAlgorithmVersion: null, bbwAlpha: null,
-    bbwLearningApplied: null, verdict: null, arrivalS: null, actualWeightSource: 'none',
+    bbwLearningApplied: null, verdict: null, arrivalS: null, actualWeightSource: 'none', dripNote: 23,
     wCg: [], wAtMs: [], wBreakBefore: [], wHeld: [], dropS: null, dropCg: null,
     endS: null, endCg: null};
 
@@ -122,6 +122,11 @@
     b.derived.errorVsTargetG], [null, null, null, null, null, null, null, null]);
   assert.deepEqual([b.outcome.estimatedYieldG, b.stop.scaleLossSource, b.stop.blind],
       [30.5, 'projection', true]);
+  // The drip note is a stable id; 0 is "trained" only when learning applied.
+  assert.deepEqual([a.control.brewByWeight.learningNote, b.control.brewByWeight.learningNote],
+      ['trained', 'scale_lost']);
+  assert.equal(context.shotJson({...base, bbwLearningApplied: false}).control.brewByWeight
+      .learningNote, null);
 
   // The trace decoder reads the firmware's own export (TRC25 writes and
   // checks the same fixture with the firmware layout).
