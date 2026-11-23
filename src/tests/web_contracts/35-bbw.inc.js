@@ -94,11 +94,11 @@
   // The pill gives a shot's details and why it did not train the drip.
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.70, bbwAlpha: 0.3,
     bbwRecentG: [0.59, 0.72, 0.63, 0.10], bbwRecentSkipped: 10, bbwRecentNote: [0, 9, 0, 9],
-    bbwRecentShot: [[0, 300, null, 360, 20], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [1800000000, 285, 3640, 360, 20]],
+    bbwRecentShot: [[7, 0, 300, null, 360, 20], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [4, 1800000000, 285, 3640, 360, 20]],
     bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
-  assert.deepEqual(pick(6), ['at 1800000000 · 28.5 s', 'Yield 36.4 g of 36.0 g',
+  assert.deepEqual(pick(6), ['#4 · at 1800000000 · 28.5 s', 'Yield 36.4 g of 36.0 g',
     'Drip needed 0.10 g, used 0.20 g', 'Not used: the scale stopped reporting before the drip wait ended']);
-  assert.deepEqual(pick(9), ['30.0 s', 'Drip needed 0.59 g, used 0.20 g', 'Used in the current correction']);
+  assert.deepEqual(pick(9), ['#7 · 30.0 s', 'Drip needed 0.59 g, used 0.20 g', 'Used in the current correction']);
   // An edited field keeps the owner's value across refreshes.
   elements.get('dripSetG').value = '0.50';
   elements.get('dripSetG').dataset.edited = '1';

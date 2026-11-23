@@ -248,13 +248,13 @@ int main() {
     // and so is a yield the shot never measured.
     fields.bbwRecentCount = 3;
     fields.bbwRecentSkipped = 6;
-    fields.bbwRecent[0] = {1, 1800000000U, 285, 360, -1, 3640, 20, 0};
-    fields.bbwRecent[1] = {2, 0, 250, 360, -80, SHOT_LOG_WEIGHT_MISSING, 20, 3};
+    fields.bbwRecent[0] = {1, 1, 1800000000U, 285, 360, -1, 3640, 20, 0};
+    fields.bbwRecent[1] = {2, 2, 0, 250, 360, -80, SHOT_LOG_WEIGHT_MISSING, 20, 3};
     fields.bbwRecent[2].neededCg = 320;
     assert(formatDripChartJson(json, sizeof(json), fields) > 0);
     assert(strstr(json, "\"bbwRecentG\":[-0.01,null,3.20]") != nullptr);
-    assert(strstr(json, "\"bbwRecentNote\":[0,3,0],\"bbwRecentShot\":[[1800000000,285,3640,"
-                        "360,20],[0,250,null,360,20],[0,0,0,0,0]]") != nullptr);
+    assert(strstr(json, "\"bbwRecentNote\":[0,3,0],\"bbwRecentShot\":[[1,1800000000,285,3640,"
+                        "360,20],[2,0,250,null,360,20],[0,0,0,0,0,0]]") != nullptr);
   }
 
   // Drip learning memory: exact NVS round trip, damaged or foreign records

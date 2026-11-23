@@ -1771,16 +1771,17 @@ function renderDripChart(c) {
       : "";
   $("dripHint").hidden = !$("dripHint").textContent;
   // The chart cursor (bound in init) reads each charted shot from here:
-  // [local time s, duration ds, yield cg, target dg, drip used cg].
+  // [shot number, local time s, duration ds, yield cg, target dg, drip used cg].
   bars._range = [pad, pad + shots.length - 1];
   bars._pick = (k) => {
     const s = slots[k],
-      [t, ds, y, goal, used] = c?.bbwRecentShot?.[s.i] || [];
+      [num, t, ds, y, goal, used] = c?.bbwRecentShot?.[s.i] || [];
     return {
       kind: kind(s),
       y: h(s.g ?? 0),
       lines: [
         [
+          num > 0 && "#" + num,
           t > 0 && R.formatHumanTime(t),
           ds > 0 && (ds / 10).toFixed(1) + " " + __WEBUI_TEXT__("runtime.s"),
         ]

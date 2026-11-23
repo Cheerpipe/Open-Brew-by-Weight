@@ -21854,9 +21854,9 @@ void fw06_status_carries_recent_drips_and_markers() {
                      "\"quickG\":0.00},\"bbwRecentAfterSet\":3,\"bbwRecentAfterQuick\":-1,"
                      "\"bbwRecentG\":[0.55,0.54,0.53,0.52,0.51,0.50],"
                      "\"bbwRecentSkipped\":2,\"bbwRecentNote\":[0,9,0,0,0,0],"
-                     "\"bbwRecentShot\":[[1800000000,300,3555,360,100],[0,300,3554,360,100],"
-                     "[0,300,3553,360,100],[0,300,3552,360,100],[0,300,3551,360,100],"
-                     "[0,300,3550,360,100]]") == 0);
+                     "\"bbwRecentShot\":[[6,1800000000,300,3555,360,100],[5,0,300,3554,360,100],"
+                     "[4,0,300,3553,360,100],[3,0,300,3552,360,100],[2,0,300,3551,360,100],"
+                     "[1,0,300,3550,360,100]]") == 0);
   // Another preset's shots never reach this preset's chart.
   CHECK(setActiveShotPreset(presetBank, presetBank.presets[1].id));
   publishControlStatus();

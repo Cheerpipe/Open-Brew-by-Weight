@@ -1980,7 +1980,7 @@ inline const char *bootStateName(BootState state) {
 // DripLearnNote. localSec is 0 without wall time; yieldCg keeps the record's
 // missing-weight sentinel.
 struct DripChartShot {
-  uint32_t id, localSec;
+  uint32_t id, number, localSec;  // number: as Shots shows it
   uint16_t durationDs, goalDg;
   int16_t neededCg, yieldCg, usedCg;
   uint8_t note;

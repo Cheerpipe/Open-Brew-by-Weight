@@ -1187,8 +1187,8 @@ void p24_preset_bank_size_and_crud_budgets() {
   // for its ten shots; 7432: the delta-stream curve record (external
   // work-area growth; see OpenBrewByWeightControlStatusTypes.inc); 7448: +16
   // for the charted shots' drip notes; 7616: their details, in the external
-  // half.
-  CHECK(sizeof(ControlStatusSnapshot) <= 7616);
+  // half; 7656: +40 for each charted shot's number.
+  CHECK(sizeof(ControlStatusSnapshot) <= 7656);
   CHECK(sizeof(ControlGateSnapshot) <= 32);
   CHECK(sizeof(WebCommand) <= 440);
   WebCommand command;

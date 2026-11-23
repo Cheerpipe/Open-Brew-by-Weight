@@ -254,7 +254,7 @@ as well, only the correction from before you last set it, or nothing. While a
 quick start runs, the line above the chart stays empty after one shot; from
 two on it says whether your shots still agree closely enough to quick start.
 Tap a bar, or drag across the chart, to see that shot: a dot marks the bar
-and a label above it shows when you pulled the shot, how long it ran, how
+and a label above it shows the shot's number (the same one Shots uses), when you pulled it, how long it ran, how
 much reached the cup against your target, the drip it needed against the
 correction in use at the time, and how the shot counted. For a shot that
 was left out it also says why, for example that the scale stopped reporting

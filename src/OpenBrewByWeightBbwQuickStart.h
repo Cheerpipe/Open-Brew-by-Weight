@@ -208,8 +208,9 @@ inline size_t formatDripChartJson(char *out, size_t cap, const ControlStatusSnap
     const DripChartShot &shot = c.bbwRecent[i];
     char yield[8] = "null";
     if (!shotLogWeightIsMissing(shot.yieldCg)) snprintf(yield, sizeof(yield), "%d", shot.yieldCg);
-    put(snprintf(out + used, cap - used, "%s[%lu,%u,%s,%u,%d]",
-                 i ? "," : "],\"bbwRecentShot\":[", static_cast<unsigned long>(shot.localSec),
+    put(snprintf(out + used, cap - used, "%s[%lu,%lu,%u,%s,%u,%d]",
+                 i ? "," : "],\"bbwRecentShot\":[", static_cast<unsigned long>(shot.number),
+                 static_cast<unsigned long>(shot.localSec),
                  static_cast<unsigned>(shot.durationDs), yield,
                  static_cast<unsigned>(shot.goalDg), shot.usedCg));
   }

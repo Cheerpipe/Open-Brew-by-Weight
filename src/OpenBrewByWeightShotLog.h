@@ -137,6 +137,7 @@ class ShotLog
       const bool measurable = !shotLogWeightIsMissing(record.cutLineCg) &&
                               !shotLogWeightIsMissing(record.actualWeightCg);
       shots[found] = {record.id,
+                      record.shotNumber ? record.shotNumber : record.id,
                       record.hasWallTime ? record.endedAtLocalSec : 0U,
                       record.durationDs,
                       record.goalWeightDg,

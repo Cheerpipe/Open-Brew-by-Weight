@@ -213,8 +213,9 @@ static_assert(sizeof(ControlStatusFields) <= 2048,
 // curve as one delta-stream record (its scalars leave the internal fields) —
 // external work-area growth, internal budget unchanged; 7448: +16 for what
 // each charted shot did to the drip; 7616: the charted shots' details for
-// the drip chart pill, moved to the external half (internal -30).
-static_assert(sizeof(ControlStatusSnapshot) <= 7616,
+// the drip chart pill, moved to the external half (internal -30); 7656: +40
+// for each charted shot's number (external half).
+static_assert(sizeof(ControlStatusSnapshot) <= 7656,
               "ControlStatusSnapshot exceeds its external workspace budget");
 
 // Gate checks use this compact internal view. The full scalar/curve snapshot
