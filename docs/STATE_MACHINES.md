@@ -178,9 +178,9 @@ reading is used if it passes the same floor and ceiling; otherwise the record
 keeps the last-known weight. A drip hold cut short (cup continuity lost, a new
 cycle, rinse or backflush) records the settled yield if the ring had filled,
 else the last-known weight; only a hold the cup ended learns, and only from a
-settled yield. A settled ring also stands in for the freshness of the live
-reading at the end of a full hold, so a lift whose readings are refused still
-learns.
+settled yield. A settled ring also stands in for the live reading at the end
+of a full hold, so a lift whose readings are refused, or a scale lost during
+the hold, still learns.
 The drip offset learns from weight cuts on any segment, against the cut line at
 the stop (observation = offset used + final − f(t_cut)); channeling, manual,
 time/safety-limit, A→M and cup-removal outcomes, and cuts without a valid flow

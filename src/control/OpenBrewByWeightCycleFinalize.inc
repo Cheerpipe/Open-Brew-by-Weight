@@ -784,9 +784,11 @@ void pendingShotFinalizeTask() {
   const float finalWeightG =
       postStopFinalWeightG(snapshot, currentWeight - snapshot.softwareZeroG);
   bool postDripWeightValid = false;
-  if (scaleAvailable() && std::isfinite(currentWeight) &&
-      currentWeightSequence != snapshot.endedWeightSequence &&
-      tickAfter(currentWeightReceivedAtMs, snapshot.endedAtMs) &&
+  // A settled tail is the yield even when the scale left during the hold.
+  if ((std::isfinite(snapshot.tailSettledG) ||
+       (scaleAvailable() && std::isfinite(currentWeight) &&
+        currentWeightSequence != snapshot.endedWeightSequence &&
+        tickAfter(currentWeightReceivedAtMs, snapshot.endedAtMs))) &&
       std::isfinite(finalWeightG) &&
       finalWeightG <= postStopCeilingG(snapshot, currentWeightReceivedAtMs) &&
       plausibleSettledBrewWeight(finalWeightG, snapshot.lastKnownWeightG,

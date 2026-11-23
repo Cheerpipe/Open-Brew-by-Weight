@@ -276,7 +276,9 @@ all use. The wait adapts to each shot:
    recorded then.
 
 Lifting the cup ends the wait at any point, and the shot keeps the weight it
-had already settled at (see below). Starting the next shot also ends it.
+had already settled at (see below). Starting the next shot also ends it. If
+the scale switches off or loses its connection during the wait, the shot
+keeps the weight it had settled at, too.
 History and Stats show how long each shot actually waited (**Drip wait**),
 and the Web UI log says why the wait ended.
 

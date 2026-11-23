@@ -22719,6 +22719,35 @@ void cd04_bullseye_is_judged_on_the_recorded_yield() {
   }
 }
 
+void cd05_scale_lost_during_the_hold_keeps_the_settled_tail() {
+  // The scale is switched off while the drip still rises: the tail it had
+  // settled at is the yield, not the weight at the stop.
+  startDripHold(false);
+  for (int i = 0; i <= 12; ++i) feedDripHold(34.8f + 0.1f * static_cast<float>(i));
+  CHECK(pendingFinalize.pending);
+  const float settledG = postStopFinalWeightG(pendingFinalize, NAN);
+  CHECK(settledG > 35.5f);
+  setScaleLinkState(ScaleLinkState::DISCONNECTED);
+  pendingShotFinalizeTask();
+  CHECK(!pendingFinalize.pending);
+  checkDripHoldEnd(DripHoldEnd::NO_READING);
+  ShotLogRecord record[1] = {};
+  CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+  CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::POST_DRIP);
+  CHECK(record[0].actualWeightCg == shotLogWeightToCentigrams(settledG));
+}
+
+void cd06_slow_creep_closes_at_the_maximum_wait() {
+  // A median that keeps rising by a scale step faster than the settle time
+  // never settles; the maximum wait records it.
+  startDripHold(false);
+  for (int i = 0; i < 100 && pendingFinalize.pending; ++i)
+    feedDripHold(34.8f + 0.1f * static_cast<float>(i / 8));
+  CHECK(!pendingFinalize.pending);
+  CHECK(elapsedMs(pendingFinalize.endedAtMs) >= DEFAULT_DRIP_MAX_WAIT_MS);
+  checkDripHoldEnd(DripHoldEnd::MAX_WAIT);
+}
+
 // Field recording (2026-11-16, shot 72): the tail settles at 35.59 g, then a
 // hand lifts the cup 1.6 s after the stop, inside the 3 s drip delay.
 constexpr PostStopSample POST_STOP_CUP_LIFT_TAIL[] = {
@@ -27012,6 +27041,8 @@ const TestCase testCases[] = {
     {"FW04", fw04_post_stop_ceiling_ignores_touches},
     {"CD03", cd03_drip_hold_waits_for_the_tail_to_settle},
     {"CD04", cd04_bullseye_is_judged_on_the_recorded_yield},
+    {"CD05", cd05_scale_lost_during_the_hold_keeps_the_settled_tail},
+    {"CD06", cd06_slow_creep_closes_at_the_maximum_wait},
     {"FW12", fw12_settled_tail_trains_after_a_cup_lift},
     {"FF13", ff13_rinse_first_drop_goes_through_stopper},
     {"FF14", ff14_no_scale_first_drop_does_not_skip_stopper},
