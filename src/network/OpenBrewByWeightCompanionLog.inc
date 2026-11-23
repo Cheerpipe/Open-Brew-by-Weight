@@ -128,13 +128,9 @@ bool OpenBrewByWeightNetwork::companionLogBody(uint8_t &count, const CompanionLi
     // oldest"): a residual zero row would repeat itself until the frame
     // fills. The ring never assigns one; this ends its page instead.
     if (event.sequence == 0) break;
-    const char *text = event.text;
     char formatted[DEBUG_EVENT_TEXT_CAPACITY];
-    if (text[0] == '\0') {
-      formatDebugEventMessage(event, formatted, sizeof(formatted), FW_VERSION);
-      text = formatted;
-    }
-    if (!escapeJsonString(text, companionWs().escape, sizeof(companionWs().escape))) break;
+    formatDebugEventMessage(event, formatted, sizeof(formatted), FW_VERSION);
+    if (!escapeJsonString(formatted, companionWs().escape, sizeof(companionWs().escape))) break;
     // Straight into the frame; a row that does not fit is cut off again.
     const int written = snprintf(
         out + used, capacity - used, "%s[%lu,%lu,%lu,\"%c\",\"%s\",\"%s\"]", first ? "" : ",",

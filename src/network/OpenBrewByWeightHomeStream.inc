@@ -1044,12 +1044,8 @@ bool OpenBrewByWeightNetwork::sendLogStream(UiStreamSession &session,
       (void)timeZoneOffsetAtOrUtc(control.config.timezoneId, event.wallSec,
                                   eventOffset);
     char message[128];
-    const char *text = event.text;
-    if (text[0] == '\0') {
-      formatDebugEventMessage(event, message, sizeof(message), FW_VERSION);
-      text = message;
-    }
-    escapeJsonString(text, work.jsonItem, NetworkWorkBuf::kJsonItem);
+    formatDebugEventMessage(event, message, sizeof(message), FW_VERSION);
+    escapeJsonString(message, work.jsonItem, NetworkWorkBuf::kJsonItem);
     // Append-only budget: an event that no longer fits ends this frame and
     // resumes on the next dispatch (logPush stays armed).
     if (used + strlen(work.jsonItem) + 256 > kUiStreamFrameBudget) {

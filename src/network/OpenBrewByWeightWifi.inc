@@ -1037,7 +1037,9 @@ void OpenBrewByWeightNetwork::stopNetwork() {
 
 void OpenBrewByWeightNetwork::serviceStaState(uint32_t now) {
   NetworkStatusSnapshot status = snapshot();
-  if (!status.wifiConfigured) {
+  // A configured STA stops only in esp_restart()'s Wi-Fi shutdown handler:
+  // the leave (reason 8) is the restart itself, not a link failure.
+  if (!status.wifiConfigured || WiFi.status() == WL_STOPPED) {
     return;
   }
 

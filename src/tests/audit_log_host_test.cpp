@@ -164,6 +164,9 @@ static void testFormatAuditRecordDetail() {
   record.argument1 = 42;
   formatAuditRecordDetail(record, detail, sizeof(detail));
   assert(strcmp(detail, "station connection failed: unknown (status 42)") == 0);
+  record.argument1 = 254;
+  formatAuditRecordDetail(record, detail, sizeof(detail));
+  assert(strcmp(detail, "station connection failed: stopped (status 254)") == 0);
   record.argument1 = 5;
   record.argument2 = packStaDisconnectDetail(200, -79);
   formatAuditRecordDetail(record, detail, sizeof(detail));
@@ -188,6 +191,19 @@ static void testFormatAuditRecordDetail() {
   record.code = static_cast<uint8_t>(DebugCode::SAFETY_LOCKOUT_ACTIVE);
   formatAuditRecordDetail(record, detail, sizeof(detail));
   assert(detail[0] == '\0');
+  // Ring and last-words lines keep the headline ahead of the emitter's detail;
+  // a detail-only code still renders its text alone.
+  DebugEvent event;
+  event.code = DebugCode::HEALTH_LOOP_GAP;
+  event.argument1 = 505;
+  event.argument2 = 1305;
+  copyCString(event.text, sizeof(event.text), "idle=5119 us flash=0");
+  formatDebugEventMessage(event, detail, sizeof(detail), "");
+  assert(strcmp(detail, "health loop gap high max=505 ms (limit 200 ms)"
+                        " loop cpu=1305 us idle=5119 us flash=0") == 0);
+  event.code = DebugCode::SCALE_STALE_EVENT_REJECTED;
+  formatDebugEventMessage(event, detail, sizeof(detail), "");
+  assert(strcmp(detail, "idle=5119 us flash=0") == 0);
   // A short output buffer truncates safely instead of overflowing.
   char small[16];
   record.code = static_cast<uint8_t>(DebugCode::HEALTH_LOOP_GAP);
