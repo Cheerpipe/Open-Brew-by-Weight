@@ -3181,6 +3181,18 @@ inline void formatDebugEventMessage(const DebugEvent &event, char *message,
   if (message == nullptr || capacity == 0) {
     return;
   }
+  if (event.text[0] != '\0') {
+    // A structured code keeps its headline; the emitter's detail follows it.
+    if (formatScaleSampleDebugMessage(event, message, capacity) ||
+        formatPersistDebugMessage(event, message, capacity) ||
+        formatLifecycleDebugMessage(event, message, capacity)) {
+      const size_t used = strlen(message);
+      if (used + 1 < capacity) snprintf(message + used, capacity - used, " %s", event.text);
+    } else {
+      copyCString(message, capacity, event.text);
+    }
+    return;
+  }
   if (event.code == DebugCode::BOOT_BANNER) {
     snprintf(message, capacity, "Open Brew by Weight %s (bootId=%ld)",
              firmwareVersion, static_cast<long>(event.argument1));
@@ -3196,17 +3208,9 @@ inline void formatDebugEventMessage(const DebugEvent &event, char *message,
              stopperStateName(static_cast<StopperState>(event.argument2)));
     return;
   }
-  // A structured code keeps its headline; the emitter's detail follows it.
   if (formatScaleSampleDebugMessage(event, message, capacity) ||
       formatPersistDebugMessage(event, message, capacity) ||
       formatLifecycleDebugMessage(event, message, capacity)) {
-    const size_t used = strlen(message);
-    if (event.text[0] != '\0' && used + 1 < capacity)
-      snprintf(message + used, capacity - used, " %s", event.text);
-    return;
-  }
-  if (event.text[0] != '\0') {
-    copyCString(message, capacity, event.text);
     return;
   }
   if ((event.code == DebugCode::WEB_COMMAND_ACCEPTED ||
