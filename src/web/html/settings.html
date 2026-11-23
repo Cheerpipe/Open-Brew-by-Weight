@@ -1322,41 +1322,39 @@
     </details>
     <details data-g="dripWait" class="cfgGroup">
       <summary>{{webui:settings.drip_wait}}</summary>
-      <div class="row">
-        <label
-          >{{webui:settings.drip_delay_s}}<input
-            id="dripDelayS"
-            type="number"
-            min="0"
-            max="10"
-            step="0.1"
-            required
-            data-unit="s"
-          /><small class="fieldHint"
-            >{{webui:settings.wait_for_drips_before_saving_final_weight}}</small
-          ></label
-        ><label
-          >{{webui:settings.drip_settle_s}}<input
-            id="dripSettleS"
-            type="number"
-            min="1"
-            max="10"
-            step="0.1"
-            required
-            data-unit="s"
-          /><small class="fieldHint">{{webui:settings.drip_settle_hint}}</small></label
-        ><label
-          >{{webui:settings.drip_max_wait_s}}<input
-            id="dripMaxWaitS"
-            type="number"
-            min="5"
-            max="25"
-            step="1"
-            required
-            data-unit="s"
-          /><small class="fieldHint">{{webui:settings.drip_max_wait_hint}}</small></label
-        >
-      </div>
+      <label
+        >{{webui:settings.drip_delay_s}}<input
+          id="dripDelayS"
+          type="number"
+          min="0"
+          max="10"
+          step="0.1"
+          required
+          data-unit="s"
+        /><small class="fieldHint"
+          >{{webui:settings.wait_for_drips_before_saving_final_weight}}</small
+        ></label
+      ><label
+        >{{webui:settings.drip_settle_s}}<input
+          id="dripSettleS"
+          type="number"
+          min="1"
+          max="10"
+          step="0.1"
+          required
+          data-unit="s"
+        /><small class="fieldHint">{{webui:settings.drip_settle_hint}}</small></label
+      ><label
+        >{{webui:settings.drip_max_wait_s}}<input
+          id="dripMaxWaitS"
+          type="number"
+          min="5"
+          max="25"
+          step="1"
+          required
+          data-unit="s"
+        /><small class="fieldHint">{{webui:settings.drip_max_wait_hint}}</small></label
+      >
     </details>
     <details data-g="tare" class="cfgGroup">
       <summary>{{webui:settings.tare}}</summary>
