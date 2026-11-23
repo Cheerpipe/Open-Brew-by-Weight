@@ -1079,6 +1079,8 @@
     "err.shot_trace_unavailable": "The shot trace could not be read.",
     "err.state_field_invalid": "The state field must be \"off\" or \"on\".",
     "err.state_override_switch_only": "Inferred-state override is only available on switch-only builds.",
+    "err.stats_header_overflow": "The stats charts exceeded their fixed buffer.",
+    "err.stats_query_invalid": "window must be 10, 25, 50 or 100 and preset a preset ID from 0 (All) to 255.",
     "err.status_busy": "Status snapshot is busy; retry shortly.",
     "err.status_page_unknown": "Unknown status page; use /api/v1/status/admin.",
     "err.status_too_large": "Status snapshot exceeds its size limit.",

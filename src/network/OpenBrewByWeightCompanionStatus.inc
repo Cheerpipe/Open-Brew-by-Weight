@@ -45,6 +45,16 @@ bool OpenBrewByWeightNetwork::appendCompanionStatus(size_t *used) const {
                                 static_cast<unsigned>(companionIgnoredCount(g_companion.pairing)));
 }
 
+// The paired companion's address while its shot archive switch is on, for
+// the integration snapshot: Home Assistant reads the whole-history Stats from it.
+bool OpenBrewByWeightNetwork::companionArchiveAddress(char *address, size_t capacity) const {
+  TaskLockGuard lock(dataMux_);
+  const CompanionStored &stored = g_companion.stored;
+  if (!stored.paired || !stored.archiveSwitch || !stored.address[0]) return false;
+  copyCString(address, capacity, stored.address);
+  return true;
+}
+
 // Diagnostic → Companion: the pairing, its link and the La Marzocco route.
 void OpenBrewByWeightNetwork::companionSnapshot(CompanionSnapshot &out) const {
   const LaMarzoccoCompanionRouteStatus route = machineIntegrationCompanionRouteStatus();

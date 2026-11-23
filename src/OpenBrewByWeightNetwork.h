@@ -1143,6 +1143,7 @@ class OpenBrewByWeightNetwork {
   bool companionRecordsSend(size_t used, bool wrap, bool &deferArm);
   bool companionTraceFrame();
   bool appendCompanionStatus(size_t *used) const;
+  bool companionArchiveAddress(char *address, size_t capacity) const;
   void companionSnapshot(CompanionSnapshot &out) const;
   void companionRequestLabels(char (&name)[COMPANION_NAME_TEXT],
                               char (&address)[COMPANION_ADDRESS_TEXT]) const;

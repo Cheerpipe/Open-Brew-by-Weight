@@ -6,7 +6,7 @@
     '/api/v1/integration/webhook', '/api/v1/integration/webhook/test',
     '/api/v1/integration/presets', '/api/v1/integration/presets/active',
     '/api/v1/integration/quick-settings', '/api/v1/integration/restart',
-    '/api/v1/integration/shots/last',
+    '/api/v1/integration/shots/last', '/api/v1/integration/stats',
   ]) {
     if (!integrationApi.includes(route))
       throw new Error(`Missing Home Assistant integration route: ${route}`);
@@ -69,8 +69,23 @@
       !integrationApi.includes('const bool hasCurve = read == ShotCurveRead::FOUND;')) {
     throw new Error('The last shot must answer busy until its curve is loaded');
   }
+  // The Stats cards draw the Web UI Stats header itself, never during a shot,
+  // and leave the Stats stream to rebuild its own header.
+  const stats = fixtureJson('integration_stats.json');
+  if (!integrationApi.includes('formatStatsHeader(cache, size, static_cast<uint8_t>(presetId))') ||
+      !integrationApi.includes('cache.headerWindow = size;') ||
+      !/integration\/stats"[\s\S]*?companionSyncHold\(\)[\s\S]*?SHOT_STORAGE_BUSY/.test(integrationApi) ||
+      !integrationApi.includes('\\"last_shot_curve_v1\\",\\"stats_charts_v1\\"') ||
+      !Number.isInteger(stats.good) ||
+      !integrationApi.includes('\\"shotEpoch\\":%lu,\\"companion\\":%s,') ||
+      !integrationApi.includes('self.companionArchiveAddress(companionAddress, sizeof(companionAddress))') ||
+      !('shotEpoch' in fixtureJson('integration_snapshot.json')) ||
+      ['dens', 'cons', 'facets', 'preset', 'cut'].some((key) => !(key in stats.stats))) {
+    throw new Error('The stats route must serve the Web UI Stats header outside shots');
+  }
   for (const fixture of [
     'integration_snapshot.json', 'integration_presets.json', 'integration_last_shot.json',
+    'integration_stats.json',
     'webhook_end_v1.json', 'webhook_presets_changed_v1.json',
     'webhook_quick_settings_changed_v1.json',
     'webhook_controller_started_v1.json', 'webhook_ip_changed_v1.json',

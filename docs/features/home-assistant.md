@@ -63,6 +63,14 @@ Entity IDs are built from that name.
   record as the idle Home card. Short, weightless, or 2 g-or-less activations
   don't replace it; deleting the newest history row reveals the next one, and
   clearing the log clears both views.
+- **Dashboard cards draw what the Web UI draws.** The integration's cards copy
+  the Web UI's preset chart, last-shot charts, shot card, and the three Stats
+  charts (Shot time, Shot consistency, Cut accuracy), reading the same data
+  the controller builds for its own pages. A Stats card is read again only
+  after a new shot, never during one. With a companion keeping your
+  [shot archive](companion.md), the Stats cards read your whole history from
+  the companion instead; Home Assistant finds it through the controller, so
+  there is nothing to set up.
 - **Update the integration first.** When a firmware release adds a new kind of
   value, such as a new stop reason, update the integration before the
   firmware. An older integration can't label values it hasn't seen.

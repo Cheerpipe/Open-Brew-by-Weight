@@ -311,7 +311,8 @@ whole-history figures. With the controller off they come from the companion's
 copy, or say they are not available right now. Opened directly, the
 controller offers 10, 25, 50 and 100 by the same rule, and its date ranges
 cover up to their newest 100 shots. Preset figures, such as a preset's arrival line and
-grind hint, and Home Assistant's statistics stay the controller's own.
+grind hint, and Home Assistant's Stats sensors stay the controller's own;
+Home Assistant's Stats cards read the companion's whole-history figures too.
 
 **Opened directly**, Stats and History show what the controller holds, and
 end with a note that the companion keeps a copy, including older records.

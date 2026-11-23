@@ -166,6 +166,11 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
     integrationDeviceId(id);
     char btMac[18] = {};
     integrationBluetoothMac(btMac);
+    // The companion keeping the shot archive, when there is one (IP text only).
+    char companionAddress[COMPANION_ADDRESS_TEXT] = {}, companion[COMPANION_ADDRESS_TEXT + 16] = "null";
+    if (self.companionArchiveAddress(companionAddress, sizeof(companionAddress)))
+      snprintf(companion, sizeof(companion), "{\"address\":\"%s\"}", companionAddress);
+    const uint32_t shotEpoch = self.callbacks_.shotLogEpoch ? self.callbacks_.shotLogEpoch() : 0;
     char firmware[32] = {};
     sanitizeJsonEmbed(FW_VERSION, firmware, sizeof(firmware));
     const int written = snprintf(
@@ -179,11 +184,11 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
         "\"ip\":\"%s\",\"mdnsHost\":\"%s\","
         "\"capabilities\":[\"webhook_v1\",\"preset_select_v1\","
         "\"quick_settings_v1\",\"restart_v1\",\"stored_shots_v1\","
-        "\"preset_rules_v1\",\"last_shot_curve_v1\"],"
+        "\"preset_rules_v1\",\"last_shot_curve_v1\",\"stats_charts_v1\"],"
         "\"shotState\":\"%s\",\"bootId\":%lu,\"activePresetId\":%u,"
         "\"presetRevision\":%lu,\"quickSettings\":%s,"
         "\"lastShot\":%s,"
-        "\"lastActivation\":%s,\"stats\":%s,"
+        "\"lastActivation\":%s,\"stats\":%s,\"shotEpoch\":%lu,\"companion\":%s,"
         "\"lastCommand\":{\"requestId\":%lu,\"state\":\"%s\"}}",
         id, id, btMac, firmware,
         OPEN_BREW_BY_WEIGHT_HARDWARE_PROFILE_ID, FW_BOARD_ARCH_STRING,
@@ -195,6 +200,7 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
         static_cast<unsigned long>(recipe.runtime.revision),
         work.integrationQuickSettings, work.integrationLastShot,
         work.integrationLastActivation, work.integrationStats,
+        static_cast<unsigned long>(shotEpoch), companion,
         static_cast<unsigned long>(network.lastCommandRequestId),
         commandResultStateName(network.lastCommandState));
     const bool ok = lastShotOk && quickSettingsOk &&
@@ -266,6 +272,59 @@ esp_err_t OpenBrewByWeightNetwork::integrationHandler(httpd_req_t *request) {
         ? sendJson(request, STATUS_OK, work.statusJson)
         : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
                     nullptr, "LAST_SHOT_OVERFLOW");
+    self.unlockWorkBuf();
+    return result;
+  }
+
+  // The Web UI Stats header (aggregate, density, consistency, cut series)
+  // for one window and chart preset, so a client draws the Stats charts
+  // exactly like the Web UI; `good` counts the log's good shots. Like the
+  // companion's record sync, it never wakes the radio during a shot.
+  if (apiUriMatches(uri, "/api/v1/integration/stats") &&
+      request->method == HTTP_GET) {
+    char query[32] = {}, window[8] = {}, preset[8] = {};
+    const bool parsed = httpd_req_get_url_query_str(request, query, sizeof(query)) == ESP_OK &&
+        httpd_query_key_value(query, "window", window, sizeof(window)) == ESP_OK &&
+        httpd_query_key_value(query, "preset", preset, sizeof(preset)) == ESP_OK;
+    char *end = nullptr;
+    const unsigned long size = parsed ? strtoul(window, &end, 10) : 0;
+    bool valid = parsed && *window && !*end;
+    const unsigned long presetId = valid ? strtoul(preset, &end, 10) : 0;
+    valid = valid && *preset && !*end && presetId <= UINT8_MAX;
+    bool known = false;
+    for (const size_t choice : SHOT_LOG_STATS_WINDOWS) known = known || choice == size;
+    if (!valid || !known)
+      return sendError(request, STATUS_BAD_REQUEST, "INVALID_REQUEST", nullptr,
+                       "STATS_QUERY_INVALID");
+    if (self.companionSyncHold())
+      return sendError(request, STATUS_UNAVAILABLE, "SHOT_STORAGE_BUSY", nullptr,
+                       "SHOT_STORAGE_BUSY");
+    if (!self.lockWorkBuf()) return self.workBufBusy(request);
+    NetworkWorkBuf &work = *self.workBuf_;
+    auto &cache = work.statsCache;
+    const uint32_t epoch = self.callbacks_.shotLogEpoch ? self.callbacks_.shotLogEpoch() : 0;
+    if (!self.freshShotSnapshot(epoch)) {
+      self.unlockWorkBuf();
+      return sendError(request, STATUS_UNAVAILABLE, "SHOT_STORAGE_BUSY", nullptr,
+                       "SHOT_STORAGE_BUSY");
+    }
+    // The Stats stream rebuilds its own header from these identity fields.
+    cache.statsOk = formatStatsHeader(cache, size, static_cast<uint8_t>(presetId));
+    cache.headerEpoch = cache.snapshot.epoch;
+    cache.headerWindow = size;
+    cache.headerPresetId = static_cast<uint8_t>(presetId);
+    size_t good = 0;
+    for (size_t i = 0; i < cache.snapshot.count; ++i)
+      good += shotLogRecordEligible(cache.snapshot.records[i]);
+    const int written = snprintf(work.statusJson, NetworkWorkBuf::kStatusJson,
+                                 "{\"apiVersion\":1,\"good\":%u,\"stats\":%s}",
+                                 static_cast<unsigned>(good), cache.header);
+    const bool ok = cache.statsOk && written > 0 &&
+                    static_cast<size_t>(written) < NetworkWorkBuf::kStatusJson;
+    const esp_err_t result = ok
+        ? sendJson(request, STATUS_OK, work.statusJson)
+        : sendError(request, STATUS_SERVER_ERROR, "RESPONSE_TOO_LARGE",
+                    nullptr, "STATS_HEADER_OVERFLOW");
     self.unlockWorkBuf();
     return result;
   }

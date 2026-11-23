@@ -2488,6 +2488,8 @@ const errorReasonTexts = {
   SHOT_TRACE_UNAVAILABLE: __WEBUI_TEXT__("err.shot_trace_unavailable"),
   STATE_FIELD_INVALID: __WEBUI_TEXT__("err.state_field_invalid"),
   STATE_OVERRIDE_SWITCH_ONLY: __WEBUI_TEXT__("err.state_override_switch_only"),
+  STATS_HEADER_OVERFLOW: __WEBUI_TEXT__("err.stats_header_overflow"),
+  STATS_QUERY_INVALID: __WEBUI_TEXT__("err.stats_query_invalid"),
   STATUS_BUSY: __WEBUI_TEXT__("err.status_busy"),
   STATUS_PAGE_UNKNOWN: __WEBUI_TEXT__("err.status_page_unknown"),
   STATUS_TOO_LARGE: __WEBUI_TEXT__("err.status_too_large"),

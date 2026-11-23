@@ -402,6 +402,9 @@ params substituted in order (see the example above).
 | ``RESTART_REQUIRES_EMPTY_OBJECT`` | Restart requires an empty JSON object. |
 | ``SETTINGS_UPDATE_PENDING`` | Another settings update is pending. |
 | ``SHOT_CURVE_BUSY`` | The last shot's curve is not loaded yet; retry shortly. |
+| ``SHOT_STORAGE_BUSY`` | The controller is busy (a shot, a rinse or the scale); try again shortly. |
+| ``STATS_HEADER_OVERFLOW`` | The stats charts exceeded their fixed buffer. |
+| ``STATS_QUERY_INVALID`` | window must be 10, 25, 50 or 100 and preset a preset ID from 0 (All) to 255. |
 | ``UNKNOWN_INTEGRATION_ROUTE`` | Unknown integration API route. |
 | ``WEBHOOK_BOUNDED_JSON_REQUIRED`` | A bounded webhook JSON request is required. |
 | ``WEBHOOK_CONFIG_INVALID`` | A valid bounded http:// webhook configuration is required. |
@@ -555,7 +558,7 @@ preset revision, and the complete Quick Settings snapshot.
   "manufacturer": "Open Brew by Weight",
   "model": "Open Brew by Weight",
   "firmwareVersion": "0.1.0",
-  "capabilities": ["webhook_v1", "preset_select_v1", "quick_settings_v1", "restart_v1", "stored_shots_v1", "preset_rules_v1", "last_shot_curve_v1"],
+  "capabilities": ["webhook_v1", "preset_select_v1", "quick_settings_v1", "restart_v1", "stored_shots_v1", "preset_rules_v1", "last_shot_curve_v1", "stats_charts_v1"],
   "shotState": "idle",
   "bootId": 123,
   "activePresetId": 2,
@@ -573,7 +576,9 @@ preset revision, and the complete Quick Settings snapshot.
   },
   "lastShot": null,
   "lastActivation": null,
-  "stats": {"window": 10, "shotCount": 0, "totalDurationS": 0, "avgDurationS": null, "avgYieldG": null, "avgErrorPct": null, "avgFlowGps": null, "shotsPerDay": null, "durationsS": []}
+  "stats": {"window": 10, "shotCount": 0, "totalDurationS": 0, "avgDurationS": null, "avgYieldG": null, "avgErrorPct": null, "avgFlowGps": null, "shotsPerDay": null, "durationsS": []},
+  "shotEpoch": 57,
+  "companion": null
 }
 ```
 
@@ -623,6 +628,19 @@ against the cut line at the stop rather than the target. Unavailable averages ar
 The controller derives these values from RAM; the Web UI streams the same
 object over its data WebSocket, and this payload carries it under `stats`,
 alongside `savePending`.
+
+`shotEpoch` names the current state of shot history: it changes whenever a
+shot is stored, rated, deleted, or the history is cleared, so a client reads
+the [stats charts](#get-apiv1integrationstats) again only when it moved.
+`companion` is `{"address":"192.168.1.20"}` while a paired
+[companion](features/companion.md) keeps the shot archive (Admin →
+Companion, Shot archive on), and `null` otherwise. That companion serves the
+same Stats header over the whole history, up to 1,000 shots, at
+`GET https://<address>/__companion/archive/stats?window=&active=&epoch=`
+(HTTPS only, under the certificate authority it offers at
+`http://<address>/openbrewbyweight-ca.crt`), answering once its copy reached
+`epoch`, the `shotEpoch` above. Home Assistant prefers it and falls back to the
+controller's own route.
 
 `shotState` is `idle` or `brewing`. `wifiMac` and `bluetoothMac` repeat the
 station interface addresses as upper-case `AA:BB:CC:DD:EE:FF` strings; the
@@ -775,6 +793,34 @@ The newest 500 curves are kept in memory, so this route's curve is normally
 there at once; a shot without a stored curve comes with an empty one. The row
 is a few kilobytes, so read it once per shot: after the `end` webhook, and only when the snapshot's `lastShot.shotId` differs from the
 `id` of the shot you already hold.
+
+### `GET /api/v1/integration/stats`
+
+Available with the `stats_charts_v1` capability. Requires `window` (`10`,
+`25`, `50`, or `100`) and `preset` (`0` for All, or a preset id) and returns
+the header the Web UI Stats page draws its charts from, for that window and
+chart preset, plus `good`, how many good shots the log holds:
+
+```json
+{"apiVersion":1,"good":42,"stats":{"window":10,"shotCount":10,…,
+ "dens":[{"lo":18.0,"hi":42.0,"a":25.0,"b":33.0,"shared":true,"n":[2,7,1],"h":[0,1,…]},true],
+ "cons":{"t":[281,295,…],"p":2},
+ "facets":{"presets":[[2,"Double"]],"scales":[[2884452355,"Lunar"]]},
+ "preset":2,"cut":{"t":360,"p":2,"e":[12,-8,…]}}}
+```
+
+`stats` is exactly the [Stats live updates](#stats-live-updates) header
+(`dens`, `cons`, `facets`, `preset`, and `cut`, with the aggregate fields),
+so a client draws the Shot time, Shot consistency, and Cut accuracy charts as
+the Web UI does. A `preset` without good shots in the log still answers;
+follow the Web UI and pick All, or the active preset, when `facets` does not
+list it. Offer each window smaller than `good` plus the smallest one covering
+it, and no choice up to ten shots. `400 STATS_QUERY_INVALID` refuses any other
+query. Like the companion's record sync, the route answers
+`503 SHOT_STORAGE_BUSY` during a shot and its drip delay, a rinse, or while the
+scale connects: read it again after the `end` webhook. The header changes only
+when the shot log does, so read each window and preset a client shows once
+after the `end` webhook, a deletion, or a cleared history, never on a timer.
 
 ### `PUT /api/v1/integration/presets/active`
 
