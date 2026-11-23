@@ -5163,12 +5163,38 @@ const PILL =
 function escHtml(text) {
   return String(text).replace(/[&<>"]/g, (c) => "&#" + c.charCodeAt(0) + ";");
 }
-// Near the left edge it flips to the right of the handle instead of covering it.
+// Near the left edge it flips to the right of the handle instead of covering
+// it. Too wide for either side of a narrow chart, it moves its last two parts
+// (the reading) to a second line, and if still too wide it sits above or
+// below the handle, on the roomier side, kept within the chart's width (in
+// the units of the chart's own coordinates).
 function placePill(pill, text, x, y) {
-  pill.lastChild.innerHTML = text;
-  const pw = pill.lastChild.getBBox().width + 16;
-  pill.firstChild.setAttribute("width", pw);
-  pill.setAttribute("transform", `translate(${x - 11 - pw < 1 ? x + 11 : x - 11 - pw} ${y})`);
+  const [rect, label] = pill.children,
+    svg = pill.ownerSVGElement,
+    box = svg?.viewBox.baseVal,
+    W = box?.width || svg?.clientWidth,
+    parts = text.split(" · "),
+    beside = () => !W || label.getBBox().width + 28 <= Math.max(x, W - x);
+  let h = 9;
+  label.innerHTML = text;
+  if (!beside() && parts.length > 1) {
+    const k = Math.max(1, parts.length - 2);
+    label.innerHTML = [parts.slice(0, k), parts.slice(k)]
+      .map((p, i) => `<tspan x="8" dy="${i ? 16 : -9}">${p.join(" · ")}</tspan>`)
+      .join("");
+    h = 17;
+  }
+  const pw = label.getBBox().width + 16,
+    [px, py] = beside()
+      ? [x - 11 - pw < 1 ? x + 11 : x - 11 - pw, y]
+      : [
+          Math.max(1, Math.min(x - pw / 2, W - pw - 1)),
+          y < (box?.height || svg.clientHeight) / 2 ? y + h + 12 : y - h - 12,
+        ];
+  rect.setAttribute("width", pw);
+  rect.setAttribute("y", -h);
+  rect.setAttribute("height", 2 * h);
+  pill.setAttribute("transform", `translate(${px} ${py})`);
 }
 // Every chart cursor scrubs alike: any pointer grabs it at once and drags it
 // anywhere on the chart, and arrow keys step it once focused. A vertical swipe

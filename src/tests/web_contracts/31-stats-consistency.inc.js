@@ -90,6 +90,33 @@
   assert.ok(codeIncludes(viewJs.stats, 'R.placePill(pill, R.escHtml(text),'),
       'The consistency pill must escape the preset name');
 }
+// A chart pill sits beside the handle while it fits; on a narrow chart it
+// moves its reading to a second line and stays within the chart's width.
+{
+  const assert = require('assert');
+  const placePill = new Function(`${blockAt(runtimeJs, 'function placePill(')};return placePill;`)();
+  const node = () => ({attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }});
+  const at = (text, x, y) => {
+    const label = {...node(), innerHTML: '',
+      getBBox() { return {width: 6 * Math.max(...this.innerHTML.split('</tspan>').map((l) => l.replace(/<[^>]*>/g, '').length))}; }};
+    const pill = {...node(), children: [node(), label],
+      ownerSVGElement: {viewBox: {baseVal: {width: 0, height: 0}}, clientWidth: 260, clientHeight: 72}};
+    placePill(pill, text, x, y);
+    return {lines: label.innerHTML.match(/<tspan/g)?.length || 1, label: label.innerHTML,
+      at: pill.attrs.transform, rect: pill.children[0].attrs};
+  };
+  assert.deepEqual(at('20 s · 2%', 30, 40), {lines: 1, label: '20 s · 2%', at: 'translate(41 40)',
+    rect: {width: 70, y: -9, height: 18}});
+  const wide = at('Shot 5 · Single · Adaptive · 17.9 g of 18.0 g · −0.1 g', 130, 50);
+  assert.equal(wide.lines, 2);
+  assert.ok(wide.label.includes('>Shot 5 · Single · Adaptive</tspan>') &&
+      wide.label.includes('>17.9 g of 18.0 g · −0.1 g</tspan>'), wide.label);
+  assert.deepEqual(wide.rect, {width: 172, y: -17, height: 34});
+  assert.equal(wide.at, 'translate(44 21)');
+  const top = 'Shot 9 · Double · Adaptive · 36.59 g of 36.0 g · +0.59 g';
+  assert.equal(at(top, 250, 10).at, 'translate(61 10)', 'two lines that fit stay beside');
+  assert.equal(at(top, 130, 10).at, 'translate(41 39)', 'near the top it sits below');
+}
 // The Stats averages resolve their element ids from fixed names, never from
 // translated text, so every locale fills all five values.
 {
