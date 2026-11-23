@@ -481,17 +481,6 @@ label:has(> input[type="checkbox"]) .fieldHint {
   margin-left: 1.9rem;
 }
 
-.row {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.row > * {
-  flex: 1 1 15rem;
-  min-width: 0;
-}
-
 .statusColumn {
   display: grid;
   grid-template-columns: 1fr 1fr;
