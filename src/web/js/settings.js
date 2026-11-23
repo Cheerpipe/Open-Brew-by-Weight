@@ -2562,6 +2562,8 @@ const GROUP_SUMMARIES = {
       ? R.sub(__WEBUI_TEXT__("settings.sum_seconds"), [val("rinseDurationS")])
       : OFF,
   scale: () => picked("scalePreference"),
+  dripWait: () =>
+    R.sub(__WEBUI_TEXT__("settings.sum_seconds"), [`${val("dripDelayS")}–${val("dripMaxWaitS")}`]),
   bookoo: () =>
     ({
       255: __WEBUI_TEXT__("settings.bookoo_volume_keep"),

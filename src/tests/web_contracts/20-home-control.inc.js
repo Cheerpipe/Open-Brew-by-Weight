@@ -1586,10 +1586,15 @@ if (!html.includes('<summary>Cup detection</summary>') ||
     html.indexOf('id="retareWindowS"') > html.indexOf('<summary>Cup detection</summary>') ||
     html.indexOf('id="scaleTimerStopExtraDelayMs"') <
         html.indexOf('<summary>Scale</summary>') ||
-    html.indexOf('id="dripDelayS"') <
-        html.indexOf('id="scaleTimerStopExtraDelayMs"') ||
+    html.indexOf('<summary>Drip wait</summary>') <
+        html.indexOf('<summary>AtomHeart Eclair</summary>') ||
+    html.indexOf('<summary>Drip wait</summary>') >
+        html.indexOf('<summary>Tare</summary>') ||
+    ['dripDelayS', 'dripSettleS', 'dripMaxWaitS'].some(id =>
+      html.indexOf(`id="${id}"`) < html.indexOf('<summary>Drip wait</summary>') ||
+      html.indexOf(`id="${id}"`) > html.indexOf('<summary>Tare</summary>')) ||
     html.indexOf('id="scalePreference"') <
-        html.indexOf('id="dripDelayS"') ||
+        html.indexOf('id="scaleTimerStopExtraDelayMs"') ||
     html.indexOf('id="scalePreference"') <
         html.indexOf('<summary>Scale</summary>') ||
     html.indexOf('id="preferredScaleSelect"') <

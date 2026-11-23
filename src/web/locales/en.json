@@ -2209,6 +2209,7 @@
     "settings.drip_set_hint": "Coffee allowed for after the stop on top of what the flow already predicts, so it can be much smaller than the drip you see, even zero. The value you set is used from your next shot, then adjusts itself with every shot; if your next 3 shots agree on a different amount, it moves there straight away. Not sure? Leave it as it is: it finds its own value.",
     "settings.drip_settle_hint": "After the minimum wait, the yield is recorded once the weight has stopped rising for this long. Keep the cup on the scale until then.",
     "settings.drip_settle_s": "Settle time (s)",
+    "settings.drip_wait": "Drip wait",
     "settings.duplicate": "Duplicate",
     "settings.eclair_uses_the_normal_tare_and_timer": "Eclair uses the regular tare and timer workflow. It has no extra volume or sound options; alerts it cannot play use the built-in buzzer when available.",
     "settings.enable_cup_protections_also_in_home_quick": "Stops or blocks shots based on the cup. Rinses always run.",

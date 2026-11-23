@@ -37,7 +37,7 @@ needed rather than reading the entire directory.
 | Coffee apps | [Beanconqueror](settings/beanconqueror.md) |
 | Grinder | [Mahlkönig](settings/mahlkonig.md) (untested with a real grinder yet) |
 | Without a scale / rinse | [Scale guard](settings/no-scale-bbw.md) / [quick rinse](settings/quick-rinse.md) |
-| Scale and cup | [Scales](settings/scales.md) / [Bluetooth on/off](settings/scales.md#bluetooth-onoff) / [cup detection](settings/cup.md) / [tare](settings/tare.md) |
+| Scale and cup | [Scales](settings/scales.md) / [Bluetooth on/off](settings/scales.md#bluetooth-onoff) / [drip wait](settings/drip-wait.md) / [cup detection](settings/cup.md) / [tare](settings/tare.md) |
 | Network | [Wi-Fi](settings/wifi.md) / [access point](settings/ap.md) / [device name](settings/wifi.md#discovery-by-name) / [Web UI access](settings/web-access.md) |
 | Energy | [Power management](settings/power-management.md) |
 | Interface | [Theme](settings/theme.md) / [shot card colors](settings/theme.md#shot-card-colors) / [settings for this device](settings/app.md) |

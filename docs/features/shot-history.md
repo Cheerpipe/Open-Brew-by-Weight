@@ -293,7 +293,7 @@ rules on top.
 
 The controller collects accepted scale readings in memory while the shot runs
 and saves the completed curve once the last drips settle (see
-[drip wait](../settings/scales.md#when-it-applies)). Each reading
+[drip wait](../settings/drip-wait.md#when-it-applies)). Each reading
 keeps its actual arrival time, including repeated weights and changing scale
 cadence. Duration ends when the machine circuit opens. During the drip delay,
 accepted readings continue as a faint dashed line without fill. A small hollow

@@ -65,6 +65,10 @@
     <circle cx="12" cy="10.2" r="3.2" />
     <path d="M9 16.5h6" />
   </symbol>
+  <symbol id="g-dripWait" viewBox="0 0 24 24">
+    <path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" />
+    <path d="M12 14.5c.9 1.3 1.6 2.3 1.6 3.1a1.6 1.6 0 0 1-3.2 0c0-.8.7-1.8 1.6-3.1Z" />
+  </symbol>
   <symbol id="g-tare" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="8" />
     <ellipse cx="12" cy="12" rx="3" ry="4.5" />
@@ -1224,41 +1228,6 @@
           >{{webui:settings.extra_wait_for_the_scale_timer_to}}</small
         ></label
       >
-      <div class="row">
-        <label
-          >{{webui:settings.drip_delay_s}}<input
-            id="dripDelayS"
-            type="number"
-            min="0"
-            max="10"
-            step="0.1"
-            required
-            data-unit="s"
-          /><small class="fieldHint"
-            >{{webui:settings.wait_for_drips_before_saving_final_weight}}</small
-          ></label
-        ><label
-          >{{webui:settings.drip_settle_s}}<input
-            id="dripSettleS"
-            type="number"
-            min="1"
-            max="10"
-            step="0.1"
-            required
-            data-unit="s"
-          /><small class="fieldHint">{{webui:settings.drip_settle_hint}}</small></label
-        ><label
-          >{{webui:settings.drip_max_wait_s}}<input
-            id="dripMaxWaitS"
-            type="number"
-            min="5"
-            max="25"
-            step="1"
-            required
-            data-unit="s"
-          /><small class="fieldHint">{{webui:settings.drip_max_wait_hint}}</small></label
-        >
-      </div>
       <label
         >{{webui:settings.scale_preference}}
         <span class="selBox"
@@ -1347,6 +1316,44 @@
         <summary>{{webui:settings.atomheart_eclair}}</summary>
         <small class="fieldHint">{{webui:settings.eclair_uses_the_normal_tare_and_timer}}</small>
       </details>
+    </details>
+    <details data-g="dripWait" class="cfgGroup">
+      <summary>{{webui:settings.drip_wait}}</summary>
+      <div class="row">
+        <label
+          >{{webui:settings.drip_delay_s}}<input
+            id="dripDelayS"
+            type="number"
+            min="0"
+            max="10"
+            step="0.1"
+            required
+            data-unit="s"
+          /><small class="fieldHint"
+            >{{webui:settings.wait_for_drips_before_saving_final_weight}}</small
+          ></label
+        ><label
+          >{{webui:settings.drip_settle_s}}<input
+            id="dripSettleS"
+            type="number"
+            min="1"
+            max="10"
+            step="0.1"
+            required
+            data-unit="s"
+          /><small class="fieldHint">{{webui:settings.drip_settle_hint}}</small></label
+        ><label
+          >{{webui:settings.drip_max_wait_s}}<input
+            id="dripMaxWaitS"
+            type="number"
+            min="5"
+            max="25"
+            step="1"
+            required
+            data-unit="s"
+          /><small class="fieldHint">{{webui:settings.drip_max_wait_hint}}</small></label
+        >
+      </div>
     </details>
     <details data-g="tare" class="cfgGroup">
       <summary>{{webui:settings.tare}}</summary>

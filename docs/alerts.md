@@ -97,7 +97,7 @@ only**, and a local buzzer is compiled in.
 The melody plays when the shot's yield is recorded, and only if that yield,
 as Last Shot and history show it to a tenth of a gram, is exactly the target.
 The yield is the weight the cup settles at after the drips (see
-[drip wait](settings/scales.md#when-it-applies)), so a shot that creeps up to
+[drip wait](settings/drip-wait.md#when-it-applies)), so a shot that creeps up to
 its target a few seconds after the stop still counts, and the melody and your
 history always agree. If you lift the cup after the weight has settled, the
 melody still plays; lifting it earlier, or starting another cycle, means no
