@@ -120,12 +120,12 @@ class ShotLog
   }
 
   // The drip each newest good shot of a preset needed (offset used + final −
-  // cut line, cg), newest first; skipped when the shot did not train the drip.
-  // Skipped shots keep their measured value so the chart can draw them
-  // hatched; only shots without a computable value stay empty. `notes`
-  // carries each shot's DripLearnNote.
-  size_t recentDrips(uint8_t presetId, uint32_t *ids, int16_t *neededCg, uint8_t *notes,
-                     uint16_t &skippedMask, size_t max) const {
+  // cut line, cg) with the shot's details, newest first; skipped when the shot
+  // did not train the drip. Skipped shots keep their measured value so the
+  // chart can draw them hatched; only shots without a computable value stay
+  // empty.
+  size_t recentDrips(uint8_t presetId, DripChartShot *shots, uint16_t &skippedMask,
+                     size_t max) const {
     size_t found = 0;
     skippedMask = 0;
     size_t index = store_.header.writeIndex;
@@ -136,12 +136,17 @@ class ShotLog
       const bool trained = ((record.extractionExtended >> 5) & 3) == 2;
       const bool measurable = !shotLogWeightIsMissing(record.cutLineCg) &&
                               !shotLogWeightIsMissing(record.actualWeightCg);
-      ids[found] = record.id;
-      notes[found] = shotLogDripLearnNote(record);
-      neededCg[found] = measurable
-          ? static_cast<int16_t>(record.offsetUsedCg + record.actualWeightCg -
-                                 record.cutLineCg)
-          : int16_t{0};
+      shots[found] = {record.id,
+                      record.hasWallTime ? record.endedAtLocalSec : 0U,
+                      record.durationDs,
+                      record.goalWeightDg,
+                      measurable ? static_cast<int16_t>(record.offsetUsedCg +
+                                                        record.actualWeightCg -
+                                                        record.cutLineCg)
+                                 : int16_t{0},
+                      record.actualWeightCg,
+                      record.offsetUsedCg,
+                      shotLogDripLearnNote(record)};
       if (!trained) skippedMask |= static_cast<uint16_t>(1U << found);
       ++found;
     }

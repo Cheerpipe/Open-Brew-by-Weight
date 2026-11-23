@@ -239,19 +239,22 @@ int main() {
     assert(!bootQuickStart(booted, false, bank, &record));
     assert(memcmp(&booted, &record, sizeof(booted)) == 0);
     // Status JSON: no markers, an empty history and a buffer too small.
-    ControlStatusFields fields;
-    char json[256];
+    ControlStatusSnapshot fields;
+    char json[512];
     assert(formatDripChartJson(json, sizeof(json), fields) > 0);
     assert(strstr(json, "\"bbwRecentAfterSet\":-1,\"bbwRecentAfterQuick\":-1,\"bbwRecentG\":[]") != nullptr);
     assert(formatDripChartJson(json, 40, fields) == 0);
-    // A trained shot keeps a negative value; a skipped one below zero is null.
+    // A trained shot keeps a negative value; a skipped one below zero is null,
+    // and so is a yield the shot never measured.
     fields.bbwRecentCount = 3;
     fields.bbwRecentSkipped = 6;
-    fields.bbwRecentCg[0] = -1;
-    fields.bbwRecentCg[1] = -80;
-    fields.bbwRecentCg[2] = 320;
+    fields.bbwRecent[0] = {1, 1800000000U, 285, 360, -1, 3640, 20, 0};
+    fields.bbwRecent[1] = {2, 0, 250, 360, -80, SHOT_LOG_WEIGHT_MISSING, 20, 3};
+    fields.bbwRecent[2].neededCg = 320;
     assert(formatDripChartJson(json, sizeof(json), fields) > 0);
     assert(strstr(json, "\"bbwRecentG\":[-0.01,null,3.20]") != nullptr);
+    assert(strstr(json, "\"bbwRecentNote\":[0,3,0],\"bbwRecentShot\":[[1800000000,285,3640,"
+                        "360,20],[0,250,null,360,20],[0,0,0,0,0]]") != nullptr);
   }
 
   // Drip learning memory: exact NVS round trip, damaged or foreign records

@@ -13842,10 +13842,8 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
     corridor::GrindHintV2 hint;
     corridor::FirstDropStats ownDrop, otherDrop;
     size_t drips;
-    int16_t dripCg[10];
-    uint8_t dripNote[10];
+    DripChartShot drip[10];
     uint16_t skipped;
-    uint32_t dripIds[10];
     ShotLogRecord home;
     bool hasHome;
     PresetShotStats preset[MAX_SHOT_PRESETS];
@@ -13880,7 +13878,7 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
     out.hint = shotLog.grindHint(preset);
     out.ownDrop = shotLog.firstDropStats(preset);
     out.otherDrop = shotLog.firstDropStats(preset, true);
-    out.drips = shotLog.recentDrips(preset.id, out.dripIds, out.dripCg, out.dripNote, out.skipped, 10);
+    out.drips = shotLog.recentDrips(preset.id, out.drip, out.skipped, 10);
     out.hasHome = copyHomeShot(out.home, nullptr);
     copyPresetShotStats(presetBank, out.preset);
   };
@@ -13924,10 +13922,10 @@ void s01o_bad_shots_feed_no_statistic_or_learning_input() {
         mixed.otherDrop.medianMs == clean.otherDrop.medianMs);
   CHECK(mixed.preset[own].firstDrop.n == clean.preset[own].firstDrop.n &&
         mixed.preset[own].firstDrop.medianMs == clean.preset[own].firstDrop.medianMs);
-  CHECK(mixed.drips == clean.drips && mixed.skipped == clean.skipped &&
-        !memcmp(mixed.dripCg, clean.dripCg, sizeof(clean.dripCg)));
+  CHECK(mixed.drips == clean.drips && mixed.skipped == clean.skipped);
   for (size_t n = 0; n < clean.drips; ++n)
-    CHECK(position(mixedIds, mixed.dripIds[n]) == position(goodIds, clean.dripIds[n]));
+    CHECK(mixed.drip[n].neededCg == clean.drip[n].neededCg &&
+          position(mixedIds, mixed.drip[n].id) == position(goodIds, clean.drip[n].id));
   CHECK(mixed.hasHome && clean.hasHome && mixed.home.actualWeightCg == clean.home.actualWeightCg &&
         mixed.home.durationDs == clean.home.durationDs);
   // The default list filter keeps exactly the good shots; Show bad shots
@@ -21824,6 +21822,8 @@ void fw06_status_carries_recent_drips_and_markers() {
     record.cutLineCg = 3600;
     record.offsetUsedCg = 100;
     record.actualWeightCg = static_cast<int16_t>(3550 + i);  // needed 0.50 + i cg
+    record.hasWallTime = i == 5;
+    record.endedAtLocalSec = 1800000000U;
     shotLogSetPresetId(record, preset.id);
     shotLogSetBbw(record, {.algorithm = 1, .version = BBW_PROFILE_VERSION, .alpha = 30,
                            .learningApplied = i != 4});
@@ -21838,21 +21838,25 @@ void fw06_status_carries_recent_drips_and_markers() {
   ControlStatusSnapshot status;
   copyControlStatus(status);
   CHECK(status.bbwRecentCount == 6 && status.bbwRecentSkipped == 2);
-  CHECK(status.bbwRecentCg[0] == 55 && status.bbwRecentCg[1] == 54 &&
-        status.bbwRecentCg[2] == 53 && status.bbwRecentCg[4] == 51);
+  CHECK(status.bbwRecent[0].neededCg == 55 && status.bbwRecent[1].neededCg == 54 &&
+        status.bbwRecent[2].neededCg == 53 && status.bbwRecent[4].neededCg == 51);
   CHECK(status.bbwRecentAfterSet == 3 && status.bbwRecentAfterQuick == 0xFF);
-  CHECK(status.bbwRecentNote[1] == static_cast<uint8_t>(DripLearnNote::NOT_FRESH) &&
-        status.bbwRecentNote[0] == 0);
+  CHECK(status.bbwRecent[1].note == static_cast<uint8_t>(DripLearnNote::NOT_FRESH) &&
+        status.bbwRecent[0].note == 0);
   CHECK(status.bbwQuickState == static_cast<uint8_t>(QuickStartState::ARMED) &&
         status.bbwQuickSetCg == 120);
-  char json[256];
+  char json[768];
   CHECK(formatDripChartJson(json, sizeof(json), status) > 0);
   // The skipped fifth shot keeps its measured value, rides the mask and
-  // names why it did not train.
+  // names why it did not train; each shot carries its details, and only the
+  // newest has wall time.
   CHECK(strcmp(json, ",\"bbwQuickStart\":{\"state\":\"armed\",\"count\":0,\"setG\":1.20,"
                      "\"quickG\":0.00},\"bbwRecentAfterSet\":3,\"bbwRecentAfterQuick\":-1,"
                      "\"bbwRecentG\":[0.55,0.54,0.53,0.52,0.51,0.50],"
-                     "\"bbwRecentSkipped\":2,\"bbwRecentNote\":[0,9,0,0,0,0]") == 0);
+                     "\"bbwRecentSkipped\":2,\"bbwRecentNote\":[0,9,0,0,0,0],"
+                     "\"bbwRecentShot\":[[1800000000,300,3555,360,100],[0,300,3554,360,100],"
+                     "[0,300,3553,360,100],[0,300,3552,360,100],[0,300,3551,360,100],"
+                     "[0,300,3550,360,100]]") == 0);
   // Another preset's shots never reach this preset's chart.
   CHECK(setActiveShotPreset(presetBank, presetBank.presets[1].id));
   publishControlStatus();

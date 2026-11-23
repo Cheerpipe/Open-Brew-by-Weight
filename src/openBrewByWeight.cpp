@@ -1115,6 +1115,7 @@ void copyControlStatus(ControlStatusSnapshot &output) {
   TaskLockGuard lock(controlStatusMutex);
   static_cast<ControlStatusFields &>(output) = publishedControlStatus;
   copyShotCurve(output.shotCurve, publishedControlCurve.shotCurve);
+  memcpy(output.bbwRecent, publishedControlCurve.bbwRecent, sizeof(output.bbwRecent));
   output.snapshotStale =
       __atomic_load_n(&controlStatusPublishRequested, __ATOMIC_ACQUIRE);
 }

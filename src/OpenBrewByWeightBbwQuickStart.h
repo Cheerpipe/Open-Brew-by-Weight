@@ -16,6 +16,7 @@
 #include <type_traits>
 
 #include "OpenBrewByWeightPresets.h"
+#include "OpenBrewByWeightShotLogTypes.h"
 
 namespace openbrewbyweight {
 
@@ -171,14 +172,17 @@ inline bool observeQuickStart(QuickStartRecord &record, const ShotPresetBank &ba
 // (-1 = none), the newest needed drips (null = no computable value), the
 // bitmask of shots that did not train the drip (bit i matches bbwRecentG[i];
 // skipped shots with a value draw hatched in the chart; one at or below zero
-// measured no drip and goes as null) and each shot's DripLearnNote. Returns
-// the length written, or 0 when the buffer is too small.
-inline size_t formatDripChartJson(char *out, size_t cap, const ControlStatusFields &c) {
+// measured no drip and goes as null), each shot's DripLearnNote, and each
+// shot's details for the chart's pill: [local time s (0 = none), duration ds,
+// yield cg (null = missing), target dg, drip used cg]. Returns the length
+// written, or 0 when the buffer is too small.
+inline size_t formatDripChartJson(char *out, size_t cap, const ControlStatusSnapshot &c) {
   static const char *const states[] = {"off", "armed", "applied", "disagreed"};
+  const uint8_t n = std::min<uint8_t>(c.bbwRecentCount, 10);
   size_t used = 0;
-  const auto put = [&](int n) {
-    if (n < 0 || used + static_cast<size_t>(n) >= cap) used = cap;
-    else used += static_cast<size_t>(n);
+  const auto put = [&](int written) {
+    if (written < 0 || used + static_cast<size_t>(written) >= cap) used = cap;
+    else used += static_cast<size_t>(written);
   };
   put(snprintf(out, cap,
                ",\"bbwQuickStart\":{\"state\":\"%s\",\"count\":%u,\"setG\":%.2f,"
@@ -188,20 +192,28 @@ inline size_t formatDripChartJson(char *out, size_t cap, const ControlStatusFiel
                c.bbwQuickSetCg / 100.0, c.bbwQuickCg / 100.0,
                c.bbwRecentAfterSet == 0xFF ? -1 : c.bbwRecentAfterSet,
                c.bbwRecentAfterQuick == 0xFF ? -1 : c.bbwRecentAfterQuick));
-  for (uint8_t i = 0; used < cap && i < c.bbwRecentCount && i < 10; ++i)
-    put(((c.bbwRecentSkipped >> i) & 1U) && c.bbwRecentCg[i] <= 0
+  for (uint8_t i = 0; used < cap && i < n; ++i)
+    put(((c.bbwRecentSkipped >> i) & 1U) && c.bbwRecent[i].neededCg <= 0
             ? snprintf(out + used, cap - used, "%snull", i ? "," : "")
             : snprintf(out + used, cap - used, "%s%.2f", i ? "," : "",
-                       c.bbwRecentCg[i] / 100.0));
+                       c.bbwRecent[i].neededCg / 100.0));
   if (used < cap)
     put(snprintf(out + used, cap - used, "],\"bbwRecentSkipped\":%u",
-                 static_cast<unsigned>(c.bbwRecentCount < 10
-                     ? c.bbwRecentSkipped & ((1U << c.bbwRecentCount) - 1U)
-                     : c.bbwRecentSkipped)));
-  for (uint8_t i = 0; used < cap && i < c.bbwRecentCount && i < 10; ++i)
+                 static_cast<unsigned>(n < 10 ? c.bbwRecentSkipped & ((1U << n) - 1U)
+                                              : c.bbwRecentSkipped)));
+  for (uint8_t i = 0; used < cap && i < n; ++i)
     put(snprintf(out + used, cap - used, "%s%u", i ? "," : ",\"bbwRecentNote\":[",
-                 static_cast<unsigned>(c.bbwRecentNote[i])));
-  if (used < cap && c.bbwRecentCount > 0) put(snprintf(out + used, cap - used, "]"));
+                 static_cast<unsigned>(c.bbwRecent[i].note)));
+  for (uint8_t i = 0; used < cap && i < n; ++i) {
+    const DripChartShot &shot = c.bbwRecent[i];
+    char yield[8] = "null";
+    if (!shotLogWeightIsMissing(shot.yieldCg)) snprintf(yield, sizeof(yield), "%d", shot.yieldCg);
+    put(snprintf(out + used, cap - used, "%s[%lu,%u,%s,%u,%d]",
+                 i ? "," : "],\"bbwRecentShot\":[", static_cast<unsigned long>(shot.localSec),
+                 static_cast<unsigned>(shot.durationDs), yield,
+                 static_cast<unsigned>(shot.goalDg), shot.usedCg));
+  }
+  if (used < cap && n > 0) put(snprintf(out + used, cap - used, "]"));
   return used < cap ? used : 0;
 }
 

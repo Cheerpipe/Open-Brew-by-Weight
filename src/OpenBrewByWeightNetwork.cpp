@@ -221,6 +221,8 @@ struct NetworkWorkBuf {
   char safeBullseyeRtttl[BULLSEYE_RTTTL_CAPACITY]{};
   // Settings stream: the saved values of the active overrides (all seven fit).
   char quickSaved[224]{};
+  // Settings stream: the drip chart block, ten shots with their details.
+  char dripChart[768]{};
   // Must match OpenBrewByWeightNetwork::REQUEST_BODY_CAPACITY (asserted in begin()).
   char requestBody[2048]{};
   WifiScanSnapshot wifiScan{};

@@ -34,7 +34,7 @@
     return n;
   };
   const elements = new Map();
-  for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripNotes', 'dripBars', 'dripBarX', 'dripLegend',
+  for (const id of ['brewByWeight', 'learnedOffsetG', 'dripVerdict', 'dripHint', 'dripBars', 'dripBarX', 'dripLegend',
     'dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton',
     'dripQuickStart', 'dripQuickStartButton'])
     elements.set(id, node());
@@ -43,7 +43,8 @@
   learning.querySelectorAll = () => ['dripSetG', 'dripSetButton', 'dripUndoButton', 'alphaSet', 'alphaSetButton', 'alphaUndoButton'].map(id => elements.get(id));
   const document = {activeElement: null, querySelectorAll: () => [learning],
     createElement: tag => Object.assign(node(), {tag})};
-  const context = vm.createContext({$: id => elements.get(id), controlsMutable: true,
+  const R = {sub: (t, v) => t.replace(/\{(\d)\}/g, (_, i) => v[+i]), formatHumanTime: t => 'at ' + t};
+  const context = vm.createContext({$: id => elements.get(id), R, controlsMutable: true,
     uiState: {brewDirty: false, configDirty: false, bbwReadback: null}, configLoaded: true, formRev: 1, document});
   const start = runtimeJs.search(/let\s+bbwFormPresetId\s*=/);
   const end = runtimeJs.indexOf('function soundAlertsAreOn', start);
@@ -85,16 +86,19 @@
   assert.deepEqual(legend(), ['Used in the current correction', 'Not used']);
   assert(elements.get('dripBarX').innerHTML.includes('3.20'));
   assert.equal(elements.get('dripVerdict').textContent, 'On track: your last shots needed 0.59–0.72 g');
-  // Without a reason (an earlier record) no line explains it.
-  assert(elements.get('dripNotes').hidden);
-  // Each reason gets one line naming its shots.
+  // Each charted shot is a cursor stop; without details or a reason (an
+  // earlier record) its pill says only what it needed and how it counted.
+  const pick = k => elements.get('dripBars')._pick(k).lines;
+  assert.deepEqual(elements.get('dripBars')._range, [6, 9]);
+  assert.deepEqual(pick(6), ['Drip needed 3.20 g, used 0 g', 'Not used']);
+  // The pill gives a shot's details and why it did not train the drip.
   refresh({bbwPresetId: 2, bbwEwmaOffsetG: 0.70, bbwAlpha: 0.3,
     bbwRecentG: [0.59, 0.72, 0.63, 0.10], bbwRecentSkipped: 10, bbwRecentNote: [0, 9, 0, 9],
+    bbwRecentShot: [[0, 300, null, 360, 20], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [1800000000, 285, 3640, 360, 20]],
     bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
-  assert(!elements.get('dripNotes').hidden);
-  assert.equal(elements.get('dripNotes').children.length, 1);
-  assert.equal(elements.get('dripNotes').children[0].children[0],
-    '0.10 g, 0.72 g: the scale stopped reporting before the drip wait ended');
+  assert.deepEqual(pick(6), ['at 1800000000 · 28.5 s', 'Yield 36.4 g of 36.0 g',
+    'Drip needed 0.10 g, used 0.20 g', 'Not used: the scale stopped reporting before the drip wait ended']);
+  assert.deepEqual(pick(9), ['30.0 s', 'Drip needed 0.59 g, used 0.20 g', 'Used in the current correction']);
   // An edited field keeps the owner's value across refreshes.
   elements.get('dripSetG').value = '0.50';
   elements.get('dripSetG').dataset.edited = '1';
@@ -142,8 +146,10 @@
   assert.deepEqual(legend(), ['Used in the current correction', 'Also used in quick start', 'Used before you set 1.20 g']);
   // One counted shot gives quick start nothing to say yet.
   assert.equal(elements.get('dripVerdict').textContent, '');
-  // The legend tells it apart: no note line, and no hint while quick start runs.
-  assert(elements.get('dripNotes').hidden && elements.get('dripHint').hidden);
+  // The legend tells it apart: its pill names no reason, and no hint while
+  // quick start runs.
+  assert.equal(pick(8).at(-1), 'Used in the current correction');
+  assert(elements.get('dripHint').hidden);
   assert.equal(bars().filter(b => b.className.includes('next')).length, 1);
   assert.equal(marks().length, 1);
   assert.equal(marks()[0].children[0].children[0], 'Quick start from 1.20 g');

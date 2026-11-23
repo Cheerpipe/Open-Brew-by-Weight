@@ -102,16 +102,14 @@ struct ControlStatusFields : ScaleLinkMetrics {
   uint8_t bbwPresetId = 0;
   uint8_t bbwAlpha = DEFAULT_BBW_EWMA_ALPHA;
   float bbwEwmaOffsetG = DEFAULT_WEIGHT_OFFSET_G;
-  // Drip chart: the active preset's newest shots (cg, newest first), how many
-  // came after the drip was set and after quick start decided (0xFF = no
-  // marker), what each did to the drip (DripLearnNote), and the quick start
+  // Drip chart: how many of the active preset's newest shots it charts (the
+  // shots ride ControlStatusCurve), how many came after the drip was set and
+  // after quick start decided (0xFF = no marker), and the quick start
   // (QuickStartEntry fields).
   uint8_t bbwRecentCount = 0;
   uint16_t bbwRecentSkipped = 0;
   uint8_t bbwRecentAfterSet = 0xFF;
   uint8_t bbwRecentAfterQuick = 0xFF;
-  int16_t bbwRecentCg[10] = {};
-  uint8_t bbwRecentNote[10] = {};
   uint8_t bbwQuickState = 0;
   uint8_t bbwQuickCount = 0;
   int16_t bbwQuickSetCg = 0;
@@ -199,10 +197,12 @@ struct ControlStatusFields : ScaleLinkMetrics {
   bool bleScanEnabled = true;
 };
 
-// The live or just-ended activity's curve (empty otherwise), published in
-// PSRAM under the same mutex/version. Readers receive one coherent copy.
+// The live or just-ended activity's curve (empty otherwise) and the drip
+// chart's shots (newest first), published in PSRAM under the same
+// mutex/version. Readers receive one coherent copy.
 struct ControlStatusCurve {
   ShotCurveRecord shotCurve{};
+  DripChartShot bbwRecent[10]{};
 };
 struct ControlStatusSnapshot : ControlStatusFields, ControlStatusCurve {};
 static_assert(sizeof(ControlStatusFields) <= 2048,
@@ -212,8 +212,9 @@ static_assert(sizeof(ControlStatusFields) <= 2048,
 // and quick start); 6952: +8 for the drip chart's newest ten shots; 7432: the
 // curve as one delta-stream record (its scalars leave the internal fields) —
 // external work-area growth, internal budget unchanged; 7448: +16 for what
-// each charted shot did to the drip.
-static_assert(sizeof(ControlStatusSnapshot) <= 7448,
+// each charted shot did to the drip; 7616: the charted shots' details for
+// the drip chart pill, moved to the external half (internal -30).
+static_assert(sizeof(ControlStatusSnapshot) <= 7616,
               "ControlStatusSnapshot exceeds its external workspace budget");
 
 // Gate checks use this compact internal view. The full scalar/curve snapshot

@@ -1587,7 +1587,7 @@ function syncHeroTintAvailability() {
 }
 // What each newest shot needed against the drip in use, oldest bar first.
 // Markers show where the owner set the drip and where quick start decided;
-// a line per reason says why shots did not train it.
+// the chosen bar's pill gives its shot's details and how it counted.
 function renderDripChart(c) {
   // What a charted shot did to the drip correction, by DripLearnNote number
   // (firmware OpenBrewByWeightBbwTypes.h); 0 trained it and 16 trained it
@@ -1725,18 +1725,16 @@ function renderDripChart(c) {
     )
     .join("");
   // The legend names only the kinds of bar drawn, hatched first as the bars are.
-  const kinds = new Set(
-    slots
-      .filter((s) => s.g != null)
-      .map((s) => (skip(s.i) ? "skip" : old(s) ? "old" : counted(s) ? "qs" : "")),
-  );
+  const KINDS = {
+      "": __WEBUI_TEXT__("runtime.drip_legend_current"),
+      qs: __WEBUI_TEXT__("runtime.drip_legend_quick"),
+      old: __WEBUI_TEXT__("runtime.drip_legend_before") + dripText(q.setG),
+      skip: __WEBUI_TEXT__("runtime.drip_legend_unused"),
+    },
+    kind = (s) => (skip(s.i) ? "skip" : old(s) ? "old" : counted(s) ? "qs" : ""),
+    kinds = new Set(slots.filter((s) => s.g != null).map(kind));
   $("dripLegend").replaceChildren(
-    ...[
-      ["", __WEBUI_TEXT__("runtime.drip_legend_current")],
-      ["qs", __WEBUI_TEXT__("runtime.drip_legend_quick")],
-      ["old", __WEBUI_TEXT__("runtime.drip_legend_before") + dripText(q.setG)],
-      ["skip", __WEBUI_TEXT__("runtime.drip_legend_unused")],
-    ]
+    ...Object.entries(KINDS)
       .filter(([k]) => kinds.has(k))
       .map(([k, text]) => el("span", "", el("i", k), text)),
   );
@@ -1772,17 +1770,39 @@ function renderDripChart(c) {
       ? __WEBUI_TEXT__("runtime.drip_hint_learning")
       : "";
   $("dripHint").hidden = !$("dripHint").textContent;
-  const reasons = new Map();
-  for (const s of shots)
-    if (NOTES[note(s.i)])
-      reasons.set(note(s.i), [
-        ...(reasons.get(note(s.i)) || []),
-        s.g != null ? dripText(s.g) : __WEBUI_TEXT__("runtime.drip_skipped"),
-      ]);
-  $("dripNotes").replaceChildren(
-    ...[...reasons].map(([k, values]) => el("li", "", values.join(", ") + ": " + NOTES[k])),
-  );
-  $("dripNotes").hidden = !reasons.size;
+  // The chart cursor (bound in init) reads each charted shot from here:
+  // [local time s, duration ds, yield cg, target dg, drip used cg].
+  bars._range = [pad, pad + shots.length - 1];
+  bars._pick = (k) => {
+    const s = slots[k],
+      [t, ds, y, goal, used] = c?.bbwRecentShot?.[s.i] || [];
+    return {
+      kind: kind(s),
+      y: h(s.g ?? 0),
+      lines: [
+        [
+          t > 0 && R.formatHumanTime(t),
+          ds > 0 && (ds / 10).toFixed(1) + " " + __WEBUI_TEXT__("runtime.s"),
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        y != null &&
+          goal > 0 &&
+          R.sub(__WEBUI_TEXT__("runtime.drip_pill_yield"), [
+            (y / 100).toFixed(1),
+            (goal / 10).toFixed(1),
+          ]),
+        R.sub(__WEBUI_TEXT__("runtime.drip_pill_drip"), [
+          s.g != null ? dripText(s.g) : "—",
+          dripText((used ?? 0) / 100),
+        ]),
+        KINDS[kind(s)] + (NOTES[note(s.i)] ? ": " + NOTES[note(s.i)] : ""),
+      ].filter(Boolean),
+    };
+  };
+  // A new shot shifts every bar, so the choice resets; otherwise it stays.
+  if (bars._key !== (bars._key = n + ":" + c?.bbwRecentShot?.[0])) bars._at = null;
+  bars._seek?.(bars._at);
   $("dripQuickStart").hidden = !c || armed;
   $("dripStatus").className = "dcStatus" + (armed || mode === "applied" ? " quick" : "");
   $("dripStatus").lastElementChild.textContent = armed
@@ -2884,6 +2904,42 @@ export function init() {
     b.textContent = __WEBUI_TEXT__("settings.beanconqueror_copied");
     setTimeout(() => (b.textContent = __WEBUI_TEXT__("settings.beanconqueror_copy")), 1500);
   };
+  // Drip chart cursor, as on the Shots charts: a dot on the chosen bar and a
+  // pill with its shot, kept until the chart loses focus or a shot arrives.
+  const bars = $("dripBars"),
+    make = (tag, cls) => Object.assign(document.createElement(tag), { className: cls });
+  bars._seek = (v) => {
+    bars.querySelector(".dcSel")?.remove();
+    const [lo, hi] = bars._range || [0, -1];
+    bars._at = v == null || hi < lo ? null : Math.max(lo, Math.min(hi, v));
+    if (bars._at == null) return bars.removeAttribute("aria-valuetext");
+    const p = bars._pick(bars._at),
+      sel = make("div", "dcSel " + p.kind),
+      dot = make("b", ""),
+      pill = make("div", "dcPill");
+    sel.style.left = `calc((100% + var(--dcGap)) * ${bars._at + 0.5} / 10 - var(--dcGap) / 2)`;
+    dot.style.bottom = p.y;
+    pill.style.bottom = `calc(${p.y} + 10px)`;
+    pill.append(...p.lines.map((t) => Object.assign(make("span", ""), { textContent: t })));
+    sel.append(dot, pill);
+    bars.append(sel);
+    // Above the dot, centred on it and kept within the chart's width.
+    const fig = bars.parentElement.getBoundingClientRect(),
+      x = sel.getBoundingClientRect().left,
+      w = pill.offsetWidth;
+    pill.style.left = Math.max(fig.left - x, Math.min(fig.right - x - w, -w / 2)) + "px";
+    bars.setAttribute("aria-valuetext", p.lines.join(", "));
+  };
+  R.bindScrub(
+    bars,
+    (x) => {
+      const b = bars.getBoundingClientRect();
+      return Math.round(((x - b.left) / b.width) * 10 - 0.5);
+    },
+    (v) => bars._seek(v > bars._at ? Math.ceil(v) : Math.floor(v)),
+    () => bars._at ?? bars._range?.[1],
+  );
+  bars.addEventListener("blur", () => bars._seek(null));
   R.setSettingsRenderer((c) => {
     renderDripChart(c);
     R.renderGroupRows($("workflowPanel"), GROUP_SUMMARIES);

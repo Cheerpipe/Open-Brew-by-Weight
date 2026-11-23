@@ -1558,7 +1558,7 @@ if (!codeIncludes(ui, 'id="learnedOffsetG"') ||
     !css.includes('.numBox:has(>input[data-edited])>input{padding-right:13rem') ||
     css.includes('#bbwAlgorithm{width:100%}') ||
     !network.includes('"dripG"') ||
-    !network.includes('formatDripChartJson(drip, sizeof(drip), control)') ||
+    !network.includes('formatDripChartJson(drip, sizeof(g_work->dripChart), control)') ||
     !fs.readFileSync(path.join(sketchDir, 'OpenBrewByWeightBbwQuickStart.h'), 'utf8').includes('bbwRecentG')) {
   throw new Error('Drip compensation must show the drip, its recent shots and the inline Set keys in order');
 }

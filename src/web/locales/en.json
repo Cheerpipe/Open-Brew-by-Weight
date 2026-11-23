@@ -1477,6 +1477,8 @@
     "runtime.drip_note_timer": "a timer-only shot, without weight",
     "runtime.drip_note_too_low": "almost nothing reached the cup",
     "runtime.drip_on_track": "On track: ",
+    "runtime.drip_pill_drip": "Drip needed {0}, used {1}",
+    "runtime.drip_pill_yield": "Yield {0} g of {1} g",
     "runtime.drip_quick_from": "Quick start from ",
     "runtime.drip_quick_set": "Quick start set to ",
     "runtime.drip_settle": "Settle time",

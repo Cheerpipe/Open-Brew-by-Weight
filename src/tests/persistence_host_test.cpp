@@ -1186,8 +1186,9 @@ void p24_preset_bank_size_and_crud_budgets() {
   // 6920: +8 bytes for the hero tint; 6944: +24 for the drip chart; 6952: +8
   // for its ten shots; 7432: the delta-stream curve record (external
   // work-area growth; see OpenBrewByWeightControlStatusTypes.inc); 7448: +16
-  // for the charted shots' drip notes.
-  CHECK(sizeof(ControlStatusSnapshot) <= 7448);
+  // for the charted shots' drip notes; 7616: their details, in the external
+  // half.
+  CHECK(sizeof(ControlStatusSnapshot) <= 7616);
   CHECK(sizeof(ControlGateSnapshot) <= 32);
   CHECK(sizeof(WebCommand) <= 440);
   WebCommand command;

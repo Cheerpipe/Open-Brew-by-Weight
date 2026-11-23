@@ -253,9 +253,13 @@ each kind of bar it shows was used for: the current correction, quick start
 as well, only the correction from before you last set it, or nothing. While a
 quick start runs, the line above the chart stays empty after one shot; from
 two on it says whether your shots still agree closely enough to quick start.
-Below the legend, one line per reason
-names those shots and says why they were left out, for example that the
-scale stopped reporting before the drip wait ended. The Web UI log keeps the
+Tap a bar, or drag across the chart, to see that shot: a dot marks the bar
+and a label above it shows when you pulled the shot, how long it ran, how
+much reached the cup against your target, the drip it needed against the
+correction in use at the time, and how the shot counted. For a shot that
+was left out it also says why, for example that the scale stopped reporting
+before the drip wait ended. Tap anywhere else to close it; with a keyboard,
+the arrow keys move between shots. The Web UI log keeps the
 same reason for every shot, and a line for every change you make to the
 correction: what changed, the correction and learning speed now in use, and
 whether it came from this Web UI or through the companion. With
