@@ -240,7 +240,7 @@ void regenerate(const char *path) {
   untimed.untimedEvery = 1;
   cJSON_AddItemToArray(cases, caseOf("window10_no_timed_shots", 10, 1, rowsOf(15, untimed)));
   cJSON_AddItemToArray(cases, caseOf("window10_empty", 10, 1, cJSON_CreateArray()));
-  // All presets: no preset chart and no cut series.
+  // All presets: no preset chart; the cut series over every preset.
   Shape all;
   cJSON_AddItemToArray(cases, caseOf("window50_all_presets", 50, 0, rowsOf(60, all)));
   // One preset, one target: the cut series' "t" is a single number.

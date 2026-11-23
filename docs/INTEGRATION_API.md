@@ -1630,12 +1630,14 @@ the averages whatever the sort, filter, or scroll:
   list filter.
 - `preset`: the preset the chosen-preset chart and `cut` follow (`0` All), so
   the page can tell a header built for an earlier choice.
-- `cut`: for the cut accuracy chart, absent with All or when the chosen preset
-  has none: that preset's newest `window` good shots stopped by weight (target,
-  fast-guard or slow-guard cut), within `days` when asked, with a settled
-  yield, oldest first, as `t`, their targets in tenths of a gram (one number
-  when they share one), `e`, the settled yield minus the target in hundredths
-  of a gram, and `g` as in `cons`.
+- `cut`: for the cut accuracy chart, absent when the chosen preset (with All,
+  any preset) has none: the newest `window` good shots of that preset, or of
+  every preset with All, stopped by weight (target, fast-guard or slow-guard
+  cut), within `days` when asked, with a settled yield, oldest first, as `t`,
+  each shot's own target in tenths of a gram (one number when they share one),
+  `p`, their preset ids (one number when they share one), `e`, the settled
+  yield minus that shot's target in hundredths of a gram, and `g` as in
+  `cons`.
 
 The integration API's stats object stays at ten shots.
 Each row retains its own `bootId` and curve arrays; row errors are calculated

@@ -637,9 +637,8 @@ function fillShotCharts(h, m) {
 // chosen one while it holds good shots; until one is chosen, or once the
 // chosen one has none left, the active one while it holds good shots, else
 // All, as the controller's header keeps following the active preset until a
-// page names one. The header's `preset` names the one it was built for: the chosen one,
-// or with All the active one, whose stops Cut accuracy shows, since a stop
-// only compares with its own preset's target.
+// page names one. The header's `preset` names the one it was built for, so
+// a header built for an earlier choice is told apart.
 const statsChosenPreset = () => {
     const chosen = R.uiState.statsPreset,
       active = statsActivePreset(),
@@ -684,7 +683,6 @@ function renderStatsDurChart() {
     names = new Map(st.facets?.presets || []),
     ids = [...names.keys()],
     only = statsChosenPreset(),
-    want = only || statsActivePreset(),
     nameOf = (id) => presets.items?.find((x) => x.id === id)?.name || names.get(id),
     // The firmware's charts over the panel's window, whatever the table's
     // order or scroll: density curves for all presets and the chosen one
@@ -716,16 +714,16 @@ function renderStatsDurChart() {
   root.hidden = !ids.length;
   // A header built for another preset leaves the charts as they are until
   // the one they follow arrives: the companion is asked again, the
-  // controller told the choice (until then it follows the active preset).
-  if (st.preset != null && st.preset !== want) {
+  // controller told the preset the page follows.
+  if (st.preset != null && st.preset !== only) {
     if (statsMerged) refreshMergedHeader();
-    else if (R.uiState.statsPreset != null && statsPresetSent !== want)
-      R.sendUiOperation({ op: "stats", on: true, preset: (statsPresetSent = want) });
+    else if (statsPresetSent !== only)
+      R.sendUiOperation({ op: "stats", on: true, preset: (statsPresetSent = only) });
     return;
   }
   host.hidden = !d;
   renderStatsConsistency(shots);
-  renderStatsCutAccuracy(st, want, !only && nameOf(want));
+  renderStatsCutAccuracy(st, !only && nameOf);
   const band = $("statsBandButton");
   if (band) {
     band.hidden = $("statsConsistency").hidden && $("statsCutAccuracy").hidden;
@@ -1264,16 +1262,18 @@ function renderStatsConsistency(shots) {
     ),
   });
 }
-// Cut accuracy: how far each automatic stop of the chosen preset settled
-// from its target, from the header's "cut" series (oldest first). A bullseye
-// settles exactly on the target, as the Bullseye melody counts it; shots a
-// guard stopped on purpose are drawn but not scored. Past CUT_CLOSE_G a miss
-// is amber, past CUT_FAR_G red.
+// Cut accuracy: how far each automatic stop of the chosen preset, or of
+// every preset with All, settled from its own shot's target, from the
+// header's "cut" series (oldest first). A bullseye settles exactly on the
+// target, as the Bullseye melody counts it; shots a guard stopped on purpose
+// are drawn but not scored. Past CUT_CLOSE_G a miss is amber, past CUT_FAR_G
+// red.
 const CUT_CLOSE_G = 0.2,
   CUT_FAR_G = 0.5;
 function cutModel(cut) {
   const rows = cut.e.map((e, i) => ({
       targetG: (Array.isArray(cut.t) ? cut.t[i] : cut.t) / 10,
+      presetId: Array.isArray(cut.p) ? cut.p[i] : cut.p,
       missG: e / 100,
       guard: cut.g?.[i] || 0,
     })),
@@ -1296,26 +1296,21 @@ function cutModel(cut) {
     lean: mean((r) => r.missG),
     // At least ±0.5 g, at most ±1.5 g, in 0.25 g steps over the scored misses.
     M: Math.min(1.5, Math.max(0.5, Math.ceil((max * 1.15) / 0.25 - 1e-9) * 0.25)),
-    oneTarget: new Set(rows.map((r) => r.targetG)).size === 1,
   };
 }
-// With All it follows the active preset, named beside its title.
-function renderStatsCutAccuracy(st, preset, active) {
+// With All (`nameOf` set) each shot's pill names its preset.
+function renderStatsCutAccuracy(st, nameOf) {
   const root = $("statsCutAccuracy");
   if (!root) return;
   root.hidden = !st.facets?.presets?.length;
   if (root.hidden) return;
-  const title =
-    __WEBUI_TEXT__("runtime.stats_title_cut") +
-    (active
-      ? "<span>" + R.sub(__WEBUI_TEXT__("runtime.cut_active"), [R.escHtml(active)]) + "</span>"
-      : "");
-  if (!preset || !st.cut?.e?.length) {
+  const title = __WEBUI_TEXT__("runtime.stats_title_cut");
+  if (!st.cut?.e?.length) {
     root.innerHTML =
       '<p class="dcTitle">' +
       title +
       '</p><p class="fieldHint">' +
-      (preset ? __WEBUI_TEXT__("runtime.cut_none") : __WEBUI_TEXT__("runtime.cut_pick")) +
+      __WEBUI_TEXT__("runtime.cut_none") +
       "</p>";
     return;
   }
@@ -1368,15 +1363,15 @@ function renderStatsCutAccuracy(st, preset, active) {
         : SIZE_COLORS[sizeOf(rows[i].missG, CUT_CLOSE_G, CUT_FAR_G)],
     near: CUT_CLOSE_G,
     far: CUT_FAR_G,
-    edges: [
-      "+" + grams(M),
-      m.oneTarget ? grams(rows[0].targetG) : __WEBUI_TEXT__("runtime.cut_target"),
-      "−" + grams(M),
-    ],
+    edges: ["+" + grams(M), __WEBUI_TEXT__("runtime.cut_target"), "−" + grams(M)],
     pill: (i) =>
       R.sub(__WEBUI_TEXT__("runtime.cut_pill"), [
         i + 1,
-        grams(rows[i].targetG + rows[i].missG),
+        nameOf ? " · " + nameOf(rows[i].presetId) : "",
+        R.sub(__WEBUI_TEXT__("runtime.cut_of"), [
+          grams(rows[i].targetG + rows[i].missG),
+          grams(rows[i].targetG),
+        ]),
         kind(rows[i]) === "bull" ? __WEBUI_TEXT__("runtime.cut_bullseye") : signed(rows[i].missG),
       ]),
     aria: __WEBUI_TEXT__("runtime.cut_cursor"),
@@ -1433,7 +1428,7 @@ async function refreshMergedHeader() {
           ["result", "preset", "scale"].filter((k) => q[k]).map((k) => [k, q[k]]),
         ),
         ...statsScope(1000),
-        active: statsChosenPreset() || statsActivePreset(),
+        active: statsChosenPreset(),
         epoch,
       });
   // A choice and the controller's header that follows it ask the same: a
@@ -3514,7 +3509,6 @@ export function init() {
       statsPresetButton: choiceMenu(__WEBUI_TEXT__("stats.chart_preset"), () =>
         statsPresetItems.map(([v, text]) => ({
           text,
-          hint: v ? "" : __WEBUI_TEXT__("stats.preset_all_hint"),
           tag: v && v === statsActivePreset() ? __WEBUI_TEXT__("runtime.active") : "",
           on: v === statsChosenPreset(),
           pick: () => pickStatsPreset(v),

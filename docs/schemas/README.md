@@ -109,7 +109,7 @@ Versioning:
   `STATS_HEADER_REGENERATE=1 build-host/normal/src/tests/stats_header_host_test`
   (from `./scripts/dev test normal`'s build), then update the companion's copy.
   SHA-256 of the current file:
-  `402823758e72dd876c61ae73f13188a3c1dd8346a480de839096ffb10602a78a`.
+  `8f431ee02d5a026e18402e4a18857b8c22fea3e4126c52b6d362dd3cab12fa92`.
 - Consumed by the firmware host test `src/tests/stats_header_host_test.cpp`
   and by the companion's tests.
 
@@ -142,7 +142,7 @@ Versioning:
 - Regenerate after a deliberate frame change with
   `COMPANION_RECORDS_REGENERATE=1 node src/tests/check_web_assets.js`, then
   update the companion's copy. SHA-256 of the current file:
-  `ea1837838a3dc400a63efb730cdd62c00923b4a0ef1f24040b65f57db9dad05a`.
+  `4758c011031f9e4dbff229239dd88d50e95ea525f861dc8f3b2ea313262c2f7d`.
 - Produced and checked byte for byte by the web contract
   `src/tests/web_contracts/27-companion-records-vectors.inc.js`; replayed by
   the companion's sync and replica tests.

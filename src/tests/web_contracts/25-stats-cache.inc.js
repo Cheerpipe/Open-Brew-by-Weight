@@ -231,14 +231,16 @@ int main(){
     assert(formatStatsHeader(cache,10,4)&&std::string(cache.header).find("\\"dens\\":[null,null],\\"cons\\":{\\"t\\":[],\\"p\\":0}")!=std::string::npos);
     // The chosen preset's newest weight cuts, oldest first, with the guard
     // that decided each stop; the timed series carries it too, without the
-    // newest shot, which has no arrival. All has none.
+    // newest shot, which has no arrival. All takes every preset's, each
+    // against its own target.
     for(size_t i=0;i<recent.count;++i){recent.records[i].goalWeightDg=360;recent.records[i].arrivalDs=280+i;}
     recent.records[2].stopDetail=static_cast<uint8_t>(ShotLogStopDetail::SLOW_MIN_WEIGHT);
     recent.records[3].actualWeightCg=3612;
     assert(formatStatsHeader(cache,3,4));
     assert(std::string(cache.header).find("\\"p\\":4,\\"g\\":[0,2]},")!=std::string::npos);
-    assert(std::string(cache.header).find("]},\\"preset\\":4,\\"cut\\":{\\"t\\":360,\\"e\\":[12,0,0],\\"g\\":[0,2,0]}}")!=std::string::npos);
-    assert(formatStatsHeader(cache,3,0)&&std::string(cache.header).find("\\"cut\\"")==std::string::npos);
+    assert(std::string(cache.header).find("]},\\"preset\\":4,\\"cut\\":{\\"t\\":360,\\"p\\":4,\\"e\\":[12,0,0],\\"g\\":[0,2,0]}}")!=std::string::npos);
+    recent.records[2].goalWeightDg=180;recent.records[2].actualWeightCg=1800;shotLogSetPresetId(recent.records[2],7);
+    assert(formatStatsHeader(cache,3,0)&&std::string(cache.header).find("]},\\"preset\\":0,\\"cut\\":{\\"t\\":[360,180,360],\\"p\\":[4,7,4],\\"e\\":[12,0,0],\\"g\\":[0,2,0]}}")!=std::string::npos);
     assert(std::string(cache.header).find("]},null],")!=std::string::npos);
     cache=StatsStreamCache{};
   }

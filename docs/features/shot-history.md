@@ -136,14 +136,16 @@ and use the arrow keys, to read each shot's time and how far it was from your
 average. On a touch screen, put your finger on the dot itself to grab it;
 anywhere else, the chart scrolls the page as usual.
 
-The **Cut accuracy** chart shows how close each automatic stop of the chosen
-preset brought the cup to its target weight. It looks at that preset's own
-newest shots stopped by weight, as many as **Last 10**, **50** or **100**
-asks for. A stop can only be judged against its own preset's target, so with
-**All** chosen above it shows the active preset, named beside its title, and
-follows it when you switch presets. Each column is one shot, newest on the
-right, starting at the target, the dashed line, and rising for a cup that
-settled heavier or falling for one that settled lighter. As on the Shot
+The **Cut accuracy** chart shows how close each automatic stop brought the
+cup to the target weight that shot was aiming for. It looks at the newest
+shots stopped by weight, of the chosen preset or of every preset with **All**,
+as many as **Last 10**, **50** or **100** asks for. Each shot is measured
+against its own target, so a 36 g double and an 18 g single that each settled
+0.1 g heavy stand side by side at the same height, and changing a preset's
+target later leaves the shots you already pulled exactly as they were. Each
+column is one shot, newest on the right, starting at the dashed **Target**
+line, and rising for a cup that settled heavier or falling for one that
+settled lighter. As on the Shot
 consistency chart, a column's color says how far it missed, whichever way:
 green within **0.2 g** of the target, yellow up to 0.5 g, and red beyond. A
 ring on the line is a **bullseye**: a cup that settled exactly on the target,
@@ -159,7 +161,8 @@ chart sum up the rest: **Bullseyes**, how many of those shots landed exactly
 on the target; **Within ±0.2 g**, the share that landed that close; **Avg
 miss**, how far a cup typically settled from the target either way; and
 which way the stops lean, **Centred**, **Leans over** or **Leans under**. Use
-the cursor as on the Shot consistency chart to read each shot's settled weight.
+the cursor as on the Shot consistency chart to read each shot's settled weight
+next to its target, and with **All**, the preset it was pulled with.
 
 Stopwatch and gram-weight icons sit beside the large duration and yield values
 in each shot card and beside Avg time and Avg yield in the Stats summary.

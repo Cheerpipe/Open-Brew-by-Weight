@@ -1693,32 +1693,40 @@ if (!statsSection ||
   if (pressed() !== 'Lungo' || histPlot.hidden || global.sentOps.length) {
     throw new Error('Until a preset is chosen, Stats must follow the active one');
   }
-  // All asks the controller for the active preset's header, whose stops Cut
-  // accuracy shows under that preset's name; a header built for another
-  // preset leaves the charts as they are until it arrives.
+  // All asks the controller for its own header, whose Cut accuracy covers
+  // every preset's stops; a header built for another preset leaves the
+  // charts as they are until it arrives.
   helpers.pick(0);
   if (pressed() !== 'All' || zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' ||
-      JSON.stringify(global.sentOps) !== '[{"op":"stats","on":true,"preset":1}]') {
-    throw new Error('All must ask for the active preset and keep the charts until it arrives');
+      JSON.stringify(global.sentOps) !== '[{"op":"stats","on":true,"preset":0}]') {
+    throw new Error('All must ask for its own header and keep the charts until it arrives');
   }
   global.shotStats = charts(curve(-7, 15, 0, 7, false, [1, 2, 2]),
-      curve(21, 40, 27, 34, true, [1, 2, 1]), [300], {preset: 1});
+      curve(21, 40, 27, 34, true, [1, 2, 1]), [300], {preset: 0});
   helpers.renderStatsDurChart();
   // All: every shot by its own verdict against its own window.
   if (fills() !== 3 || zones() !== '20%/1/Fast,40%/2/On recipe,40%/2/Slow' ||
       !histPlot.innerHTML.includes('<div class="statsDensZones"><span>') ||
       ticks.join() !== 'Window start,Window end,−5 s,+5 s' || tickMax !== 22 ||
-      !cutRoot.innerHTML.includes('Active preset: House') || global.sentOps.length !== 1) {
+      !cutRoot.innerHTML.includes('No shot in this view') ||
+      cutRoot.innerHTML.includes('Active preset') || global.sentOps.length !== 1) {
     throw new Error('All presets must share out every shot by its own verdict against its own window');
   }
   if (cursorAt() !== '3.8 s into the window · 15% of shots/var(--ok)') {
     throw new Error('Across windows the Shot time cursor must read against the window: ' + cursorAt());
   }
-  // The active preset from All needs no new header: it draws at once.
+  // The active preset from All asks for its own header, keeping All's charts
+  // until it arrives.
   helpers.pick(1);
-  if (pressed() !== 'House' || zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow' ||
-      cutRoot.innerHTML.includes('Active preset') || global.sentOps.length !== 1) {
-    throw new Error('The active preset chosen from All must draw from the header already shown');
+  if (pressed() !== 'House' || zones() !== '20%/1/Fast,40%/2/On recipe,40%/2/Slow' ||
+      global.sentOps.at(-1).preset !== 1) {
+    throw new Error('The active preset chosen from All must ask for its own header');
+  }
+  global.shotStats = charts(curve(-7, 15, 0, 7, false, [1, 2, 2]),
+      curve(21, 40, 27, 34, true, [1, 2, 1]), [300], {preset: 1});
+  helpers.renderStatsDurChart();
+  if (zones() !== '25%/1/Fast,50%/2/On recipe,25%/1/Slow') {
+    throw new Error('The active preset must draw once its header arrives');
   }
   helpers.pick(2);
   if (pressed() !== 'Lungo' || histRoot.hidden || histPlot.hidden ||
@@ -1747,7 +1755,7 @@ if (!statsSection ||
   mergedAsks = 0;
   helpers.merged(charts(curve(21, 40, 27, 34, true, [1, 1, 1]), true, [300], {preset: 0}));
   helpers.renderStatsDurChart();
-  if (mergedAsks !== 1 || pressed() !== 'House' || !histPlot.hidden || global.sentOps.length !== 2) {
+  if (mergedAsks !== 1 || pressed() !== 'House' || !histPlot.hidden || global.sentOps.length !== 3) {
     throw new Error('A companion header for another preset must be asked again for the chosen one');
   }
   helpers.merged(charts(curve(21, 40, 27, 34, true, [1, 1, 1]), true, [300], {preset: 1}));

@@ -130,12 +130,11 @@ bool appendStatsDensity(StatsHeaderWork &cache, size_t n, size_t *used) {
 // presets and scales the good shots of the whole log hold, newest first, for
 // the list filter (scales keyed by shotLogScaleKey); and "cut", for the cut
 // accuracy chart: `presetId`'s newest `window` good weight cuts in the scope
-// with a settled weight, oldest first, as their targets ("t", tenths of a
-// gram, one number when they share one), the settled weight's miss from the
-// target ("e", hundredths of a gram) and "g" as above; "preset", the
-// `presetId` they follow, so a page can tell a header built for an earlier
-// choice. `presetId` 0 is All: no preset chart and no "cut", as for a preset
-// without such shots.
+// with a settled weight, oldest first, as their own targets ("t", tenths of a
+// gram, one number when they share one), their presets ("p", likewise), the
+// settled weight's miss from that target ("e", hundredths of a gram) and "g"
+// as above; "preset", the `presetId` they follow, so a page can tell a header
+// built for an earlier choice. `presetId` 0 is All: no preset chart, and "cut" over every preset.
 __attribute__((optimize("Os")))
 bool formatStatsHeader(StatsHeaderWork &cache, size_t scope, uint8_t presetId) {
   const ShotStatsRecordsSnapshot &snapshot = cache.snapshot;
@@ -220,17 +219,20 @@ bool formatStatsHeader(StatsHeaderWork &cache, size_t scope, uint8_t presetId) {
   if (!jsonScratchAppend(out, capacity, &used, "]},\"preset\":%u", static_cast<unsigned>(presetId)))
     return false;
   size_t cuts = 0;
-  bool oneTarget = true;
-  for (size_t i = 0; presetId && i < snapshot.count && cuts < window; ++i) {
+  bool oneTarget = true, oneCutPreset = true;
+  for (size_t i = 0; i < snapshot.count && cuts < window; ++i) {
     const ShotLogRecord &record = snapshot.records[i];
-    if (shotLogPresetId(record) != presetId || !shotLogRecordEligible(record) ||
+    if ((presetId && shotLogPresetId(record) != presetId) || !shotLogRecordEligible(record) ||
         !shotLogStatsInScope(record, scope) || !shotLogBbwErrorEligible(record) || record.actualWeightCg == SHOT_LOG_WEIGHT_MISSING)
       continue;
     oneTarget = oneTarget && (!cuts || record.goalWeightDg == cache.scope[0]->goalWeightDg);
+    oneCutPreset =
+        oneCutPreset && (!cuts || shotLogPresetId(record) == shotLogPresetId(*cache.scope[0]));
     cache.scope[cuts++] = &record;
   }
   if (cuts) {
     const auto target = [](const ShotLogRecord &r) { return r.goalWeightDg; };
+    const auto preset = [](const ShotLogRecord &r) { return shotLogPresetId(r); };
     const auto miss = [](const ShotLogRecord &r) {
       return static_cast<int32_t>(r.actualWeightCg) - 10 * static_cast<int32_t>(r.goalWeightDg);
     };
@@ -238,6 +240,9 @@ bool formatStatsHeader(StatsHeaderWork &cache, size_t scope, uint8_t presetId) {
         !(oneTarget ? jsonScratchAppend(out, capacity, &used, "\"t\":%u",
                                         static_cast<unsigned>(cache.scope[0]->goalWeightDg))
                     : appendStatsSeries(cache, cuts, &used, "\"t\":[", false, target)) ||
+        !(oneCutPreset ? jsonScratchAppend(out, capacity, &used, ",\"p\":%u",
+                                           static_cast<unsigned>(shotLogPresetId(*cache.scope[0])))
+                       : appendStatsSeries(cache, cuts, &used, ",\"p\":[", false, preset)) ||
         !appendStatsSeries(cache, cuts, &used, ",\"e\":[", false, miss) ||
         !appendStatsSeries(cache, cuts, &used, ",\"g\":[", true, statsGuardStop) ||
         !jsonScratchAppend(out, capacity, &used, "}"))

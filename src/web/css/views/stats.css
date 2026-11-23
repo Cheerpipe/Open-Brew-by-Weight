@@ -163,13 +163,6 @@ in the phone sheet (stacked again on the narrowest phones), then Apply. */
   color: var(--z);
 }
 
-/* With All, the active preset it follows, beside its title. */
-#statsCutAccuracy .dcTitle span {
-  margin-left: 0.45rem;
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
 #statsCutAccuracy .statsDensZones {
   grid-template-columns: repeat(4, 1fr);
 }
