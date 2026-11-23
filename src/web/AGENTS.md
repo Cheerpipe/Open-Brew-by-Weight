@@ -21,3 +21,10 @@
   mutable state that views update lives in the exported `uiState` object.
 - Web-only changes are R1 unless they touch OTA or remote control, which are at
   least R2 and R3 respectively.
+- The Home Assistant integration's dashboard cards
+  (`ha-open-brew-by-weight`, `frontend/src/`) copy the Web UI's charts: the
+  preset chart, the last-shot charts, the shot card and the Stats charts
+  (Shot time, Shot consistency, Cut accuracy). Every change to one of those
+  charts (drawing, colors, figures, legends or texts) ships with the matching
+  card change in the same piece of work, and the card goldens are regenerated
+  from this checkout (`frontend/scripts/*golden-from-firmware.mjs`).

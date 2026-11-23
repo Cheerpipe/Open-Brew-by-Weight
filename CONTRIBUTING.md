@@ -32,6 +32,11 @@ changing a dependency.
 5. Follow [documentation maintenance](docs/AI_WORKFLOW.md#documentation-maintenance)
    to update the canonical guides for changed settings, commands, interfaces, or
    behavior in the same change. Link to reference tables rather than copying them.
+   A change to a Web UI chart that the Home Assistant cards copy (the preset
+   chart, the last-shot charts, the shot card, or the Stats charts) also
+   changes the matching card in
+   [ha-open-brew-by-weight](https://github.com/Cheerpipe/ha-open-brew-by-weight)
+   in the same piece of work; see `src/web/AGENTS.md`.
 6. Run `./scripts/dev validate` on the final changed paths. Consult
    [VALIDATION.md](VALIDATION.md) for required gates and evidence.
    R2/R3 validation builds every profile with transient development and USB
