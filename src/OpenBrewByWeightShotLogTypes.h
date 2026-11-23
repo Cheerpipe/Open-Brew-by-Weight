@@ -830,7 +830,13 @@ inline ShotStatsView shotLogStatsView(size_t count, size_t scope, At at) {
       if (oldestDay < 0 || oldestDay > day) oldestDay = day;
     }
   }
-  if (newestDay >= 0 && oldestDay >= 0)
+  // A range of days averages over all its days, shot or not, back to the
+  // oldest covered shot's day when it holds more shots than the window.
+  if (scope > SHOT_LOG_STATS_WINDOW_MAX)
+    stats.daysSpan = static_cast<uint32_t>(
+        (scope & 0xFFFFU) - (stats.shotCount < window || oldestDay < 0
+                                 ? scope >> 16 : static_cast<size_t>(oldestDay)));
+  else if (newestDay >= 0 && oldestDay >= 0)
     stats.daysSpan = static_cast<uint32_t>(newestDay - oldestDay);
   return stats;
 }

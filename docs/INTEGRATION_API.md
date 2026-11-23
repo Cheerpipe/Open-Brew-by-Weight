@@ -1561,7 +1561,10 @@ instead: local days since 1970-01-01 in the controller's zone (a shot's
 `endedAtLocalSec` divided by 86,400), both included, `1`–`65535` with `since`
 at most `until`. It covers the range's newest 100 good shots with a wall time
 (the companion's whole-history header, asked with `days=since,until`, its
-newest 1,000); the facets still cover the whole log. Each of `window` and
+newest 1,000); the facets still cover the whole log. Its `shotsPerDay`
+divides by the range's days, `until − since + 1`, or, when the range holds
+more shots than the header covers, by the days from the oldest covered shot
+to `until`. Each of `window` and
 `days` replaces the other. `preset` (`0`–`255`) picks the preset the header's
 preset chart and cut series follow, `0` for All; without it they follow the
 active preset. A subscribe carrying only `window` or `days`, `preset`, or both

@@ -445,7 +445,10 @@ below it for a slow one — and the absolute percentages are averaged, so
 overshoots and undershoots cannot cancel each other. It is unavailable when no
 shot has been stopped by weight yet. For example, a fast shot whose cut line
 stood at 38.0 g and that yielded 38.4 g counts as a 1.1 % miss. **Daily shots**
-averages the dated shots over the calendar days they span, including both ends.
+averages the dated shots over the calendar days they span, including both ends;
+for a date range it averages over every day of the range, days without shots
+included, so **Last 7 days** divides by seven. When the range holds more shots
+than Stats covers, it averages from the oldest covered shot's day instead.
 An erase-all firmware installation starts with empty shot history.
 A shot kept from an older firmware that does not meet the good-shot rule, for
 example one recorded at exactly 12.0 s or with a yield of 2 g or less, now

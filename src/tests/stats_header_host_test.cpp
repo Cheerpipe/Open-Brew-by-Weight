@@ -257,6 +257,9 @@ void regenerate(const char *path) {
                                      20000, 20044));
   cJSON_AddItemToArray(cases, caseOf("days_range_without_shots", 100, 1, rowsOf(20, mixed),
                                      20100, 20101));
+  // Days without shots still count in the daily average.
+  cJSON_AddItemToArray(cases, caseOf("days_range_past_the_shots", 100, 1, rowsOf(30, mixed),
+                                     20001, 20010));
   char *printed = cJSON_Print(root);
   FILE *file = std::fopen(path, "wb");
   CHECK(file != nullptr && printed != nullptr);
@@ -290,7 +293,7 @@ void verify(const char *path) {
     }
     cJSON_Delete(computed);
   }
-  CHECK(cases >= 13);
+  CHECK(cases >= 14);
   cJSON_Delete(root);
 }
 
