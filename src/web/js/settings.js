@@ -1768,12 +1768,9 @@ function renderDripChart(c) {
   $("dripVerdict").textContent = verdict;
   $("dripHint").textContent = !n
     ? __WEBUI_TEXT__("runtime.drip_hint_none")
-    : {
-        learning: __WEBUI_TEXT__("runtime.drip_hint_learning"),
-        quick: "",
-        applied: __WEBUI_TEXT__("runtime.drip_hint_applied"),
-        varied: "",
-      }[mode];
+    : mode === "learning"
+      ? __WEBUI_TEXT__("runtime.drip_hint_learning")
+      : "";
   $("dripHint").hidden = !$("dripHint").textContent;
   const reasons = new Map();
   for (const s of shots)

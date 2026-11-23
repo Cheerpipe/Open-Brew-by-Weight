@@ -1449,7 +1449,6 @@
     "runtime.dose": "Dose",
     "runtime.drip": "Drip",
     "runtime.drip_delay": "Minimum drip wait",
-    "runtime.drip_hint_applied": "From here the correction keeps fine-tuning gently with each shot.",
     "runtime.drip_hint_learning": "Each bar is what one shot needed.",
     "runtime.drip_hint_none": "Pull a shot with this preset to see what it needed.",
     "runtime.drip_in_use": "in use",
