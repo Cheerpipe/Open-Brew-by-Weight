@@ -617,13 +617,13 @@ void orchestratePostTareBaselineArm() {
 void confirmLateRetareBaseline();
 
 // A pre-zero packet can sit inside the baseline band: the baseline must be
-// nearer zero than the pre-tare load. Loads under the touch residual cannot
-// pass for a touch step, so they need no proof.
+// within half the pre-tare load of zero, so neither that load nor one that
+// grew on it (a settling cup, coffee under a re-tare) becomes the zero. Loads
+// under the touch residual cannot pass for a touch step and need no proof.
 bool postTareBaselinePlausible(float weightG) {
   const float loadG = fabsf(session.preTareWeightG);
   return fabsf(weightG) <= POST_TARE_BASELINE_MAX_ABS_G &&
-      !(loadG >= ACCIDENTAL_TOUCH_RESIDUAL_G &&
-        fabsf(weightG - session.preTareWeightG) < loadG / 2.0f);
+      !(loadG >= ACCIDENTAL_TOUCH_RESIDUAL_G && fabsf(weightG) > loadG / 2.0f);
 }
 
 void applyShotTareResult(const ScaleEvent &event) {
@@ -690,7 +690,7 @@ void confirmLateRetareBaseline() {
     // A fresh zero: what disturbed the old frame (the cup going on) cannot
     // bias the drip this shot measures; later disturbances still clear it.
     session.calibrationEligible = session.automaticEnabled;
-    session.calibrationLoss = DripLearnNote::NONE;
+    if (session.calibrationEligible) session.calibrationLoss = DripLearnNote::NONE;
   }
   if (pendingFinalize.pending && pendingFinalize.cycleId == session.id) {
     pendingFinalize.firstDropDs = SHOT_LOG_METRIC_MISSING;

@@ -106,7 +106,7 @@
     bbwRecentAfterSet: -1, bbwRecentAfterQuick: -1, bbwQuickStart: {state: 'off', count: 0, setG: 0, quickG: 0}});
   assert.equal(pick(6).at(-1), 'Not used: the scale stopped sending readings or reconnected during the shot');
   assert.equal(pick(8).at(-1),
-    'Not used: the weight jumped and stayed: the cup was nudged or something was set on the scale');
+    'Not used: the weight shifted and stayed, likely a nudged cup or something set on the scale');
   // An edited field keeps the owner's value across refreshes.
   elements.get('dripSetG').value = '0.50';
   elements.get('dripSetG').dataset.edited = '1';

@@ -5912,24 +5912,31 @@ void w80_buzzer_only_retare_beeps_before_tare_result() {
 }
 
 // A cup set down after start trips the slew guard; the retare's new zero
-// makes the shot a drip observation again.
+// makes the shot a drip observation again and forgets the cause. A zero that
+// leaves weight control suspended keeps learning off and its first cause.
 void w80b_late_cup_retare_restores_drip_learning() {
-  resetHarness(false, true);
-  runtimeConfig.autoRetare = true;
-  runtimeConfig.bbwProtectionMs = minimumBbwProtectionMs(runtimeConfig);
-  reachReadyFromBoot();
-  startCycle();
-  CHECK(executeNextScaleCommand());
-  establishPostTareBaseline();
-  CHECK(session.calibrationEligible);
-  runLoopAfter(runtimeConfig.rinseGestureMs + 1);
-  publishStableCupWeight(150.0f, 10);
-  CHECK(session.retarePerformed);
-  CHECK(!session.calibrationEligible);
-  CHECK(executeNextScaleCommand());
-  publishWeight(0.0f, hostMillis + 50, 0, 40);
-  CHECK(!session.retareEffectPending);
-  CHECK(session.calibrationEligible);
+  for (const bool suspended : {false, true}) {
+    resetHarness(false, true);
+    runtimeConfig.autoRetare = true;
+    runtimeConfig.bbwProtectionMs = minimumBbwProtectionMs(runtimeConfig);
+    reachReadyFromBoot();
+    startCycle();
+    CHECK(executeNextScaleCommand());
+    establishPostTareBaseline();
+    CHECK(session.calibrationEligible);
+    runLoopAfter(runtimeConfig.rinseGestureMs + 1);
+    publishStableCupWeight(150.0f, 10);
+    CHECK(session.retarePerformed);
+    CHECK(!session.calibrationEligible);
+    const DripLearnNote cause = session.calibrationLoss;
+    CHECK(cause != DripLearnNote::NONE);
+    if (suspended) suspendWeightControl(DripLearnNote::SCALE_LOST);
+    CHECK(executeNextScaleCommand());
+    publishWeight(0.0f, hostMillis + 50, 0, 40);
+    CHECK(!session.retareEffectPending);
+    CHECK(session.calibrationEligible == !suspended);
+    CHECK(session.calibrationLoss == (suspended ? cause : DripLearnNote::NONE));
+  }
 }
 
 void w81_scale_priority_failed_start_falls_back_after_disconnect() {
@@ -12261,9 +12268,11 @@ void r43b_post_tare_baseline_rejects_stale_light_load() {
   // Shot 90: a 15.7 g load under a 50 g minimum cup, and a packet that still
   // showed it after the tare write. Taken as the zero, the real zero became a
   // -15.7 g touch that turned SUSTAINED and skipped drip learning.
-  struct Case { float preG, minCupG; bool staleAccepted; };
-  for (const Case c : {Case{15.7f, 50.0f, false}, Case{15.7f, 10.0f, false},
-                       Case{-20.0f, 10.0f, false}, Case{1.0f, 50.0f, true}}) {
+  // A load that grew before the tare took effect is no zero either.
+  struct Case { float preG, staleG, minCupG; bool staleAccepted; };
+  for (const Case c : {Case{15.7f, 15.7f, 50.0f, false}, Case{15.7f, 15.7f, 10.0f, false},
+                       Case{-20.0f, -20.0f, 10.0f, false}, Case{1.0f, 1.0f, 50.0f, true},
+                       Case{15.7f, 25.0f, 10.0f, false}}) {
     resetHarness(false, true);
     reachReadyFromBoot();
     runtimeConfig.avoidAccidentalTouchEnabled = true;
@@ -12273,7 +12282,7 @@ void r43b_post_tare_baseline_rejects_stale_light_load() {
     currentWeightSequence = 1;
     startCycle();
     CHECK(executeNextScaleCommand());
-    publishWeight(c.preG, hostMillis + 1);
+    publishWeight(c.staleG, hostMillis + 1);
     CHECK(session.awaitingPostTareBaseline == !c.staleAccepted);
     for (int i = 0; i < 30; ++i) publishWeight(0.0f, hostMillis + 100);
     CHECK(!session.awaitingPostTareBaseline);
@@ -22029,13 +22038,15 @@ void fw08_drip_filter_physics_outliers_and_step() {
 }
 
 void fw09b_first_disturbance_names_the_skip() {
-  // A jump that leads to a suspension is still the jump; every trigger keeps
-  // learning off, and a new cycle starts with no cause.
+  // A jump that leads to a suspension is still the jump, timed from the
+  // circuit closing; the named causes are the disturbances.
   resetHarness(false, true);
   reachReadyFromBoot();
   startCycle();
   advanceToBrew();
   CHECK(session.calibrationEligible && session.calibrationLoss == DripLearnNote::NONE);
+  const uint32_t closedAtMs = session.circuitClosedAtMs;
+  hostMillis += 2689;
   loseCalibration(DripLearnNote::WEIGHT_JUMP);
   const uint32_t lostAtMs = session.calibrationLostAtMs;
   ++hostMillis;
@@ -22043,6 +22054,11 @@ void fw09b_first_disturbance_names_the_skip() {
   CHECK(!session.calibrationEligible);
   CHECK(session.calibrationLoss == DripLearnNote::WEIGHT_JUMP);
   CHECK(session.calibrationLostAtMs == lostAtMs);
+  finalizeCycle(EndReason::ACTIVATOR, StopperState::READY);
+  CHECK(pendingFinalize.pending && !pendingFinalize.offsetAnalysis);
+  CHECK(pendingFinalize.calibrationLoss == DripLearnNote::WEIGHT_JUMP);
+  CHECK(pendingFinalize.calibrationLostMs == static_cast<int32_t>(lostAtMs - closedAtMs));
+  CHECK(pendingFinalize.calibrationLostMs >= 2689);
   for (uint8_t note = 0; note < DRIP_LEARN_NOTE_COUNT; ++note)
     CHECK(dripLearnNoteIsDisturbance(note) ==
           (note == static_cast<uint8_t>(DripLearnNote::WEIGHT_DISTURBED) ||

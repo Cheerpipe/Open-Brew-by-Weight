@@ -263,9 +263,9 @@ shot, it names what happened first: the cup was nudged or something was set
 on the scale, the cup was lifted, a knock made the reading jump, a press
 pushed the scale beyond its range, a press ended the shot on its safety
 backup, or the scale lost its connection. The matching Web UI log line also
-says how many seconds into the shot it happened. Tap anywhere else to close it; with a keyboard,
-the arrow keys move between shots. The Web UI log keeps the
-same reason for every shot, and a line for every change you make to the
+says how many seconds into the shot it happened. Tap anywhere else to close
+it; with a keyboard, the arrow keys move between shots. The Web UI log keeps
+the same reason for every shot, and a line for every change you make to the
 correction: what changed, the correction and learning speed now in use, and
 whether it came from this Web UI or through the companion. With
 brew by weight

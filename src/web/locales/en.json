@@ -1465,7 +1465,7 @@
     "runtime.drip_note_cut_short": "the cup left, or the next shot started, before the weight settled",
     "runtime.drip_note_disturbed": "the scale reading was disturbed during the shot",
     "runtime.drip_note_impossible": "the flow at the stop can't explain that weight, likely a bump or a touch",
-    "runtime.drip_note_level_shift": "the weight jumped and stayed: the cup was nudged or something was set on the scale",
+    "runtime.drip_note_level_shift": "the weight shifted and stayed, likely a nudged cup or something set on the scale",
     "runtime.drip_note_manual": "pulled as a manual shot",
     "runtime.drip_note_no_final": "the scale sent no reading after the stop",
     "runtime.drip_note_no_rate": "the flow at the stop couldn't be measured",
