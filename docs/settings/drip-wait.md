@@ -5,6 +5,10 @@ The drip wait decides how long the controller waits for those last drips
 before it records the shot's yield. Machine-level, under
 **Settings → Shared settings → Drip wait**, shared by every preset.
 
+The [drip correction](../features/brew-by-weight.md) learns from that recorded
+yield, so a drip wait that ends before the drips settle teaches it the wrong amount. Its
+**Adjust the drip wait** link, under Drip compensation, opens this section.
+
 ## When it applies
 
 After the machine stops, the controller waits for the last drips before it

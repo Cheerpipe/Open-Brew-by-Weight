@@ -2768,12 +2768,14 @@ export function init() {
     );
   };
   // The device backup's per-preset fixed time lives in Shot limits.
-  $("scaleLossFixedLink").onclick = () => {
-    const field = $("scaleLossFixedS");
-    field.closest("details").open = true;
-    field.scrollIntoView({ block: "center" });
-    field.focus({ preventScroll: true });
-  };
+  document.querySelectorAll("[data-jump]").forEach((link) => {
+    link.onclick = () => {
+      const field = $(link.dataset.jump);
+      field.closest("details").open = true;
+      field.scrollIntoView({ block: "center" });
+      field.focus({ preventScroll: true });
+    };
+  });
   document
     .querySelectorAll("#workflowPanel input,#workflowPanel select,#workflowPanel textarea")
     .forEach((el) => {

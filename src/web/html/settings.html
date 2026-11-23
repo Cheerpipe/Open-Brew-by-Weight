@@ -489,7 +489,10 @@
     </details>
     <details data-g="drip" class="cfgGroup">
       <summary>{{webui:settings.drip_compensation}}</summary>
-      <small class="fieldHint">{{webui:settings.drip_compensation_hint}}</small>
+      <small class="fieldHint">{{webui:settings.drip_compensation_hint}}</small
+      ><button class="linkAction" type="button" data-jump="dripDelayS">
+        {{webui:settings.drip_wait_link}}
+      </button>
       <div class="bbwLearning">
         <div class="metric"><strong>{{webui:settings.drip_expected}}</strong></div>
         <div class="dcValue"><b id="learnedOffsetG">—</b><span>{{webui:runtime.g}}</span></div>
@@ -1551,7 +1554,7 @@
           >{{webui:settings.scale_loss_enabled_hint}}</small
         ></label
       ><small id="scaleLossProjection" class="fieldHint"></small
-      ><button id="scaleLossFixedLink" class="linkAction" type="button">
+      ><button id="scaleLossFixedLink" class="linkAction" type="button" data-jump="scaleLossFixedS">
         {{webui:settings.scale_loss_fixed_link}}
       </button>
     </details>
