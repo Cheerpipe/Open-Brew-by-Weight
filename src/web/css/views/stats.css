@@ -47,9 +47,17 @@ text. The native date fields stack in the panel; in the phone sheet they sit
 side by side with the compact apply key that touches only these dates, stacked
 again with the key under To on the narrowest phones. */
 .statsRange {
+  --key: 2.4rem;
+
   display: grid;
   gap: 0.45rem;
   padding: 0 0.6rem 0.5rem;
+}
+
+.statsRange input,
+.statsRange button {
+  box-sizing: border-box;
+  height: var(--key);
 }
 
 .statsRange label {
@@ -66,8 +74,7 @@ again with the key under To on the narrowest phones. */
   place-items: center;
   align-self: end;
   justify-self: end;
-  width: 2.4rem;
-  min-height: 2.4rem;
+  width: var(--key);
   padding: 0;
   border: 1.5px solid var(--pri);
   border-radius: 0.6rem;
@@ -87,15 +94,12 @@ again with the key under To on the narrowest phones. */
 }
 
 .sheetBody .statsRange {
+  --key: 2.75rem;
+
   grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
   align-items: end;
   gap: 0.6rem;
   padding: 0 0.7rem 0.7rem;
-}
-
-.sheetBody .statsRange button {
-  width: 2.75rem;
-  min-height: 2.75rem;
 }
 
 @media (width <= 359px) {
