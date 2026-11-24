@@ -402,6 +402,8 @@ struct PendingShotFinalize {
   float tailSettledG = NAN;  // the highest of those medians
   float tailPlateauG = NAN;  // the median the drip last rose to
   uint32_t tailPlateauAtMs = 0;
+  uint8_t dripSettles = 0;     // settles the hold has noted
+  uint32_t dripSettleAtMs = 0; // tailPlateauAtMs of the last one
   uint32_t tailRefAtMs = 0;  // when the cup held lastKnownWeightG
   int32_t tailRateX100 = 0;  // rate the drip ceiling trusts; 0 = no ceiling
   bool tailRefusalLogged = false;

@@ -733,6 +733,9 @@ void notePostStopTailSample(PendingShotFinalize &pending, float weightG,
   pending.tailMaxG = pending.tailCount == 0
                          ? weightG
                          : fmaxf(pending.tailMaxG, weightG);
+  // A still cup holds its scale step, so any reading a step above the plateau
+  // is the drip creeping and restarts the settle time; a dip does not.
+  if (weightG >= pending.tailPlateauG + DRIP_SETTLE_RISE_G) pending.tailPlateauAtMs = atMs;
   if (pending.tailCount > 0 &&
       static_cast<uint32_t>(
           atMs - pending.tailAtMs[pending.tailCount - 1U]) <
@@ -977,7 +980,7 @@ bool recordWeightSampleWithProvenance(float weight, uint32_t receivedAtMs,
   if (!session.active && pendingFinalize.pending &&
       (observedUnload || cupEvent != CupPresenceEvent::NONE)) {
     machineCancelSettledWeightCutOff();
-    cancelPendingFinalize("Cup continuity lost during drip analysis", 1);
+    cancelPendingFinalize("Drip wait ended: the cup was lifted or moved", 1);
   }
   if ((runtimeConfig.autoTareOutsideBrew || idleTare.requestId != 0) &&
       !session.active) {

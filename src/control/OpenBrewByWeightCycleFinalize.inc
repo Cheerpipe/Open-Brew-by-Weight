@@ -733,10 +733,11 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
   const bool good = snapshot.logEligible && shotLogWeightEligible(weightG, valid);
   // Only a lifted cup keeps the celebration; the next cycle has begun otherwise.
   if (good && profileReason == 1) playBullseyeIfOnTarget(snapshot, weightG, source);
-  // A cup lifted once the tail settled took nothing the drip still owed; a
-  // hold cut short earlier, or by the next cycle or a new coffee, does not
-  // train, and says so.
-  if (good && profileReason == 1 && source == ActualWeightSource::POST_DRIP) {
+  // A cup lifted once the tail filled its ring, or any end after a settle,
+  // took nothing the drip still owed; a hold cut short earlier by the next
+  // cycle or a new coffee does not train, and says so.
+  if (good && (profileReason == 1 || snapshot.dripSettles > 0) &&
+      source == ActualWeightSource::POST_DRIP) {
     snapshot.bbwLearningApplied = learnPendingBbw(snapshot, weightG, true);
   } else if (good && snapshot.offsetAnalysis) {
     snapshot.dripLearnNote = DripLearnNote::CUT_SHORT;
@@ -758,9 +759,10 @@ void cancelPendingFinalize(const char *reason, uint32_t profileReason) {
 
 #include "OpenBrewByWeightBbwFinalize.inc"
 
-// Drip delay is the minimum hold (0 finalizes at once). The shot then waits
-// until its tail median has stopped rising for the settle time, up to the
-// maximum wait; without a fresh scale reading there is nothing to wait for.
+// Drip delay is the minimum hold (0 finalizes at once). After it, each time the
+// tail stops rising for the settle time the hold notes a settle (SETTLED) but
+// stays open: the longer the cup stays, the truer its yield. Lifting the cup,
+// the next cycle, the maximum wait or a missing fresh reading ends it.
 DripHoldEnd dripHoldEnd(const PendingShotFinalize &pending) {
   const uint32_t heldMs = elapsedMs(pending.endedAtMs);
   if (heldMs < pending.dripDelayMs) return DripHoldEnd::WAITING;
@@ -769,7 +771,8 @@ DripHoldEnd dripHoldEnd(const PendingShotFinalize &pending) {
   if (!pending.startedWithScale || !scaleAvailable() || !currentWeightIsFresh())
     return DripHoldEnd::NO_READING;
   return std::isfinite(pending.tailPlateauG) &&
-                 elapsedMs(pending.tailPlateauAtMs) >= pending.dripSettleMs
+                 elapsedMs(pending.tailPlateauAtMs) >= pending.dripSettleMs &&
+                 (pending.dripSettles == 0 || pending.dripSettleAtMs != pending.tailPlateauAtMs)
              ? DripHoldEnd::SETTLED
              : DripHoldEnd::WAITING;
 }
@@ -777,7 +780,16 @@ DripHoldEnd dripHoldEnd(const PendingShotFinalize &pending) {
 void pendingShotFinalizeTask() {
   if (!pendingFinalize.pending) return;
   const DripHoldEnd holdEnd = dripHoldEnd(pendingFinalize);
-  if (holdEnd == DripHoldEnd::WAITING) return;
+  if (holdEnd == DripHoldEnd::SETTLED) {
+    // A settled weight cut lets a momentary machine infer its stop, as before.
+    if (brewWeightCutSettlesMachineOff(pendingFinalize.endReason)) machineNoteSettledWeightCutOff();
+    pendingFinalize.dripSettleAtMs = pendingFinalize.tailPlateauAtMs;
+    ++pendingFinalize.dripSettles;
+    serialTracef(LogLevel::INFO, "Drip settled at %.1fg after %.1f s; waiting for the cup",
+                 static_cast<double>(postStopFinalWeightG(pendingFinalize, NAN)),
+                 static_cast<double>(elapsedMs(pendingFinalize.endedAtMs)) / 1000.0);
+  }
+  if (holdEnd == DripHoldEnd::WAITING || holdEnd == DripHoldEnd::SETTLED) return;
 
   captureLateTareCompletion();
   const ProfileControlObservation profile;

@@ -99,9 +99,10 @@ as Last Shot and history show it to a tenth of a gram, is exactly the target.
 The yield is the weight the cup settles at after the drips (see
 [drip wait](settings/drip-wait.md#when-it-applies)), so a shot that creeps up to
 its target a few seconds after the stop still counts, and the melody and your
-history always agree. If you lift the cup after the weight has settled, the
-melody still plays; lifting it earlier, or starting another cycle, means no
-Bullseye for that shot.
+history always agree. The yield is recorded when you lift the cup, so that is
+when the melody plays; a cup left in place plays it at the maximum drip wait.
+Lifting the cup within about the first second after the stop, or starting
+another cycle, means no Bullseye for that shot.
 
 In **Buzzer only** (and Scale first when the scale is not usable),
 tare/retare sounds follow paddle/retare immediately and do not wait for a

@@ -282,7 +282,7 @@ them are gone before it can copy them, and the list says so where the gap
 is. Nothing is copied during a shot, nor while the machine is busy (a rinse,
 a backflush, a scale connecting): the controller and the companion do not
 talk to each other at all until it is over, so the scale has the radio to
-itself. A new shot is copied the moment the shot and its drip delay end, and
+itself. A new shot is copied the moment the shot and its drip wait end, and
 pages opened meanwhile come from the companion's copy.
 
 **Through the companion**, Stats and History are one list. Sorting and

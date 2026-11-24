@@ -1041,7 +1041,9 @@ removal. `CUP_PLACED` with `source=tare` is a cup the shot-start tare proved
 before it had time to qualify. `FINALIZE_CANCELLED` distinguishes cup
 continuity, a new cycle, and rinse. `DRIP_HOLD_END` closes every other drip
 hold with the recorded yield as its weight, `held_ms` since the stop and a
-`reason`: `immediate` (minimum wait 0), `settled`, `max_wait` or `no_reading`.
+`reason`: `immediate` (minimum wait 0), `max_wait` or `no_reading`; `settled`
+appears only in profiles from firmware where a settle still ended the hold. A
+hold the cup lift ends is a `FINALIZE_CANCELLED` with cup continuity.
 The `settings=` header line ends with `dripMs:` minimum/settle/maximum waits. Existing shot-end reasons continue to describe guard stop outcomes.
 
 For correlation, follow `IDLE_REQUEST_ID`/`IDLE_PLACEMENT_ID`/`IDLE_ORIGIN` for

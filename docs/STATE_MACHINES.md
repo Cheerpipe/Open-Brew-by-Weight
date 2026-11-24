@@ -154,10 +154,13 @@ removal and A→M keep their existing authority; nothing in the smooth cut can
 suspend the wall or the circuit limit.
 
 After the drip hold, history records captured values and whether learning
-applied. The hold lasts at least `dripDelayMs` (0 finalizes at once), then ends
-once the tail median has not risen by 0.05 g for `dripSettleMs`, at
-`dripMaxWaitMs`, on a cup event, on the next cycle, or when no fresh reading
-remains. Bullseye is decided at that moment, on the recorded yield.
+applied. The hold lasts at least `dripDelayMs` (0 finalizes at once). After
+it, each time `dripSettleMs` passes without the tail median rising by 0.05 g
+and without any accepted reading 0.05 g above that median, the hold notes a
+settle (a Web UI log line; a momentary machine may infer its stop) and stays
+open. It ends on a cup event (the cup lift is the normal end), at
+`dripMaxWaitMs`, on the next cycle, or when no fresh reading remains.
+Bullseye is decided at that moment, on the recorded yield.
 The settled yield is the median of a ring of the last five post-stop readings
 taken at least 250 ms apart (a full ring spans 1 s). If that median is more
 than 2 g below the highest median the ring reached, the highest is used:
@@ -177,8 +180,8 @@ log line. When the hold ends with no accepted tail reading, the newest
 reading is used if it passes the same floor and ceiling; otherwise the record
 keeps the last-known weight. A drip hold cut short (cup continuity lost, a new
 cycle, rinse or backflush) records the settled yield if the ring had filled,
-else the last-known weight; only a hold the cup ended learns, and only from a
-settled yield. A settled ring also stands in for the live reading at the end
+else the last-known weight; only a hold the cup ended, or one that had noted a
+settle, learns, and only from a settled yield. A settled ring also stands in for the live reading at the end
 of a full hold, so a lift whose readings are refused, or a scale lost during
 the hold, still learns.
 The drip offset learns from weight cuts on any segment, against the cut line at
@@ -390,7 +393,7 @@ settle to `IDLE` when
 **Assume idle when the scale connects** is on and no brew cycle is active
 (no relay pulse). A successful BBW or extraction-guard cut
 (`SCALE_THRESHOLD`, `FAST_EXTRACTION_*`, `SLOW_EXTRACTION_*`) plus a quiet
-pan (live, or at drip delay with a plausible settled weight) settles to
+pan (live, or at the first drip settle with a plausible settled weight) settles to
 `IDLE`. A short shot that never schedules drip-delay finalize still
 settles on a quiet pan. Home
 **Override idle** / **Override brewing** are the manual escape hatch when

@@ -22731,24 +22731,25 @@ void feedDripHold(float weight) {
   pendingShotFinalizeTask();
 }
 
-void cd03_drip_hold_waits_for_the_tail_to_settle() {
+void cd03_drip_hold_settles_until_the_cup_leaves() {
   startDripHold(false);
   CHECK(pendingFinalize.dripDelayMs == DEFAULT_DRIP_DELAY_MS);
   for (int i = 0; i <= 12; ++i) feedDripHold(34.8f + 0.1f * static_cast<float>(i));
   // 3.9 s after the stop: past the minimum hold, still dripping.
-  CHECK(pendingFinalize.pending);
-  // Scale noise around the settled weight neither restarts nor ends the wait.
-  const float noise[] = {35.9f, 36.0f, 36.2f, 36.0f, 35.9f, 36.0f, 36.1f};
-  uint32_t plateauAtMs = 0;
-  for (size_t i = 0; i < 40 && pendingFinalize.pending; ++i) {
-    plateauAtMs = pendingFinalize.tailPlateauAtMs;
-    feedDripHold(noise[i % 7]);
-  }
+  CHECK(pendingFinalize.pending && pendingFinalize.dripSettles == 0);
+  // A still cup dipping a step below its weight settles, and the hold stays open.
+  for (int i = 0; i < 13; ++i) feedDripHold(i % 4 == 3 ? 35.9f : 36.0f);
+  CHECK(pendingFinalize.pending && pendingFinalize.dripSettles == 1);
+  // One reading a step above restarts the settle time; the next settle counts.
+  feedDripHold(36.1f);
+  CHECK(pendingFinalize.tailPlateauAtMs == hostMillis);
+  for (int i = 0; i < 11; ++i) feedDripHold(36.0f);
+  CHECK(pendingFinalize.pending && pendingFinalize.dripSettles == 2);
+  // The cup stays: the maximum wait records the yield.
+  for (int i = 0; i < 60 && pendingFinalize.pending; ++i) feedDripHold(36.0f);
   CHECK(!pendingFinalize.pending);
-  CHECK(elapsedMs(plateauAtMs) >= DEFAULT_DRIP_SETTLE_MS);
-  CHECK(elapsedMs(plateauAtMs) < DEFAULT_DRIP_SETTLE_MS + 300);
-  CHECK(elapsedMs(pendingFinalize.endedAtMs) < DEFAULT_DRIP_MAX_WAIT_MS);
-  checkDripHoldEnd(DripHoldEnd::SETTLED);
+  CHECK(elapsedMs(pendingFinalize.endedAtMs) >= DEFAULT_DRIP_MAX_WAIT_MS);
+  checkDripHoldEnd(DripHoldEnd::MAX_WAIT);
   ShotLogRecord record[1] = {};
   CHECK(shotLog.copyNewestFirst(record, 1) == 1);
   CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::POST_DRIP);
@@ -22798,7 +22799,7 @@ void cd04_bullseye_is_judged_on_the_recorded_yield() {
         localBuzzer.stopAll();
         // The drip reaches the target only after the minimum hold.
         for (int i = 0; i <= 12; ++i) feedDripHold(34.8f + 0.1f * static_cast<float>(i));
-        for (int i = 0; i < 20 && pendingFinalize.pending; ++i) feedDripHold(settledG);
+        for (int i = 0; i < 80 && pendingFinalize.pending; ++i) feedDripHold(settledG);
         CHECK(!pendingFinalize.pending);
         const bool plays = settledG == 36.0f && eligible && buzzerOnly;
         CHECK((localBuzzer.activeCue == BuzzerCue::BULLSEYE) == plays);
@@ -22834,6 +22835,52 @@ void cd06_slow_creep_closes_at_the_maximum_wait() {
   CHECK(!pendingFinalize.pending);
   CHECK(elapsedMs(pendingFinalize.endedAtMs) >= DEFAULT_DRIP_MAX_WAIT_MS);
   checkDripHoldEnd(DripHoldEnd::MAX_WAIT);
+}
+
+// Field recording (2026-11-24, shot 97, BOOKOO Themis Mini): after the stop
+// the cup rests at 35.9 g, flickers to 36.0 g twice and steps there 8.2 s
+// later. Each entry is the reading, every 100 ms, from that time on.
+constexpr PostStopSample POST_STOP_SLOW_STEP_TAIL[] = {
+    {87, 35.0f},    {177, 35.2f},   {297, 35.4f},   {387, 35.59f},  {477, 35.7f},
+    {597, 35.8f},   {777, 35.9f},   {987, 35.8f},   {2697, 35.9f},  {5517, 36.0f},
+    {5727, 35.9f},  {6117, 36.0f},  {6327, 35.9f},  {8247, 36.0f},  {12267, 36.09f},
+    {12477, 36.0f}, {12657, 36.09f}, {12867, 36.0f}, {13677, 36.0f}};
+
+void cd07_slow_last_step_keeps_the_hold_until_the_cup_leaves() {
+  // The first 3 s settle used to record 35.9 g at 6.4 s: the flickers restart
+  // it and the step settles at 36.0 g. Lifting the cup records the Bullseye;
+  // the next cycle after that settle still trains, without the melody.
+  for (const uint32_t endReason : {1U, 2U}) {
+    startDripHold(true);
+    bullseyeMelodyConfig.enabled = true;
+    copyCString(bullseyeMelodyConfig.rtttl, sizeof(bullseyeMelodyConfig.rtttl),
+                "bullseye:d=16,o=5,b=180:c,e,g,c6");
+    CHECK(localBuzzer.configureBullseyeRtttl(bullseyeMelodyConfig.rtttl));
+    runtimeConfig.alertOutputChannel = static_cast<uint8_t>(AlertOutputChannel::BUZZER_ONLY);
+    localBuzzer.stopAll();
+    uint32_t sequence = pendingFinalize.curveLastSequence;
+    size_t next = 0;
+    for (uint32_t afterMs = POST_STOP_SLOW_STEP_TAIL[0].afterMs;
+         afterMs <= std::end(POST_STOP_SLOW_STEP_TAIL)[-1].afterMs; afterMs += 100) {
+      while (next + 1 < std::size(POST_STOP_SLOW_STEP_TAIL) &&
+             POST_STOP_SLOW_STEP_TAIL[next + 1].afterMs <= afterMs)
+        ++next;
+      hostMillis = pendingFinalize.endedAtMs + afterMs;
+      markScaleWorkerProgress();
+      publishWeight(POST_STOP_SLOW_STEP_TAIL[next].weightG, hostMillis,
+                    pendingFinalize.scaleConnectionGeneration, ++sequence);
+      pendingShotFinalizeTask();
+      CHECK(pendingFinalize.pending);
+    }
+    CHECK(pendingFinalize.dripSettles == 1);
+    cancelPendingFinalize("Drip wait test end", endReason);
+    ShotLogRecord record[1] = {};
+    CHECK(shotLog.copyNewestFirst(record, 1) == 1);
+    CHECK(shotLogWeightSource(record[0]) == ActualWeightSource::POST_DRIP);
+    CHECK(record[0].actualWeightCg == 3600);
+    CHECK(strcmp(shotLogBbwLearningApplied(record[0]), "true") == 0);
+    CHECK((localBuzzer.activeCue == BuzzerCue::BULLSEYE) == (endReason == 1));
+  }
 }
 
 // Field recording (2026-11-16, shot 72): the tail settles at 35.59 g, then a
@@ -27127,10 +27174,11 @@ const TestCase testCases[] = {
     {"FW02", fw02_offset_learns_below_sensor_lag},
     {"FW03", fw03_dense_tail_decimates_to_reachable_median},
     {"FW04", fw04_post_stop_ceiling_ignores_touches},
-    {"CD03", cd03_drip_hold_waits_for_the_tail_to_settle},
+    {"CD03", cd03_drip_hold_settles_until_the_cup_leaves},
     {"CD04", cd04_bullseye_is_judged_on_the_recorded_yield},
     {"CD05", cd05_scale_lost_during_the_hold_keeps_the_settled_tail},
     {"CD06", cd06_slow_creep_closes_at_the_maximum_wait},
+    {"CD07", cd07_slow_last_step_keeps_the_hold_until_the_cup_leaves},
     {"FW12", fw12_settled_tail_trains_after_a_cup_lift},
     {"FF13", ff13_rinse_first_drop_goes_through_stopper},
     {"FF14", ff14_no_scale_first_drop_does_not_skip_stopper},

@@ -350,11 +350,12 @@ its own colour, without adding competing time labels;
 the time axis uses 10-second references. Home shows the live memory curve
 during a shot and the newest good shot's exact curve while idle.
 
-Observed removal or a new placement during the drip delay preserves the weight
-captured at shot end and discards post-drip learning, regardless of the idle
-automatic-tare setting. A single fresh reading consistent with the known empty
-pan is enough to discard this optional analysis, but cannot trigger a replacement
-tare. If a physical swap is completely absent from the scale notifications,
+Lifting the cup is how the drip wait normally ends: the shot keeps the weight
+the cup had settled at, and learns from it, regardless of the idle
+automatic-tare setting. Within about the first second after the stop, before
+the readings steady, it keeps the weight captured at shot end and does not
+learn. A new placement or a single fresh reading consistent with the known
+empty pan ends the wait the same way, but cannot trigger a replacement tare. If a physical swap is completely absent from the scale notifications,
 weight alone cannot establish that the final reading belongs to another cup.
 
 ## In the Web UI
@@ -377,7 +378,7 @@ Factory reset clears both histories on the controller; a
 copy. The [activation history](activation-history.md)
 records every confirmed activation, including rinses and cycles that do not
 qualify as shots. Deleting or clearing shot history never changes that diary.
-New rows appear after the configured drip delay. If flash saving is still
+New rows appear once the drip wait ends, usually when you lift the cup. If flash saving is still
 pending, the API reports `savePending`; a failed write remains pending for retry.
 Once saving completes, the newest shot and its curve survive a restart.
 Power loss before saving completes can still lose pending changes, including
