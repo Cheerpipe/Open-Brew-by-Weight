@@ -1676,13 +1676,25 @@ function pointerDrag(node, handlers) {
     node.addEventListener("pointercancel", end);
   });
 }
-// Shows or hides a bottom sheet (components/sheet.css) and its backdrop; the
-// page behind stops scrolling while one is open.
+// Shows or hides a bottom sheet (components/sheet.css) and its backdrop. The
+// page is pinned at its scroll offset while one is open, so an iOS drag inside
+// the sheet cannot move it; closing restores the offset.
+let sheetScroll = 0;
 function showSheet(sheet, backdrop, on) {
+  const body = document.body,
+    wasOpen = body.classList.contains("sheetOpen");
+  if (on && !wasOpen) {
+    sheetScroll = globalThis.scrollY || 0;
+    body.style.top = -sheetScroll + "px";
+  }
   sheet.inert = backdrop.inert = !on;
   sheet.classList.toggle("open", on);
   backdrop.classList.toggle("show", on);
-  document.body.classList.toggle("sheetOpen", on);
+  body.classList.toggle("sheetOpen", on);
+  if (!on && wasOpen) {
+    body.style.top = "";
+    globalThis.scrollTo?.(0, sheetScroll);
+  }
 }
 // Dragging a sheet's grips down follows the finger; past 90 px the sheet
 // slides away and dismiss() runs, short of it the sheet springs back.

@@ -26,7 +26,8 @@ some days, and the averages and the charts follow your choice.
   shown.
 - **Dates**: **Today**, **Last 3 days**, **Last 7 days**, **Last 30 days**, or
   **Pick dates**, where you choose the first and the last day with your
-  phone's or computer's own date picker and tap **Apply**. Days follow the
+  phone's or computer's own date picker and confirm them with the check key
+  beside the two fields. Days follow the
   controller's clock and time zone, the same ones the shot times show, and
   the ranges that end today move on by themselves at midnight. Shots without
   a date, made while the controller did not know the time, are never in a

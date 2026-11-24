@@ -5,6 +5,8 @@ record menus and the header panels, sized to their content, and the modal
 dialogs take the same shape. */
 body.sheetOpen {
   overflow: hidden;
+  position: fixed;
+  inset-inline: 0;
 }
 
 .sheetBackdrop {

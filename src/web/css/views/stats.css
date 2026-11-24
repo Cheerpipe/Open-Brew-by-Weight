@@ -42,13 +42,14 @@ from Bands down (app.js fitBar). */
   display: none;
 }
 
-/* The window menu's custom dates, under their choice and aligned with its
-text: the native date fields one above the other in the panel, side by side
-in the phone sheet (stacked again on the narrowest phones), then Apply. */
+/* The window menu's custom dates, under their heading and aligned with its
+text. The native date fields stack in the panel; in the phone sheet they sit
+side by side with the compact apply key that touches only these dates, stacked
+again with the key under To on the narrowest phones. */
 .statsRange {
   display: grid;
   gap: 0.45rem;
-  padding: 0 0.6rem 0.5rem 2.35rem;
+  padding: 0 0.6rem 0.5rem;
 }
 
 .statsRange label {
@@ -61,28 +62,49 @@ in the phone sheet (stacked again on the narrowest phones), then Apply. */
 }
 
 .statsRange button {
+  display: grid;
+  place-items: center;
+  align-self: end;
+  justify-self: end;
+  width: 2.4rem;
   min-height: 2.4rem;
+  padding: 0;
   border: 1.5px solid var(--pri);
+  border-radius: 0.6rem;
   background: var(--pri);
   color: var(--on);
-  font-weight: 700;
   cursor: pointer;
 }
 
+.statsRange button .g {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .sheetBody .statsRange {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
   gap: 0.6rem;
-  padding: 0 0.7rem 0.7rem 2.9rem;
+  padding: 0 0.7rem 0.7rem;
 }
 
 .sheetBody .statsRange button {
-  grid-column: 1 / -1;
-  min-height: 3rem;
+  width: 2.75rem;
+  min-height: 2.75rem;
 }
 
 @media (width <= 359px) {
   .sheetBody .statsRange {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sheetBody .statsRange button {
+    grid-column: 2;
   }
 }
 

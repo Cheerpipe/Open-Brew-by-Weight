@@ -1540,7 +1540,8 @@ function statsSpanLabel(s) {
       : date(s[0]) + " – " + date(s[1]);
 }
 // The custom dates: two native date fields, none past the controller's
-// today, and Apply; they open on the chosen days or the last week.
+// today, and a compact apply key beside them, scoped by the menu's Pick dates
+// heading; they open on the chosen days or the last week.
 function statsRangeForm(apply) {
   const form = document.createElement("form"),
     today = statsToday(),
@@ -1548,16 +1549,20 @@ function statsRangeForm(apply) {
   form.className = "statsRange";
   form.innerHTML =
     '<label><span></span><input type="date" required min="1970-01-02"></label>' +
-    '<label><span></span><input type="date" required></label><button type="submit"></button>';
+    '<label><span></span><input type="date" required></label>' +
+    '<button type="submit"><svg class="g" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l4.7 4.7L19.5 6.9"/></svg></button>';
   const [from, to] = form.querySelectorAll("input"),
     [a, b] = form.querySelectorAll("span"),
+    submit = form.querySelector("button"),
+    label = __WEBUI_TEXT__("stats.apply_dates"),
     sync = () => {
       to.min = from.value || from.min;
       from.max = to.value || to.max;
     };
   a.textContent = __WEBUI_TEXT__("stats.date_from");
   b.textContent = __WEBUI_TEXT__("stats.date_to");
-  form.querySelector("button").textContent = __WEBUI_TEXT__("stats.apply_dates");
+  submit.title = label;
+  submit.setAttribute("aria-label", label);
   to.max = isoDay(today);
   from.value = isoDay(Math.min(since, today));
   to.value = isoDay(Math.min(until, today));
@@ -3497,12 +3502,7 @@ export function init() {
             on: v === span,
             pick: () => pickWindow(R.uiState.statsWindow, v),
           })),
-          {
-            text: __WEBUI_TEXT__("stats.custom_dates"),
-            on: Array.isArray(span),
-            stay: true,
-            pick: () => range.querySelector("input").focus(),
-          },
+          __WEBUI_TEXT__("stats.custom_dates"),
           range,
         ];
       }),

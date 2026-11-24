@@ -119,8 +119,8 @@
     'The quick-weight sheet keeps its own height on the shared frame');
   qwAssert.ok(/touch-action:none/.test(qwCssRule('qwZone')),
     'The tick zone must own touch gestures');
-  qwAssert.ok(/body\.sheetOpen\{overflow:hidden\}/.test(css),
-    'Page scroll must lock while the sheet is open');
+  qwAssert.ok(/body\.sheetOpen\{overflow:hidden;[^}]*position:fixed[^}]*inset-inline:0\}/.test(css),
+    'Page scroll must lock at its offset while the sheet is open');
   qwAssert.ok(/\.qeditPen:disabled\{display:none\}/.test(css),
     'A locked UI must hide the pencil');
 
@@ -219,8 +219,15 @@
     };
 
     const qwCtl = qwInit();
+    let qwScrollTo = null;
+    Object.defineProperty(globalThis, 'scrollY', {value: 240, configurable: true});
+    globalThis.scrollTo = (x, y) => (qwScrollTo = [x, y]);
     qwCtl.open();
     qwAssert.ok(qwEls.qwSheet.classes.has('open'), 'Opening must show the sheet');
+    qwAssert.equal(qwDocument.body.style.top, '-240px',
+      'Opening must pin the page at its scroll offset');
+    qwAssert.ok(qwDocument.body.classList.contains('sheetOpen'),
+      'Opening must lock the page behind the sheet');
     qwAssert.equal(qwEls.qwNum.textContent, '36.0', 'The sheet opens at the active preset goal');
     qwAssert.equal(qwEls.qwPreset.textContent, 'Espresso', 'The header shows the preset name');
     qwAssert.ok(!qwEls.qwRatio.hidden && qwEls.qwRatio.firstChild.textContent === '18.0 g in' &&
@@ -327,6 +334,8 @@
     qwFire(qwEls.qwSheet, 'keydown', {key: 'Escape'});
     qwAssert.ok(!qwEls.qwSheet.classes.has('open'), 'Escape closes the sheet');
     await new Promise((r) => setTimeout(r, 0));
+    qwAssert.equal(qwDocument.body.style.top, '', 'Closing must release the page pin');
+    qwAssert.deepEqual(qwScrollTo, [0, 240], 'Closing must restore the page scroll offset');
     qwAssert.equal(qwRuntime.hydrated, 0, 'An unchanged close must not hydrate or save');
 
     // The URL launcher path: open() reopens at the preset goal without a hero.
@@ -431,6 +440,8 @@
     await new Promise((r) => setTimeout(r, 0));
     qwAssert.equal(qwRuntime.saved, 2,
       'A guard-bounded session closed without edits must not save');
+    delete globalThis.scrollTo;
+    delete globalThis.scrollY;
   })().catch((error) => { console.error(error); process.exitCode = 1; });
 }
 // The dial buttons keep line-height:1: a later font shorthand would reset it.
