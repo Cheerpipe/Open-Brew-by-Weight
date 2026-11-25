@@ -244,7 +244,7 @@ in it can make the machine run water. Remote start and rinse are disabled
 in default firmware; an explicit development build can enable them, but
 Admin unlock alone cannot. Remote Stop remains privileged (Admin unlock),
 because stopping only ends brewing — it never begins it.
-See [build options](BUILD.md#5-build).
+See [build options](BUILD.md#release-development-and-custom-flags).
 
 ### Why can't I turn the machine on from the web interface?
 

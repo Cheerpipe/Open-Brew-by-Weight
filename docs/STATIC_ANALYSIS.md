@@ -79,7 +79,7 @@ compiler used by the host tests; IWYU does not need it.
 
 ## 3. Linux (Ubuntu) prerequisites
 
-After the [Ubuntu 24.04 prerequisites](BUILD.md#2-install-host-prerequisites),
+After the [Ubuntu 24.04 prerequisites](BUILD.md#linux),
 install the distribution's Cppcheck and verify it resolves on `PATH`:
 
 ```sh

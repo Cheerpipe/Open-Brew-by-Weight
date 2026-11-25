@@ -27,7 +27,8 @@ screwdriver.
 
 ## 2. Build and install the firmware
 
-On macOS (Ubuntu packages are in the [build guide](BUILD.md#linux)):
+On macOS (Linux and Windows steps, and a slower walkthrough, are in the
+[build guide](BUILD.md)):
 
 ```sh
 brew install git python cmake ninja cjson node cppcheck ccache
