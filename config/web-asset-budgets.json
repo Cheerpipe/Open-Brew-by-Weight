@@ -6,23 +6,23 @@
     "raw": 0
   },
   "limits": {
-    "source.html": 167128,
-    "source.js": 876700,
-    "source.htmlJs": 1043828,
-    "gzip.shellHtml": 7652,
+    "source.html": 179793,
+    "source.js": 910793,
+    "source.htmlJs": 1090586,
+    "gzip.shellHtml": 7739,
     "gzip.shellJs": 10969,
-    "gzip.css": 28368,
-    "gzip.runtime": 61553,
+    "gzip.css": 28694,
+    "gzip.runtime": 62295,
     "gzip.otaImage": 3072,
-    "gzip.module.records": 32719,
+    "gzip.module.records": 34084,
     "gzip.module.diagnostic": 24823,
-    "gzip.module.admin": 24874,
-    "gzip.module.settings": 30567,
+    "gzip.module.admin": 25757,
+    "gzip.module.settings": 36767,
     "gzip.module.setup": 9172,
     "gzip.manifest": 1024,
     "raw.icon192": 31500,
     "raw.icon48": 3500,
-    "gzip.coldHome": 108281,
-    "gzip.combined": 242238
+    "gzip.coldHome": 109448,
+    "gzip.combined": 251847
   }
 }
