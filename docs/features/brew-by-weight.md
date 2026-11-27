@@ -69,15 +69,16 @@ paused while shots stop manually.
 **Duration** chooses when your changes undo themselves:
 
 - **Next shot**: after the next shot you pull. Rinses don't count.
-- **15 min**, **30 min**, or **1 h**: that long after your last change. Every
-  new change starts the countdown again, and everything goes back together.
-- **Keep** (the default): until you pick another preset or restart.
+- **15 min**, **30 min**, or **1 h** (the default): that long after your last
+  change. Every new change starts the countdown again, and everything goes back
+  together.
+- **Keep**: until you pick another preset or restart.
 
 The note at the bottom of the panel tells you when your changes end, and
 **Reset now** brings back the preset's settings straight away. The controller
 keeps time on its own, so this works even when no browser is open. If the time
 runs out during a shot, the settings change back once the shot ends. Your
-Duration choice returns to **Keep** after a restart.
+Duration choice returns to **1 hour** after a restart.
 
 Settings keeps showing your saved values. When one of them is changed for now
 from the panel, an orange note appears right below it; **Use saved setting**

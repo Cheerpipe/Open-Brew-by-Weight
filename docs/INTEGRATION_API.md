@@ -858,7 +858,7 @@ sooner: after the next shot that ends (rinses and abandoned starts excluded),
 or 15, 30, or 60 minutes after the last override change, each change restarting
 one shared timer. The controller performs the revert itself, waits for an
 active cycle to end and the relay to open, and then emits
-`quick_settings_changed`. The policy is RAM-only and returns to `keep` at boot. `brewByWeight=false`
+`quick_settings_changed`. The policy is RAM-only and returns to `60m` at boot. `brewByWeight=false`
 stops shots manually for now without changing the preset. Snapshots and
 webhooks report the effective values, overrides included, so the Web UI and
 every integration show the same state. Overrides are refused during an active

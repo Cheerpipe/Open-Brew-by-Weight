@@ -52,8 +52,9 @@ Entity IDs are built from that name.
   after asking you first; deleting the integration clears it only if Home
   Assistant still owns it.
 - **Quick toggles are temporary everywhere.** A change from Home Assistant is
-  the same as one from the header panel: it lasts until you pick another preset
-  or the controller restarts, and nothing is saved to presets or Settings. A
+  the same as one from the header panel: it lasts for the chosen **Duration**
+  (one hour unless you pick another), until you pick another preset, or until
+  the controller restarts, and nothing is saved to presets or Settings. A
   shorter **Duration** chosen in the panel, such as **Next shot**, also ends
   changes made from Home Assistant.
 - **Nothing changes mid-shot.** Preset and toggle changes are refused during an

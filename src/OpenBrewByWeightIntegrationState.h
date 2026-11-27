@@ -101,7 +101,7 @@ struct SessionQuickSettings {
   uint8_t presetId = 0;
   uint8_t value[QUICK_SETTING_FIELD_COUNT] = {};
   uint8_t saved[QUICK_SETTING_FIELD_COUNT] = {};
-  QuickRevertPolicy revertPolicy = QuickRevertPolicy::KEEP;
+  QuickRevertPolicy revertPolicy = QuickRevertPolicy::MINUTES_60;
   uint32_t changedAtMs = 0;
   bool shotEnded = false;
 };
