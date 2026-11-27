@@ -27,8 +27,8 @@ esp_err_t OpenBrewByWeightNetwork::mahlkonigPullHandler(httpd_req_t *request) {
   size_t length = strcspn(uri, "?");
   while (length > 0 && uri[length - 1] == '/') --length;
   const auto is = [&](const char *route) { return strlen(route) == length && strncmp(uri, route, length) == 0; };
-  char body[GBS_BODY_CAPACITY];
   if (request->method == HTTP_GET) {
+    char body[GBS_BODY_CAPACITY];
     const bool mako = is("/mako");
     const size_t n = mako ? g_gbsMako.read(body, sizeof(body) - 1)
                      : is("/machine") ? g_gbsMachine.read(body, sizeof(body) - 1)

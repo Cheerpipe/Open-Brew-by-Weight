@@ -293,10 +293,10 @@ struct GbsSnapshot {
 
 // GET /api/v2/machine: generic Xenia identity; the serial comes from the
 // device id (its MAC text), so it never changes.
-inline size_t gbsMachineBody(char *out, size_t capacity, const char *deviceId) {
+inline size_t gbsMachineBody(char *out, size_t capacity, const char *deviceMac) {
   char serial[20] = "OBBW";
   size_t used = 4;
-  for (const char *c = deviceId; c != nullptr && *c && used + 1 < sizeof(serial); ++c)
+  for (const char *c = deviceMac; c != nullptr && *c && used + 1 < sizeof(serial); ++c)
     if (*c != ':') serial[used++] = *c;
   serial[used] = '\0';
   const int n = snprintf(out, capacity,
@@ -435,9 +435,9 @@ inline bool gbsUuidValid(const char *text, size_t capacity = GBS_UUID_TEXT) {
 }
 
 // A version 4 UUID in lowercase text from 16 random bytes.
-inline void gbsUuidV4(const uint8_t random[16], char (&out)[37]) {
+inline void gbsUuidV4(const uint8_t randomBytes[16], char (&out)[37]) {
   uint8_t b[16];
-  memcpy(b, random, sizeof(b));
+  memcpy(b, randomBytes, sizeof(b));
   b[6] = static_cast<uint8_t>((b[6] & 0x0F) | 0x40);
   b[8] = static_cast<uint8_t>((b[8] & 0x3F) | 0x80);
   size_t used = 0;
@@ -647,7 +647,7 @@ inline size_t gbsRequestBody(char *out, size_t capacity, GbsRequest request, con
 // The shot settling the job in hand: a result to deliver, its event id from
 // the caller's random bytes. False when the shot is not this job's.
 inline bool gbsPushShot(GbsPush &push, const GbsShotReport &report, uint32_t startMs, uint32_t endMs,
-                        const uint8_t random[16], uint32_t now) {
+                        const uint8_t randomBytes[16], uint32_t now) {
   if (!push.hasJob || !gbsAttributable(push.jobPriorAtMs, push.jobSeenAtMs, startMs, endMs)) return false;
   push.result = GbsResult{};
   push.result.due = true;
@@ -656,7 +656,7 @@ inline bool gbsPushShot(GbsPush &push, const GbsShotReport &report, uint32_t sta
   push.result.doseType = push.job.doseType;
   push.result.report = report;
   push.result.sinceMs = push.result.retryAtMs = now;
-  gbsUuidV4(random, push.result.eventUuid);
+  gbsUuidV4(randomBytes, push.result.eventUuid);
   push.hasJob = push.jobTaken = false;
   return true;
 }
@@ -666,22 +666,23 @@ inline bool gbsPushShot(GbsPush &push, const GbsShotReport &report, uint32_t sta
 // tick), in case the grind came just before the shot and its job is first
 // seen there. The 25 s cadence restarts from that poll.
 inline bool gbsPushShotEnded(GbsPush &push, const GbsShotReport &report, uint32_t startMs, uint32_t endMs,
-                             const uint8_t random[16], uint32_t now) {
-  if (gbsPushShot(push, report, startMs, endMs, random, now)) return true;
+                             const uint8_t randomBytes[16], uint32_t now) {
+  if (gbsPushShot(push, report, startMs, endMs, randomBytes, now)) return true;
   push.pollAfterResult = true;
   return false;
 }
 
 // A taken job with no shot in its window is cancelled, so the grinder stops
 // handing it out. True when that happened.
-inline bool gbsPushExpire(GbsPush &push, const uint8_t random[16], uint32_t now) {
+inline bool gbsPushExpire(GbsPush &push, const uint8_t randomBytes[16], uint32_t now) {
   if (!push.hasJob || push.result.due ||
       ticksSince(now, push.jobSeenAtMs) < static_cast<int32_t>(GBS_JOB_WINDOW_MS))
     return false;
   GbsShotReport cancelled;
   cancelled.timeMs = 0;
   push.jobPriorAtMs = push.jobSeenAtMs;
-  return gbsPushShot(push, cancelled, push.jobSeenAtMs + 1U, push.jobSeenAtMs + 1U, random, now);
+  return gbsPushShot(push, cancelled, push.jobSeenAtMs + 1U, push.jobSeenAtMs + 1U,
+                     randomBytes, now);
 }
 
 // The wait after `failures` failures in a row: the cadence, then 60, 120 s.

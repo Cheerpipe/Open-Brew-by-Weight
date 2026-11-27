@@ -1167,11 +1167,11 @@ class OpenBrewByWeightNetwork {
   static esp_err_t mahlkonigHandler(httpd_req_t *request);
   void serviceMahlkonig(uint32_t now);
   void mahlkonigShots(uint32_t now);
-  void mahlkonigClientStep(uint32_t now, bool hold, bool direct);
-  void mahlkonigFinishRequest(uint32_t now, esp_err_t performed);
-  void mahlkonigLogTransitions(uint32_t now);
-  size_t mahlkonigCompanionConfig(char *out, size_t capacity) const;
-  void mahlkonigCompanionFrame(bool own, GbsCompanionState state, uint32_t delivered);
+  void mahlkonigClientStep(uint32_t now, bool hold, bool direct) const;
+  void mahlkonigFinishRequest(uint32_t now, esp_err_t performed) const;
+  static void mahlkonigLogTransitions(uint32_t now);
+  static size_t mahlkonigCompanionConfig(char *out, size_t capacity);
+  void mahlkonigCompanionFrame(bool own, GbsCompanionState state, uint32_t delivered) const;
   void mahlkonigView(GbsView &out) const;
   bool mahlkonigDebugExport(httpd_req_t *request, char *buf, size_t cap) const;
   bool diagnosticPageEnabled();

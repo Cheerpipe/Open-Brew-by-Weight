@@ -92,6 +92,7 @@ OPEN_BREW_BY_WEIGHT_PSRAM_BSS mbedtls_x509_crt g_gbsEmptyCa;
 // The leaf certificate decides: pinned, it must be the pinned one; unpinned,
 // it is captured (trust on first use, docs/MAHLKONIG_GBS.md). The grinder's
 // certificate is self-signed and names no host, so nothing else is checked.
+// cppcheck-suppress constParameterCallback ; mbedTLS's verify-callback type fixes mbedtls_x509_crt * as mutable; a const parameter would not match mbedtls_ssl_conf_verify's signature
 int gbsVerifyCertificate(void *, mbedtls_x509_crt *certificate, int depth, uint32_t *flags) {
   if (depth > 0) {
     *flags = 0;
@@ -174,11 +175,16 @@ void gbsReleaseClient(GbsWork &work) {
   work.client = nullptr;
 }
 
+GbsWork *allocGbsWork() {
+  void *memory = allocExternal(sizeof(GbsWork));
+  return memory == nullptr ? nullptr : new (memory) GbsWork{};
+}
+
 }  // namespace
 
 // httpd (the companion link): the companion's Mahlkönig state.
 void OpenBrewByWeightNetwork::mahlkonigCompanionFrame(bool own, GbsCompanionState state,
-                                                     uint32_t delivered) {
+                                                      uint32_t delivered) const {
   TaskLockGuard lock(dataMux_);
   g_gbsLink.own = own;
   g_gbsLink.state = state;
@@ -187,7 +193,7 @@ void OpenBrewByWeightNetwork::mahlkonigCompanionFrame(bool own, GbsCompanionStat
 
 // cfg.gbs as the controller would send it now; empty when the companion has
 // nothing to do for the grinder (network task).
-size_t OpenBrewByWeightNetwork::mahlkonigCompanionConfig(char *out, size_t capacity) const {
+size_t OpenBrewByWeightNetwork::mahlkonigCompanionConfig(char *out, size_t capacity) {
   if (capacity) out[0] = '\0';
   if (g_gbs == nullptr || !g_gbs->identityLoaded) return 0;
   return gbsCompanionConfig(out, capacity, g_gbs->model, g_gbs->identity.host, g_gbs->identity);
@@ -221,11 +227,12 @@ void OpenBrewByWeightNetwork::mahlkonigShots(uint32_t now) {
   const GbsShotReport report = gbsReport(facts);
   const uint32_t end = shot.endedAtMs, start = end - shot.durationDs * 100U;
   const uint32_t polls = g_gbsCounters.polls.load(std::memory_order_acquire);
-  uint8_t random[16];
-  esp_fill_random(random, sizeof(random));
+  uint8_t randomBytes[16];
+  esp_fill_random(randomBytes, sizeof(randomBytes));
   bool claimed = false;
   if (work.model == GBS_MODEL_E64WS) claimed = gbsPullShot(work.pull, report, start, now, polls);
-  else if (!work.companionRoute) claimed = gbsPushShotEnded(work.push, report, start, end, random, now);
+  else if (!work.companionRoute)
+    claimed = gbsPushShotEnded(work.push, report, start, end, randomBytes, now);
   work.lastId = shot.id;
   work.lastAtMs = now;
   work.lastStartMs = start;
@@ -235,18 +242,21 @@ void OpenBrewByWeightNetwork::mahlkonigShots(uint32_t now) {
   work.lastDelivered = false;
   // A push job may still show up for this shot (the 25 s cadence): ask now.
   work.lastUnclaimed = !claimed && gbsModelPush(work.model) && !work.companionRoute;
-  lifecycleLogf("Mahlkönig: shot %lu %s", static_cast<unsigned long>(shot.id),
-                !claimed && work.lastUnclaimed ? "waits for a grinder job"
-                : !claimed && work.companionRoute ? "goes to the grinder through the companion"
-                : !claimed                         ? "was not ground for (not synced)"
-                : report.success                   ? "will be sent with its time and yield"
-                                                   : "will be sent as cancelled");
+  const char *note;
+  if (!claimed) {
+    note = work.lastUnclaimed    ? "waits for a grinder job"
+           : work.companionRoute ? "goes to the grinder through the companion"
+                                 : "was not ground for (not synced)";
+  } else {
+    note = report.success ? "will be sent with its time and yield" : "will be sent as cancelled";
+  }
+  lifecycleLogf("Mahlkönig: shot %lu %s", static_cast<unsigned long>(shot.id), note);
 }
 
 // Network task: one async step of the direct push client. A sync hold tears
 // a request down at once (and starts none); the grinder drops kept-open
 // connections, so every request opens its own.
-void OpenBrewByWeightNetwork::mahlkonigClientStep(uint32_t now, bool hold, bool direct) {
+void OpenBrewByWeightNetwork::mahlkonigClientStep(uint32_t now, bool hold, bool direct) const {
   GbsWork &work = *g_gbs;
   if (work.request != GbsRequest::NONE) {
     if (hold) {
@@ -308,7 +318,7 @@ void OpenBrewByWeightNetwork::mahlkonigClientStep(uint32_t now, bool hold, bool 
 // Network task: a request ended (an answer, a transport failure or the
 // deadline). The answer drives the push state; a good exchange with an
 // unpinned grinder pins its certificate.
-void OpenBrewByWeightNetwork::mahlkonigFinishRequest(uint32_t now, esp_err_t performed) {
+void OpenBrewByWeightNetwork::mahlkonigFinishRequest(uint32_t now, esp_err_t performed) const {
   GbsWork &work = *g_gbs;
   const GbsRequest request = work.request;
   work.request = GbsRequest::NONE;
@@ -334,10 +344,10 @@ void OpenBrewByWeightNetwork::mahlkonigFinishRequest(uint32_t now, esp_err_t per
   if (gbsPushReply(work.push, work.identity, request, transportOk, mismatch, reply, now)) work.identityDirty = true;
   if (delivered) work.lastDelivered = work.lastId != 0;
   // A job seen after its shot: the shot that just ended may be its.
-  uint8_t random[16];
-  esp_fill_random(random, sizeof(random));
+  uint8_t randomBytes[16];
+  esp_fill_random(randomBytes, sizeof(randomBytes));
   if (request == GbsRequest::BREW_JOBS && work.lastUnclaimed &&
-      gbsPushShot(work.push, work.lastReport, work.lastStartMs, work.lastEndMs, random, now)) {
+      gbsPushShot(work.push, work.lastReport, work.lastStartMs, work.lastEndMs, randomBytes, now)) {
     work.lastUnclaimed = false;
     lifecycleLogf("Mahlkönig: shot %lu matched a grinder job seen after it",
                   static_cast<unsigned long>(work.lastId));
@@ -435,9 +445,8 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
     if (!enabled) return;
   }
   if (g_gbs == nullptr) {
-    void *memory = allocExternal(sizeof(GbsWork));
-    if (memory == nullptr) return;
-    g_gbs = new (memory) GbsWork{};
+    g_gbs = allocGbsWork();
+    if (g_gbs == nullptr) return;
     g_gbs->model = model;
     g_gbs->executesSeen = g_gbsCounters.executes.load(std::memory_order_acquire);
     lifecycleLogf("Mahlkönig: integration started (%s)", gbsModelName(model));
@@ -503,10 +512,10 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
   switch (action) {
     case GbsAction::PAIR:
       if (!gbsUuidValid(work.identity.brewDeviceId, sizeof(work.identity.brewDeviceId))) {
-        uint8_t random[16];
-        esp_fill_random(random, sizeof(random));
+        uint8_t randomBytes[16];
+        esp_fill_random(randomBytes, sizeof(randomBytes));
         char uuid[37];
-        gbsUuidV4(random, uuid);
+        gbsUuidV4(randomBytes, uuid);
         memcpy(work.identity.brewDeviceId, uuid, sizeof(uuid));
       }
       work.identity.paired = work.identity.pinned = 0;
@@ -577,9 +586,9 @@ void OpenBrewByWeightNetwork::serviceMahlkonig(uint32_t now) {
     }
     g_gbsCounters.serving.store(true, std::memory_order_release);
   } else {
-    uint8_t random[16];
-    esp_fill_random(random, sizeof(random));
-    if (gbsPushExpire(work.push, random, now))
+    uint8_t randomBytes[16];
+    esp_fill_random(randomBytes, sizeof(randomBytes));
+    if (gbsPushExpire(work.push, randomBytes, now))
       lifecycleLog("Mahlkönig: no shot followed the grind; it is reported as cancelled");
     mahlkonigClientStep(now, companionSyncHold(), !work.companionRoute);
   }

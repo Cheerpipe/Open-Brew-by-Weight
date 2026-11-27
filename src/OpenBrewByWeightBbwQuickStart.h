@@ -205,14 +205,15 @@ inline size_t formatDripChartJson(char *out, size_t cap, const ControlStatusSnap
     put(snprintf(out + used, cap - used, "%s%u", i ? "," : ",\"bbwRecentNote\":[",
                  static_cast<unsigned>(c.bbwRecent[i].note)));
   for (uint8_t i = 0; used < cap && i < n; ++i) {
-    const DripChartShot &shot = c.bbwRecent[i];
-    char yield[8] = "null";
-    if (!shotLogWeightIsMissing(shot.yieldCg)) snprintf(yield, sizeof(yield), "%d", shot.yieldCg);
+    const DripChartShot &recent = c.bbwRecent[i];
+    char yieldText[8] = "null";
+    if (!shotLogWeightIsMissing(recent.yieldCg))
+      snprintf(yieldText, sizeof(yieldText), "%d", recent.yieldCg);
     put(snprintf(out + used, cap - used, "%s[%lu,%lu,%u,%s,%u,%d]",
-                 i ? "," : "],\"bbwRecentShot\":[", static_cast<unsigned long>(shot.number),
-                 static_cast<unsigned long>(shot.localSec),
-                 static_cast<unsigned>(shot.durationDs), yield,
-                 static_cast<unsigned>(shot.goalDg), shot.usedCg));
+                 i ? "," : "],\"bbwRecentShot\":[", static_cast<unsigned long>(recent.number),
+                 static_cast<unsigned long>(recent.localSec),
+                 static_cast<unsigned>(recent.durationDs), yieldText,
+                 static_cast<unsigned>(recent.goalDg), recent.usedCg));
   }
   if (used < cap && n > 0) put(snprintf(out + used, cap - used, "]"));
   return used < cap ? used : 0;
