@@ -26,10 +26,12 @@ inline void fillDoubleFirmwareDefaults(ShotPreset &preset) {
   const bool adaptive = id == FACTORY_PRESET_ID_DOUBLE_ADAPTIVE ||
                         id == FACTORY_PRESET_ID_SINGLE_ADAPTIVE;
   const bool manual = id == FACTORY_PRESET_ID_MANUAL;
+  const bool ristretto = id == FACTORY_PRESET_ID_RISTRETTO;
   copyCString(preset.name, SHOT_PRESET_NAME_CAPACITY,
-              manual   ? "Manual"
-              : single ? (adaptive ? "Single \xC2\xB7 Adaptive" : "Single \xC2\xB7 Fixed")
-                       : (adaptive ? "Double \xC2\xB7 Adaptive" : "Double \xC2\xB7 Fixed"));
+              manual    ? "Manual"
+              : ristretto ? "Ristretto"
+              : single  ? (adaptive ? "Single \xC2\xB7 Adaptive" : "Single \xC2\xB7 Fixed")
+                        : (adaptive ? "Double \xC2\xB7 Adaptive" : "Double \xC2\xB7 Fixed"));
   if (single) {
     preset.goalWeightDg = FACTORY_SINGLE_GOAL_WEIGHT_DG;
     preset.doseDg = FACTORY_SINGLE_DOSE_DG;
@@ -41,8 +43,15 @@ inline void fillDoubleFirmwareDefaults(ShotPreset &preset) {
     preset.weightOffsetBaselineG = FACTORY_SINGLE_WEIGHT_OFFSET_G;
     preset.bbwEwmaOffsetG = FACTORY_SINGLE_WEIGHT_OFFSET_G;
   }
+  if (ristretto) {
+    preset.goalWeightDg = FACTORY_RISTRETTO_GOAL_WEIGHT_DG;
+    preset.fastBeforeMs = FACTORY_RISTRETTO_FAST_BEFORE_MS;
+    preset.slowAfterMs = FACTORY_RISTRETTO_SLOW_AFTER_MS;
+    preset.laMarzoccoBrewTargetDeciC = FACTORY_RISTRETTO_BREW_TARGET_DECI_C;
+  }
   // Fixed presets keep their margins stored but always stop at the target;
-  // Manual keeps the Double recipe but never stops by weight. Only the
+  // Manual keeps the Double recipe but never stops by weight. Ristretto and
+  // the other Fixed presets keep the Even/Soft default transitions. Only the
   // Adaptive presets carry the factory transition curves.
   preset.fastSideEnabled = adaptive;
   preset.slowSideEnabled = adaptive;
@@ -56,12 +65,13 @@ inline void fillDoubleFirmwareDefaults(ShotPreset &preset) {
 
 inline void seedDefaultShotPresetBank(ShotPresetBank &bank) {
   bank = ShotPresetBank{};
-  bank.count = FACTORY_PRESET_COUNT + 1;
+  bank.count = FACTORY_PRESET_COUNT + 2;
   bank.activeId = FACTORY_PRESET_ID_MANUAL;
   bank.nextId = FACTORY_PRESET_COUNT + 1;
   for (uint8_t i = 0; i < FACTORY_PRESET_COUNT; ++i)
     fillFactoryShotPreset(bank.presets[i], static_cast<uint8_t>(i + 1));
-  fillFactoryShotPreset(bank.presets[FACTORY_PRESET_COUNT], FACTORY_PRESET_ID_MANUAL);
+  fillFactoryShotPreset(bank.presets[FACTORY_PRESET_COUNT], FACTORY_PRESET_ID_RISTRETTO);
+  fillFactoryShotPreset(bank.presets[FACTORY_PRESET_COUNT + 1], FACTORY_PRESET_ID_MANUAL);
 }
 
 inline int findShotPresetIndex(const ShotPresetBank &bank, uint8_t id) {
@@ -255,6 +265,33 @@ inline void ensureShotPresetBank(ShotPresetBank &bank,
     // Last resort only when structurally irreparable.
     seedDefaultShotPresetBank(bank);
   }
+}
+
+// Boot-time upgrade for banks saved before Ristretto existed. Inserts it
+// after the last recipe-factory preset (ids 1–4) so factory recipes stay
+// contiguous and Manual stays last, when a slot is free and neither its id
+// nor the name "Ristretto" is taken; a skipped bank retries on the next boot.
+inline void addMissingRistrettoShotPreset(ShotPresetBank &bank) {
+  if (bank.count >= MAX_SHOT_PRESETS ||
+      findShotPresetIndex(bank, FACTORY_PRESET_ID_RISTRETTO) >= 0) {
+    return;
+  }
+  ShotPreset preset;
+  fillFactoryShotPreset(preset, FACTORY_PRESET_ID_RISTRETTO);
+  if (shotPresetNameExists(bank, preset.name, 0)) {
+    return;
+  }
+  uint8_t at = 0;
+  for (uint8_t i = 0; i < bank.count; ++i) {
+    if (bank.presets[i].id >= 1 && bank.presets[i].id <= FACTORY_PRESET_COUNT) {
+      at = static_cast<uint8_t>(i + 1);
+    }
+  }
+  for (uint8_t i = bank.count; i > at; --i) {
+    bank.presets[i] = bank.presets[i - 1];
+  }
+  bank.presets[at] = preset;
+  ++bank.count;
 }
 
 inline const ShotPreset &activeShotPreset(const ShotPresetBank &bank) {

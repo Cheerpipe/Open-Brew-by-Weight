@@ -1221,10 +1221,10 @@ void p24_preset_bank_size_and_crud_budgets() {
   CHECK(strcmp(formatted, "-21474836.48g") == 0);
   formatWeightCentigrams(INT32_MAX, formatted, sizeof(formatted));
   CHECK(strcmp(formatted, "21474836.47g") == 0);
-  // Fresh bank: five permanent factory presets, Manual active.
+  // Fresh bank: six permanent factory presets, Manual active.
   ShotPresetBank bank;
   seedDefaultShotPresetBank(bank);
-  CHECK(bank.count == FACTORY_PRESET_COUNT + 1 && bank.nextId == 5);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 2 && bank.nextId == 5);
   CHECK(bank.activeId == FACTORY_PRESET_ID_MANUAL);
   const struct {
     const char *name;
@@ -1262,8 +1262,38 @@ void p24_preset_bank_size_and_crud_budgets() {
     CHECK(!deleteShotPreset(bank, preset.id));
   }
   {
+    // Ristretto: the Double recipe cut early at 1:1.5, never extended.
+    const ShotPreset &ristretto = bank.presets[FACTORY_PRESET_COUNT];
+    CHECK(ristretto.id == FACTORY_PRESET_ID_RISTRETTO && ristretto.isFactory &&
+          ristretto.brewByWeight);
+    CHECK(strcmp(ristretto.name, "Ristretto") == 0);
+    CHECK(ristretto.doseDg == factory[0].dose &&
+          ristretto.goalWeightDg == FACTORY_RISTRETTO_GOAL_WEIGHT_DG);
+    CHECK(ristretto.fastMarginDg == factory[0].fast && ristretto.slowMarginDg == factory[0].slow);
+    CHECK(!ristretto.fastSideEnabled && !ristretto.slowSideEnabled);
+    CHECK(ristretto.fastRampMs == DEFAULT_RAMP_MS && ristretto.fastCurve == RAMP_CURVE_EVEN &&
+          ristretto.slowRampMs == DEFAULT_RAMP_MS && ristretto.slowCurve == RAMP_CURVE_EVEN);
+    CHECK(ristretto.fastBeforeMs == FACTORY_RISTRETTO_FAST_BEFORE_MS &&
+          ristretto.slowAfterMs == FACTORY_RISTRETTO_SLOW_AFTER_MS);
+    CHECK(ristretto.laMarzoccoBrewTargetDeciC == FACTORY_RISTRETTO_BREW_TARGET_DECI_C);
+    CHECK(ristretto.bbwProtectionMs == DEFAULT_BBW_PROTECTION_MS &&
+          ristretto.operationalWallMs == DEFAULT_OPERATIONAL_WALL_MS);
+    CHECK(validateShotPresetRecipe(ristretto, DEFAULT_RETARE_WINDOW_MS, true));
+    CHECK(!deleteShotPreset(bank, ristretto.id));
+    ShotPresetBank restored = bank;
+    ShotPreset *edited = mutableShotPreset(restored, FACTORY_PRESET_ID_RISTRETTO);
+    CHECK(edited != nullptr);
+    edited->goalWeightDg = 400;
+    edited->laMarzoccoBrewTargetDeciC = 910;
+    CHECK(restoreFactoryShotPresetValues(restored, FACTORY_PRESET_ID_RISTRETTO));
+    const ShotPreset *back = findShotPreset(restored, FACTORY_PRESET_ID_RISTRETTO);
+    CHECK(back->goalWeightDg == FACTORY_RISTRETTO_GOAL_WEIGHT_DG &&
+          back->laMarzoccoBrewTargetDeciC == FACTORY_RISTRETTO_BREW_TARGET_DECI_C);
+    CHECK(strcmp(back->name, "Ristretto") == 0);
+  }
+  {
     // Manual: Double · Adaptive values that never stop by weight.
-    const ShotPreset &manual = bank.presets[FACTORY_PRESET_COUNT];
+    const ShotPreset &manual = bank.presets[FACTORY_PRESET_COUNT + 1];
     CHECK(manual.id == FACTORY_PRESET_ID_MANUAL && manual.isFactory);
     CHECK(strcmp(manual.name, "Manual") == 0 && !manual.brewByWeight);
     CHECK(!manual.fastSideEnabled && !manual.slowSideEnabled);
@@ -1333,6 +1363,8 @@ void p24_preset_bank_size_and_crud_budgets() {
   CHECK(created->bbwEwmaOffsetG == DEFAULT_WEIGHT_OFFSET_G);
   CHECK(!created->isFactory && deleteShotPreset(bank, newId));
   CHECK(createUntitledShotPreset(bank, newId));
+  // Six factory presets leave one slot fewer for the copies below.
+  CHECK(deleteShotPreset(bank, newId));
 
   uint8_t copyId = 0;
   CHECK(duplicateShotPreset(bank, FACTORY_PRESET_ID_DOUBLE_ADAPTIVE, copyId));
@@ -1375,10 +1407,10 @@ void p25_invalid_active_id_keeps_customs() {
   seedDefaultShotPresetBank(bank);
   uint8_t customId = 0;
   CHECK(createUntitledShotPreset(bank, customId));
-  CHECK(bank.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
   bank.activeId = 99;  // missing
   ensureShotPresetBank(bank, DEFAULT_RETARE_WINDOW_MS, true);
-  CHECK(bank.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
   CHECK(findShotPresetIndex(bank, customId) >= 0);
   CHECK(findShotPresetIndex(bank, bank.activeId) >= 0);
 
@@ -1388,7 +1420,7 @@ void p25_invalid_active_id_keeps_customs() {
   settings.presets.activeId = 99;
   settings.runtime.timerOnly = true;
   ensurePersistedPresetBank(settings);
-  CHECK(settings.presets.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(settings.presets.count == FACTORY_PRESET_COUNT + 3);
   CHECK(findShotPresetIndex(settings.presets, customId) >= 0);
   const ShotPreset *dbl =
       findShotPreset(settings.presets, FACTORY_PRESET_ID_DOUBLE_ADAPTIVE);
@@ -1413,13 +1445,13 @@ void p35_invalid_fast_extraction_recipe_keeps_custom() {
   seedDefaultShotPresetBank(bank);
   uint8_t customId = 0;
   CHECK(createUntitledShotPreset(bank, customId));
-  CHECK(bank.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
   ShotPreset *custom = mutableShotPreset(bank, customId);
   CHECK(custom != nullptr);
   custom->fastSideEnabled = true;
   custom->fastMarginDg = 0;  // Unusable margin: the recipe resets, the slot stays.
   ensureShotPresetBank(bank, DEFAULT_RETARE_WINDOW_MS, true);
-  CHECK(bank.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
   const ShotPreset *kept = findShotPreset(bank, customId);
   CHECK(kept != nullptr);
   CHECK(validateShotPresetRecipe(*kept, DEFAULT_RETARE_WINDOW_MS, true));
@@ -1431,16 +1463,70 @@ void p38_invalid_slow_extraction_recipe_keeps_custom() {
   seedDefaultShotPresetBank(bank);
   uint8_t customId = 0;
   CHECK(createUntitledShotPreset(bank, customId));
-  CHECK(bank.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
   ShotPreset *custom = mutableShotPreset(bank, customId);
   CHECK(custom != nullptr);
   custom->slowAfterMs = custom->fastBeforeMs;  // Repaired to a 1 s window.
   ensureShotPresetBank(bank, DEFAULT_RETARE_WINDOW_MS, true);
-  CHECK(bank.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
   const ShotPreset *kept = findShotPreset(bank, customId);
   CHECK(kept != nullptr);
   CHECK(kept->slowAfterMs == kept->fastBeforeMs + MIN_WINDOW_SPAN_MS);
   CHECK(validateShotPresetRecipe(*kept, DEFAULT_RETARE_WINDOW_MS, true));
+}
+
+// Boot upgrade from a bank saved before Ristretto existed: it lands after
+// the recipe-factory block (before Manual and user presets), repeated boots
+// are idempotent, and a full bank or a taken name skips until it fits.
+void p24b_missing_ristretto_preset_upgrades_on_boot() {
+  ShotPresetBank bank;
+  seedDefaultShotPresetBank(bank);
+  // Shrink to a pre-Ristretto bank: [1, 2, 3, 4, Manual].
+  for (uint8_t i = FACTORY_PRESET_COUNT; i + 1 < bank.count; ++i)
+    bank.presets[i] = bank.presets[i + 1];
+  bank.count = FACTORY_PRESET_COUNT + 1;
+  uint8_t customId = 0;
+  CHECK(createUntitledShotPreset(bank, customId));  // Appended after Manual.
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(findShotPresetIndex(bank, FACTORY_PRESET_ID_RISTRETTO) < 0);
+
+  addMissingRistrettoShotPreset(bank);
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
+  CHECK(findShotPresetIndex(bank, FACTORY_PRESET_ID_RISTRETTO) == FACTORY_PRESET_COUNT);
+  CHECK(bank.presets[FACTORY_PRESET_COUNT + 1].id == FACTORY_PRESET_ID_MANUAL);
+  CHECK(bank.presets[FACTORY_PRESET_COUNT + 2].id == customId);
+  CHECK(validateShotPresetBank(bank, DEFAULT_RETARE_WINDOW_MS, true));
+  addMissingRistrettoShotPreset(bank);  // Idempotent.
+  CHECK(bank.count == FACTORY_PRESET_COUNT + 3);
+
+  // A user preset named Ristretto blocks the upgrade until it is deleted.
+  ShotPresetBank clash = bank;
+  for (uint8_t i = FACTORY_PRESET_COUNT; i + 1 < clash.count; ++i)
+    clash.presets[i] = clash.presets[i + 1];
+  clash.count = FACTORY_PRESET_COUNT + 2;  // Back to [1, 2, 3, 4, Manual, custom].
+  CHECK(renameShotPreset(clash, customId, "Ristretto"));
+  addMissingRistrettoShotPreset(clash);
+  CHECK(clash.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(findShotPresetIndex(clash, FACTORY_PRESET_ID_RISTRETTO) < 0);
+  CHECK(deleteShotPreset(clash, customId));
+  addMissingRistrettoShotPreset(clash);
+  CHECK(clash.count == FACTORY_PRESET_COUNT + 2);
+  CHECK(findShotPresetIndex(clash, FACTORY_PRESET_ID_RISTRETTO) == FACTORY_PRESET_COUNT);
+
+  // A full pre-Ristretto bank has no room; it upgrades once a slot frees.
+  ShotPresetBank full;
+  seedDefaultShotPresetBank(full);
+  for (uint8_t i = FACTORY_PRESET_COUNT; i + 1 < full.count; ++i)
+    full.presets[i] = full.presets[i + 1];
+  full.count = FACTORY_PRESET_COUNT + 1;
+  while (full.count < MAX_SHOT_PRESETS) {
+    uint8_t id = 0;
+    CHECK(createUntitledShotPreset(full, id));
+  }
+  CHECK(full.count == MAX_SHOT_PRESETS);
+  addMissingRistrettoShotPreset(full);
+  CHECK(full.count == MAX_SHOT_PRESETS);
+  CHECK(findShotPresetIndex(full, FACTORY_PRESET_ID_RISTRETTO) < 0);
 }
 
 void p16_static_ip_address_validation() {
@@ -3157,6 +3243,18 @@ void p91_schema2_golden_settings_blob_loads() {
   const ShotPreset *custom = findShotPreset(loaded.presets, FACTORY_PRESET_COUNT + 1);
   CHECK(custom != nullptr && strcmp(custom->name, "Golden") == 0 && !custom->isFactory);
   CHECK(!custom->fastSideEnabled && custom->goalWeightDg == FACTORY_SINGLE_GOAL_WEIGHT_DG);
+  // The blob predates Ristretto: the boot upgrade inserts it after the
+  // recipe-factory block, before Manual and the custom preset.
+  addMissingRistrettoShotPreset(loaded.presets);
+  CHECK(loaded.presets.count == FACTORY_PRESET_COUNT + 3);
+  const ShotPreset &upgraded = loaded.presets.presets[FACTORY_PRESET_COUNT];
+  CHECK(upgraded.id == FACTORY_PRESET_ID_RISTRETTO && upgraded.isFactory &&
+        strcmp(upgraded.name, "Ristretto") == 0);
+  CHECK(loaded.presets.presets[FACTORY_PRESET_COUNT + 1].id == FACTORY_PRESET_ID_MANUAL);
+  CHECK(loaded.presets.presets[FACTORY_PRESET_COUNT + 2].id == FACTORY_PRESET_COUNT + 1);
+  CHECK(validateShotPresetBank(loaded.presets, DEFAULT_RETARE_WINDOW_MS, true));
+  addMissingRistrettoShotPreset(loaded.presets);  // Idempotent.
+  CHECK(loaded.presets.count == FACTORY_PRESET_COUNT + 3);
 }
 
 // Assigns every table member a value that differs from its default.
@@ -3855,6 +3953,7 @@ const TestCase tests[] = {
     {"P45", p45_scale_mac_nvs_ignores_seq_and_defers_while_linked},
     {"P44", p44_scale_history_canonicalizes_mac_case},
     {"P24", p24_preset_bank_size_and_crud_budgets},
+    {"P24B", p24b_missing_ristretto_preset_upgrades_on_boot},
     {"P25", p25_invalid_active_id_keeps_customs},
     {"P26", p26_save_candidate_validation_does_not_require_live_mutation},
     {"P35", p35_invalid_fast_extraction_recipe_keeps_custom},

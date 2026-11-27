@@ -272,9 +272,9 @@ update therefore yields the same hint, and no settings or shot-log schema
 field exists for it. Cup
 protection, accidental-touch, touch-stop fallback and the scale-loss backup
 switch are device-level `RuntimeConfig` fields and are never overlaid from a
-preset. A fresh or factory-reset bank holds four permanent factory presets (ids
-1–4: Double · Adaptive, Single · Adaptive, Double · Fixed, Single · Fixed);
-they can be restored but not deleted. A golden schema-2 blob in the host tests
+preset. A fresh or factory-reset bank holds six permanent factory presets (ids
+1–4: Double · Adaptive, Single · Adaptive, Double · Fixed, Single · Fixed;
+254: Ristretto; 255: Manual); they can be restored but not deleted. A golden schema-2 blob in the host tests
 proves later firmware keeps settings across OTA. Candidate
 anchors/observations and the held outlier live in control-owned RAM
 (`BbwLearningBank`) and survive restarts as NVS key `bbwLearn`, saved by the

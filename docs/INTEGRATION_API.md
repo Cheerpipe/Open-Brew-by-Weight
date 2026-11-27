@@ -743,11 +743,12 @@ so Home Assistant's read after the `end` webhook already returns the new
 arrival.
 
 Preset IDs are stable while an item exists and names are unique. A fresh or
-factory-reset controller has the five factory presets (ids 1–4 and 255),
+factory-reset controller has the six factory presets (ids 1–4, 254 and 255),
 which can be restored but not deleted. User presets never receive a factory id.
-Manual (id 255) has brew by weight off. A controller updated from earlier
-firmware appends it on restart when a slot is free and no preset is named
-"Manual".
+Ristretto (id 254) always stops at its 27 g target (1:1.5, window 20–28 s,
+92.0 °C brew target on a Linea Micra). Manual (id 255) has brew by weight off.
+A controller updated from earlier firmware gains Ristretto after Single · Fixed
+on restart when a slot is free and no preset is named "Ristretto".
 
 ### `GET /api/v1/integration/shots/last`
 

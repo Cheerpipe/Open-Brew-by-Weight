@@ -966,18 +966,19 @@ enum class ConfigValidationError : uint8_t {
 
 constexpr size_t MAX_SHOT_PRESETS = 8;
 constexpr size_t SHOT_PRESET_NAME_CAPACITY = 24;
-// Permanent factory presets (Restore available, never deletable): ids 1–4 and
-// Manual. Manual uses a reserved id because user presets are allocated from 5
-// and shot history is keyed by preset id.
+// Permanent factory presets (Restore available, never deletable): ids 1–4
+// plus the two reserved ones. Ristretto and Manual use reserved ids because
+// user presets are allocated from 5 and shot history is keyed by preset id.
 constexpr uint8_t FACTORY_PRESET_ID_DOUBLE_ADAPTIVE = 1;
 constexpr uint8_t FACTORY_PRESET_ID_SINGLE_ADAPTIVE = 2;
 constexpr uint8_t FACTORY_PRESET_ID_DOUBLE_FIXED = 3;
 constexpr uint8_t FACTORY_PRESET_ID_SINGLE_FIXED = 4;
 constexpr uint8_t FACTORY_PRESET_COUNT = 4;
+constexpr uint8_t FACTORY_PRESET_ID_RISTRETTO = 254;
 constexpr uint8_t FACTORY_PRESET_ID_MANUAL = 255;
 inline bool factoryShotPresetId(uint8_t id) {
   return (id >= 1 && id <= FACTORY_PRESET_COUNT) ||
-         id == FACTORY_PRESET_ID_MANUAL;
+         id == FACTORY_PRESET_ID_RISTRETTO || id == FACTORY_PRESET_ID_MANUAL;
 }
 constexpr float FACTORY_SINGLE_WEIGHT_OFFSET_G = DEFAULT_WEIGHT_OFFSET_G;
 constexpr uint16_t FACTORY_SINGLE_GOAL_WEIGHT_DG = 180;
@@ -987,6 +988,14 @@ constexpr uint16_t FACTORY_SINGLE_SLOW_MARGIN_DG = 15;
 constexpr uint32_t FACTORY_SINGLE_FAST_BEFORE_MS = 23000;
 constexpr uint32_t FACTORY_SINGLE_SLOW_AFTER_MS = 32000;
 constexpr uint16_t FACTORY_SINGLE_DOSE_DG = 90;
+
+// Ristretto cuts the Double recipe early (1:1.5) without a finer grind: the
+// window covers its faster pace, and the 92.0 °C brew target rounds the
+// shorter extraction.
+constexpr uint16_t FACTORY_RISTRETTO_GOAL_WEIGHT_DG = 270;
+constexpr uint32_t FACTORY_RISTRETTO_FAST_BEFORE_MS = 20000;
+constexpr uint32_t FACTORY_RISTRETTO_SLOW_AFTER_MS = 28000;
+constexpr uint16_t FACTORY_RISTRETTO_BREW_TARGET_DECI_C = 920;
 
 // Largest encoded settings blob any firmware may write or must read. It never
 // shrinks, so earlier firmware can still read a later blob. The 101-page nvs

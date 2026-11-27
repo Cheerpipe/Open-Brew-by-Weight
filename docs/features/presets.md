@@ -1,9 +1,9 @@
 # Presets
 
-Presets store brew recipes. A new controller comes with five factory presets:
+Presets store brew recipes. A new controller comes with six factory presets:
 **Double · Adaptive**, **Single · Adaptive**, **Double · Fixed**,
-**Single · Fixed** and **Manual** (active until you pick another one, for
-example on the first-time setup page). Adaptive presets run fast shots a little
+**Single · Fixed**, **Ristretto** and **Manual** (active until you pick another
+one, for example on the first-time setup page). Adaptive presets run fast shots a little
 longer and stop slow shots a little sooner; Fixed presets always stop at the
 target (see [Fast and slow shots](fast-and-slow-shots.md)). **Manual** never
 stops the shot for you: pick it when you want to end each shot yourself, then
@@ -174,7 +174,7 @@ afterwards shows the normal Home.
 
 Duplicate names receive a suffix, such as "Espresso copy 2"; long names are
 shortened so the suffix fits. You can keep up to eight presets in total, the
-five factory presets included. Once you have eight, New
+six factory presets included. Once you have eight, New
 and Duplicate stop creating cards — delete one of your own presets to make room
 for a new one. Factory presets can be restored but not deleted. The active
 preset survives reboot.
@@ -203,7 +203,8 @@ asynchronous active-preset change cannot redirect those values to another recipe
 With a Linea Micra account connected and **Machine settings in presets** on,
 each preset also has a **Machine** group with the brew temperature, the steam
 boiler on or off, and the steam power (level 1–3). New and factory-reset
-presets start at 91.0 °C with steam on at level 3; duplicating a preset copies
+presets start at 91.0 °C with steam on at level 3 (Ristretto starts at
+92.0 °C); duplicating a preset copies
 these values, and turning the option off or disconnecting the account does not
 erase them. Choosing a preset, saving a change to the active one, or
 connecting the scale sends the Micra only the settings it doesn't already
@@ -213,20 +214,26 @@ see [machine settings in presets](../settings/linea-micra.md#machine-settings-in
 
 ## Factory recipes
 
-| Value | Double · Adaptive | Single · Adaptive | Double · Fixed | Single · Fixed |
-| --- | ---: | ---: | ---: | ---: |
-| Dose | 18 g | 9 g | 18 g | 9 g |
-| Target yield | 36 g | 18 g | 36 g | 18 g |
-| Shot time window | 27–36 s | 23–32 s | 27–36 s | 23–32 s |
-| Extend fast shots: extend by up to | 6 g (42 g) | 3 g (21 g) | off (6 g saved) | off (4 g saved) |
-| Shorten slow shots: shorten by up to | 3 g (33 g) | 1.5 g (16.5 g) | off (3 g saved) | off (1.5 g saved) |
-| Fast and slow transitions | 6 s, Gentle: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) |
-| Drip correction | 0.1 g | 0.1 g | 0.1 g | 0.1 g |
+| Value | Double · Adaptive | Single · Adaptive | Double · Fixed | Single · Fixed | Ristretto |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Dose | 18 g | 9 g | 18 g | 9 g | 18 g |
+| Target yield | 36 g | 18 g | 36 g | 18 g | 27 g |
+| Shot time window | 27–36 s | 23–32 s | 27–36 s | 23–32 s | 20–28 s |
+| Extend fast shots: extend by up to | 6 g (42 g) | 3 g (21 g) | off (6 g saved) | off (4 g saved) | off (6 g saved) |
+| Shorten slow shots: shorten by up to | 3 g (33 g) | 1.5 g (16.5 g) | off (3 g saved) | off (1.5 g saved) | off (3 g saved) |
+| Fast and slow transitions | 6 s, Gentle: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) |
+| Drip correction | 0.1 g | 0.1 g | 0.1 g | 0.1 g | 0.1 g |
 
-All four start with brew by weight and grind hints on, Max shot time 50 s,
+All six start with brew by weight and grind hints on, Max shot time 50 s,
 Earliest weight stop 12 s, and no fixed scale-loss stop time. The Fixed
 presets keep their fast and slow amounts saved but switched off, so they always
 stop at the target — useful while dialing in a new coffee.
+
+**Ristretto** cuts the Double recipe early: same dose and grind, and the shot
+always stops at 27 g (1:1.5). The cup keeps the first, most concentrated part
+of the extraction — smaller, denser and brighter than the Double presets,
+without touching the grinder. It never extends fast shots, and on a Linea
+Micra it brews at 92.0 °C to round the shorter extraction.
 
 **Manual** keeps the Double · Adaptive values, but brew by weight, Extend fast
 shots and Shorten slow shots are off, so the shot runs until you stop it. Its
@@ -237,11 +244,11 @@ does not change them.
 Every factory preset, Manual included, can be returned to these values with
 **Restore** but never deleted.
 
-If you update a controller that already has presets, Manual appears at the
-end of your list after the update restarts it. It is added only when there is
-a free slot and none of your presets is already called "Manual"; otherwise
-your list stays as it is, and Manual appears after a later restart once a slot
-is free and the name is available.
+If you update a controller that already has presets, Ristretto appears between
+Single · Fixed and Manual after the update restarts it. It is added only when
+there is a free slot and none of your presets is already called "Ristretto";
+otherwise your list stays as it is, and Ristretto appears after a later
+restart once a slot is free and the name is available.
 
 Learning follows the preset. New and factory recipes seed the offset from
 the table above and use current/base α=0.30. Duplicating a preset copies the

@@ -462,6 +462,7 @@ void startAfterBootRecovery() {
     presetBank = persistedSettings.presets;
     ensureShotPresetBank(presetBank, runtimeConfig.retareWindowMs,
                          runtimeConfig.autoRetare);
+    addMissingRistrettoShotPreset(presetBank);
     QuickStartRecord storedQuickStart;
     if (bootQuickStart(bbwQuickStart, freshSettings, presetBank,
                        loadQuickStart(storedQuickStart) ? &storedQuickStart : nullptr))
