@@ -218,7 +218,7 @@ see [machine settings in presets](../settings/linea-micra.md#machine-settings-in
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Dose | 18 g | 9 g | 18 g | 9 g | 18 g |
 | Target yield | 36 g | 18 g | 36 g | 18 g | 27 g |
-| Shot time window | 27–36 s | 23–32 s | 27–36 s | 23–32 s | 20–28 s |
+| Shot time window | 27–36 s | 23–32 s | 27–36 s | 23–32 s | 22–29 s |
 | Extend fast shots: extend by up to | 6 g (42 g) | 3 g (21 g) | off (6 g saved) | off (4 g saved) | off (6 g saved) |
 | Shorten slow shots: shorten by up to | 3 g (33 g) | 1.5 g (16.5 g) | off (3 g saved) | off (1.5 g saved) | off (3 g saved) |
 | Fast and slow transitions | 6 s, Gentle: Steep early (fast), Steep late (slow) | same as Double | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) | 5 s, Even, Gentle (saved) |

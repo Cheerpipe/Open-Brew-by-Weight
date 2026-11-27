@@ -989,12 +989,15 @@ constexpr uint32_t FACTORY_SINGLE_FAST_BEFORE_MS = 23000;
 constexpr uint32_t FACTORY_SINGLE_SLOW_AFTER_MS = 32000;
 constexpr uint16_t FACTORY_SINGLE_DOSE_DG = 90;
 
-// Ristretto cuts the Double recipe early (1:1.5) without a finer grind: the
-// window covers its faster pace, and the 92.0 °C brew target rounds the
-// shorter extraction.
+// Ristretto cuts the Double recipe early (1:1.5) without a finer grind. The
+// window maps the Double band through the shared pour trajectory: with the
+// preinfusion phase P kept whole and the main pour scaled by 27/36,
+// t = P + 0.75 * (T_double - P), giving [22.0, 28.75] s at P = 7 s (rounded
+// to the 500 ms grid) and a 25.5 s center. The 92.0 °C brew target rounds
+// the shorter extraction.
 constexpr uint16_t FACTORY_RISTRETTO_GOAL_WEIGHT_DG = 270;
-constexpr uint32_t FACTORY_RISTRETTO_FAST_BEFORE_MS = 20000;
-constexpr uint32_t FACTORY_RISTRETTO_SLOW_AFTER_MS = 28000;
+constexpr uint32_t FACTORY_RISTRETTO_FAST_BEFORE_MS = 22000;
+constexpr uint32_t FACTORY_RISTRETTO_SLOW_AFTER_MS = 29000;
 constexpr uint16_t FACTORY_RISTRETTO_BREW_TARGET_DECI_C = 920;
 
 // Largest encoded settings blob any firmware may write or must read. It never

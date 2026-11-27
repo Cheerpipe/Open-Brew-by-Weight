@@ -745,7 +745,7 @@ arrival.
 Preset IDs are stable while an item exists and names are unique. A fresh or
 factory-reset controller has the six factory presets (ids 1–4, 254 and 255),
 which can be restored but not deleted. User presets never receive a factory id.
-Ristretto (id 254) always stops at its 27 g target (1:1.5, window 20–28 s,
+Ristretto (id 254) always stops at its 27 g target (1:1.5, window 22–29 s,
 92.0 °C brew target on a Linea Micra). Manual (id 255) has brew by weight off.
 A controller updated from earlier firmware gains Ristretto after Single · Fixed
 on restart when a slot is free and no preset is named "Ristretto".
