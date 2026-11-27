@@ -1313,6 +1313,14 @@ void p24_preset_bank_size_and_crud_budgets() {
     uint8_t wrappedId = 0;
     CHECK(createUntitledShotPreset(restored, wrappedId));
     CHECK(wrappedId == FACTORY_PRESET_COUNT + 1);
+    // Same guarantee while the boot upgrade has not inserted Ristretto yet
+    // (full bank or taken name on a pre-Ristretto controller).
+    ShotPresetBank unupgraded = restored;
+    CHECK(deleteShotPreset(unupgraded, wrappedId));
+    unupgraded.nextId = FACTORY_PRESET_ID_RISTRETTO;
+    uint8_t skippedId = 0;
+    CHECK(createUntitledShotPreset(unupgraded, skippedId));
+    CHECK(skippedId == FACTORY_PRESET_COUNT + 1);
   }
 
   {

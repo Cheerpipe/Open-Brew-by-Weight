@@ -400,7 +400,9 @@ inline bool allocateShotPresetId(ShotPresetBank &bank, uint8_t &outId) {
   for (uint16_t attempt = 0; attempt < 256; ++attempt) {
     const uint8_t candidate = bank.nextId == 0 ? 1 : bank.nextId;
     bank.nextId = static_cast<uint8_t>(candidate + 1);
-    if (candidate == 0) {
+    // Reserved factory ids stay out of user reach even when the boot upgrade
+    // has not inserted their preset yet (full bank or taken name).
+    if (candidate == 0 || factoryShotPresetId(candidate)) {
       continue;
     }
     if (findShotPresetIndex(bank, candidate) < 0) {
